@@ -93,7 +93,8 @@ export const postToApi = async <T>({
         });
       }
 
-      throw errorInformation.value;
+      // throw errorInformation.value;
+      return errorInformation.value;
     }
 
     try {
