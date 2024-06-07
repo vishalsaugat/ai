@@ -16,7 +16,7 @@ import { openaiFailedResponseHandler } from './openai-error';
 type OpenAIEmbeddingConfig = {
   provider: string;
   baseURL: string;
-  queryString: string;
+  queryString?: string;
   headers: () => Record<string, string | undefined>;
 };
 

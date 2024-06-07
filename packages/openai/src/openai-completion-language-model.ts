@@ -27,7 +27,7 @@ import {
 type OpenAICompletionConfig = {
   provider: string;
   baseURL: string;
-  queryString: string,
+  queryString?: string,
   compatibility: 'strict' | 'compatible';
   headers: () => Record<string, string | undefined>;
 };
