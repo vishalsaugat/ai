@@ -1,5 +1,5 @@
 {
-  "name": "@ai-sdk/openai",
+  "name": "@vishalai/openai",
   "version": "0.0.24",
   "license": "Apache-2.0",
   "sideEffects": false,
