@@ -1,5 +1,62 @@
 # ai
 
+## 3.1.30
+
+### Patch Changes
+
+- fcf4323b: fix (core): filter out empty assistant text messages
+
+## 3.1.29
+
+### Patch Changes
+
+- 28427d3e: feat (core): add streamObject onFinish callback
+
+## 3.1.28
+
+### Patch Changes
+
+- 102ca22f: feat (core): add object promise to streamObject result
+- Updated dependencies [102ca22f]
+  - @ai-sdk/provider@0.0.10
+  - @ai-sdk/provider-utils@0.0.13
+
+## 3.1.27
+
+### Patch Changes
+
+- c9198d4d: feat (ui): send annotation and data fields in useChat when sendExtraMessageFields is true
+- Updated dependencies [09295e2e]
+- Updated dependencies [09295e2e]
+- Updated dependencies [043a5de2]
+  - @ai-sdk/provider@0.0.9
+  - @ai-sdk/provider-utils@0.0.12
+
+## 3.1.26
+
+### Patch Changes
+
+- 5ee44cae: feat (provider): langchain StringOutputParser support
+
+## 3.1.25
+
+### Patch Changes
+
+- ff281126: fix(ai/rsc): Remove extra reconcilation of streamUI
+
+## 3.1.24
+
+### Patch Changes
+
+- 93cae126: fix(ai/rsc): Fix unsafe {} type in application code for StreamableValue
+- 08b5c509: feat (core): add tokenUsage to streamObject result
+
+## 3.1.23
+
+### Patch Changes
+
+- c03cafe6: chore (core, ui): rename maxAutomaticRoundtrips to maxToolRoundtrips
+
 ## 3.1.22
 
 ### Patch Changes
