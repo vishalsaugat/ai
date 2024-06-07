@@ -109,7 +109,7 @@ export function createOpenAI(
 ): OpenAIProvider {
   const baseURL =
     (withoutTrailingSlash(options.baseURL ?? options.baseUrl) ??
-    'https://api.openai.com/v1') + options.queryString || '';
+    'https://api.openai.com/v1');
 
   // we default to compatible, because strict breaks providers like Groq:
   const compatibility = options.compatibility ?? 'compatible';
@@ -132,6 +132,7 @@ export function createOpenAI(
     new OpenAIChatLanguageModel(modelId, settings, {
       provider: 'openai.chat',
       baseURL,
+      queryString: options.queryString || '',
       headers: getHeaders,
       compatibility,
     });
@@ -143,6 +144,7 @@ export function createOpenAI(
     new OpenAICompletionLanguageModel(modelId, settings, {
       provider: 'openai.completion',
       baseURL,
+      queryString: options.queryString || '',
       headers: getHeaders,
       compatibility,
     });
@@ -154,6 +156,7 @@ export function createOpenAI(
     new OpenAIEmbeddingModel(modelId, settings, {
       provider: 'openai.embedding',
       baseURL,
+      queryString: options.queryString || '',
       headers: getHeaders,
     });
 

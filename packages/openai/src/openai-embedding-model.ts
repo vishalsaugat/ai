@@ -16,6 +16,7 @@ import { openaiFailedResponseHandler } from './openai-error';
 type OpenAIEmbeddingConfig = {
   provider: string;
   baseURL: string;
+  queryString: string;
   headers: () => Record<string, string | undefined>;
 };
 
@@ -64,7 +65,7 @@ export class OpenAIEmbeddingModel implements EmbeddingModelV1<string> {
     }
 
     const { responseHeaders, value: response } = await postJsonToApi({
-      url: `${this.config.baseURL}/embeddings`,
+      url: `${this.config.baseURL}/embeddings${this.config.queryString}`,
       headers: this.config.headers(),
       body: {
         model: this.modelId,

@@ -27,6 +27,7 @@ import {
 type OpenAIChatConfig = {
   provider: string;
   baseURL: string;
+  queryString?: string;
   compatibility: 'strict' | 'compatible';
   headers: () => Record<string, string | undefined>;
 };
@@ -145,7 +146,7 @@ export class OpenAIChatLanguageModel implements LanguageModelV1 {
     const args = this.getArgs(options);
 
     const { responseHeaders, value: response } = await postJsonToApi({
-      url: `${this.config.baseURL}/chat/completions`,
+      url: `${this.config.baseURL}/chat/completions${this.config.queryString}`,
       headers: this.config.headers(),
       body: args,
       failedResponseHandler: openaiFailedResponseHandler,
@@ -184,7 +185,7 @@ export class OpenAIChatLanguageModel implements LanguageModelV1 {
     const args = this.getArgs(options);
 
     const { responseHeaders, value: response } = await postJsonToApi({
-      url: `${this.config.baseURL}/chat/completions`,
+      url: `${this.config.baseURL}/chat/completions${this.config.queryString}`,
       headers: this.config.headers(),
       body: {
         ...args,
