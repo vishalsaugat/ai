@@ -54,9 +54,19 @@ Base URL for the OpenAI API calls.
   baseURL?: string;
 
   /**
-   * Query string to append to the base URL.
+Query string to append to the base URL.
    */
-   queryString?: string;
+  queryString?: string;
+
+  /**
+Environment variable name for the API key.
+   */
+  environmentVariableName?: string;
+
+  /**
+Key for the Authorization header.
+   */
+  authHeaderKey?: string;
 
   /**
 @deprecated Use `baseURL` instead.
@@ -99,17 +109,17 @@ export function createOpenAI(
 ): OpenAIProvider {
   const baseURL =
     (withoutTrailingSlash(options.baseURL ?? options.baseUrl) ??
-    'https://api.openai.com/v1') + options.queryString ?? '';
+    'https://api.openai.com/v1') + options.queryString || '';
 
   // we default to compatible, because strict breaks providers like Groq:
   const compatibility = options.compatibility ?? 'compatible';
 
   const getHeaders = () => ({
-    Authorization: `Bearer ${loadApiKey({
+    [`${options.authHeaderKey|| 'Authorization'}`]: loadApiKey({
       apiKey: options.apiKey,
-      environmentVariableName: 'OPENAI_API_KEY',
+      environmentVariableName: options.environmentVariableName || 'OPENAI_API_KEY',
       description: 'OpenAI',
-    })}`,
+    }),
     'OpenAI-Organization': options.organization,
     'OpenAI-Project': options.project,
     ...options.headers,
