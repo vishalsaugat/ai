@@ -1,5 +1,5 @@
 {
-  "name": "@ai-sdk/anthropic",
+  "name": "@vishalai/anthropic",
   "version": "0.0.19",
   "license": "Apache-2.0",
   "sideEffects": false,

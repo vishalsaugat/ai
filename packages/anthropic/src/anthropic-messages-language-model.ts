@@ -88,6 +88,7 @@ export class AnthropicMessagesLanguageModel implements LanguageModelV1 {
     const messagesPrompt = await convertToAnthropicMessagesPrompt({ prompt });
 
     const baseArgs = {
+      "anthropic_version": "vertex-2023-10-16",
       // model id:
       model: this.modelId,
 
@@ -155,7 +156,7 @@ export class AnthropicMessagesLanguageModel implements LanguageModelV1 {
     const { args, warnings } = await this.getArgs(options);
 
     const { responseHeaders, value: response } = await postJsonToApi({
-      url: `${this.config.baseURL}/messages`,
+      url: `${this.config.baseURL}`,
       headers: this.config.headers(),
       body: args,
       failedResponseHandler: anthropicFailedResponseHandler,
@@ -211,7 +212,7 @@ export class AnthropicMessagesLanguageModel implements LanguageModelV1 {
     const { args, warnings } = await this.getArgs(options);
 
     const { responseHeaders, value: response } = await postJsonToApi({
-      url: `${this.config.baseURL}/messages`,
+      url: `${this.config.baseURL}`,
       headers: this.config.headers(),
       body: {
         ...args,
