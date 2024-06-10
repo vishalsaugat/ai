@@ -1,4 +1,3 @@
-import { loadApiKey, withoutTrailingSlash } from '@ai-sdk/provider-utils';
 import { AnthropicMessagesLanguageModel } from './anthropic-messages-language-model';
 import {
   AnthropicMessagesModelId,
@@ -23,8 +22,7 @@ export class Anthropic {
    * Creates a new Anthropic provider instance.
    */
   constructor(options: AnthropicProviderSettings = {}) {
-    this.baseURL =
-      withoutTrailingSlash(options.baseURL ?? options.baseUrl) ??
+    this.baseURL = options.baseURL ?? options.baseUrl ??
       'https://api.anthropic.com/v1';
     this.apiKey = options.apiKey;
     this.headers = options.headers;
@@ -34,13 +32,6 @@ export class Anthropic {
     return {
       baseURL: this.baseURL,
       headers: () => ({
-        'anthropic-version': '2023-06-01',
-        'anthropic-beta': 'tools-2024-04-04',
-        'x-api-key': loadApiKey({
-          apiKey: this.apiKey,
-          environmentVariableName: 'ANTHROPIC_API_KEY',
-          description: 'Anthropic',
-        }),
         ...this.headers,
       }),
     };

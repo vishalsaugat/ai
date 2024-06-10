@@ -231,7 +231,6 @@ export class AnthropicMessagesLanguageModel implements LanguageModelV1 {
       });
       const client = await googleAuth.getClient();
       const { token } = await client.getAccessToken();
-      console.log(token)
       otherHeaders['Authorization'] = `Bearer ${token}`;
     }
 

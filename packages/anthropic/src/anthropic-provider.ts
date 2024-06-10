@@ -1,4 +1,3 @@
-import { loadApiKey, withoutTrailingSlash } from '@ai-sdk/provider-utils';
 import { GoogleAuthOptions } from 'google-auth-library';
 import { AnthropicMessagesLanguageModel } from './anthropic-messages-language-model';
 import {
@@ -73,17 +72,10 @@ export function createAnthropic(
   options: AnthropicProviderSettings = {},
 ): AnthropicProvider {
   const baseURL =
-    withoutTrailingSlash(options.baseURL ?? options.baseUrl) ??
+    options.baseURL ?? options.baseUrl ??
     'https://api.anthropic.com/v1';
 
   const getHeaders = () => ({
-    'anthropic-version': '2023-06-01',
-    'anthropic-beta': 'tools-2024-05-16',
-    'x-api-key': loadApiKey({
-      apiKey: options.apiKey,
-      environmentVariableName: 'ANTHROPIC_API_KEY',
-      description: 'Anthropic',
-    }),
     googleAuthOptions: options.googleAuthOptions,
     ...options.headers,
   });
