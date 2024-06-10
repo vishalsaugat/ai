@@ -1,4 +1,5 @@
 import { loadApiKey, withoutTrailingSlash } from '@ai-sdk/provider-utils';
+import { GoogleAuthOptions } from 'google-auth-library';
 import { AnthropicMessagesLanguageModel } from './anthropic-messages-language-model';
 import {
   AnthropicMessagesModelId,
@@ -50,6 +51,14 @@ It defaults to the `ANTHROPIC_API_KEY` environment variable.
   apiKey?: string;
 
   /**
+  * Optional. The Authentication options provided by google-auth-library.
+  * Complete list of authentication options is documented in the
+  * GoogleAuthOptions interface:
+  * https://github.com/googleapis/google-auth-library-nodejs/blob/main/src/auth/googleauth.ts.
+   */
+  googleAuthOptions?: GoogleAuthOptions;
+
+  /**
 Custom headers to include in the requests.
      */
   headers?: Record<string, string>;
@@ -75,6 +84,7 @@ export function createAnthropic(
       environmentVariableName: 'ANTHROPIC_API_KEY',
       description: 'Anthropic',
     }),
+    googleAuthOptions: options.googleAuthOptions,
     ...options.headers,
   });
 

@@ -4,24 +4,24 @@ The **[Anthropic provider](https://sdk.vercel.ai/providers/ai-sdk-providers/anth
 
 ## Setup
 
-The Anthropic provider is available in the `@ai-sdk/anthropic` module. You can install it with
+The Anthropic provider is available in the `@vishalai/anthropic` module. You can install it with
 
 ```
-npm i @ai-sdk/anthropic
+npm i @vishalai/anthropic
 ```
 
 ## Provider Instance
 
-You can import the default provider instance `anthropic` from `@ai-sdk/anthropic`:
+You can import the default provider instance `anthropic` from `@vishalai/anthropic`:
 
 ```ts
-import { anthropic } from '@ai-sdk/anthropic';
+import { anthropic } from '@vishalai/anthropic';
 ```
 
 ## Example
 
 ```ts
-import { anthropic } from '@ai-sdk/anthropic';
+import { anthropic } from '@vishalai/anthropic';
 import { generateText } from 'ai';
 
 const { text } = await generateText({

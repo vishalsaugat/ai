@@ -12,6 +12,7 @@ import {
   createJsonResponseHandler,
   postJsonToApi,
 } from '@ai-sdk/provider-utils';
+import { GoogleAuthOptions, GoogleAuth } from 'google-auth-library';
 import { z } from 'zod';
 import { anthropicFailedResponseHandler } from './anthropic-error';
 import {
@@ -24,7 +25,7 @@ import { mapAnthropicStopReason } from './map-anthropic-stop-reason';
 type AnthropicMessagesConfig = {
   provider: string;
   baseURL: string;
-  headers: () => Record<string, string | undefined>;
+  headers: () => Record<string, string | undefined | any>;
 };
 
 export class AnthropicMessagesLanguageModel implements LanguageModelV1 {
@@ -90,7 +91,7 @@ export class AnthropicMessagesLanguageModel implements LanguageModelV1 {
     const baseArgs = {
       "anthropic_version": "vertex-2023-10-16",
       // model id:
-      model: this.modelId,
+      // model: this.modelId,
 
       // model specific settings:
       top_k: this.settings.topK,
@@ -155,9 +156,20 @@ export class AnthropicMessagesLanguageModel implements LanguageModelV1 {
   ): Promise<Awaited<ReturnType<LanguageModelV1['doGenerate']>>> {
     const { args, warnings } = await this.getArgs(options);
 
+    let { googleAuthOptions, ...otherHeaders } = this.config.headers();
+    if (googleAuthOptions) {
+      const googleAuth = new GoogleAuth({
+        scopes: 'https://www.googleapis.com/auth/cloud-platform',
+        credentials: googleAuthOptions.credentials,
+      });
+      const client = await googleAuth.getClient();
+      const { token } = await client.getAccessToken();
+      otherHeaders['Authorization'] = `Bearer ${token}`;
+    }
+
     const { responseHeaders, value: response } = await postJsonToApi({
       url: `${this.config.baseURL}`,
-      headers: this.config.headers(),
+      headers: otherHeaders,
       body: args,
       failedResponseHandler: anthropicFailedResponseHandler,
       successfulResponseHandler: createJsonResponseHandler(
@@ -211,9 +223,21 @@ export class AnthropicMessagesLanguageModel implements LanguageModelV1 {
   ): Promise<Awaited<ReturnType<LanguageModelV1['doStream']>>> {
     const { args, warnings } = await this.getArgs(options);
 
+    let { googleAuthOptions, ...otherHeaders } = this.config.headers();
+    if (googleAuthOptions) {
+      const googleAuth = new GoogleAuth({
+        scopes: 'https://www.googleapis.com/auth/cloud-platform',
+        credentials: googleAuthOptions.credentials,
+      });
+      const client = await googleAuth.getClient();
+      const { token } = await client.getAccessToken();
+      console.log(token)
+      otherHeaders['Authorization'] = `Bearer ${token}`;
+    }
+
     const { responseHeaders, value: response } = await postJsonToApi({
       url: `${this.config.baseURL}`,
-      headers: this.config.headers(),
+      headers: otherHeaders,
       body: {
         ...args,
         stream: true,
