@@ -6,7 +6,7 @@ The **[Anthropic provider](https://sdk.vercel.ai/providers/ai-sdk-providers/anth
 
 The Anthropic provider is available in the `@vishalai/anthropic` module. You can install it with
 
-```
+```gi
 npm i @vishalai/anthropic
 ```
 

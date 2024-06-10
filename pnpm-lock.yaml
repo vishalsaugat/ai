@@ -43,7 +43,7 @@ importers:
     dependencies:
       '@ai-sdk/anthropic':
         specifier: latest
-        version: link:../../packages/anthropic
+        version: 0.0.19(zod@3.23.8)
       '@ai-sdk/google':
         specifier: latest
         version: link:../../packages/google
@@ -55,7 +55,7 @@ importers:
         version: link:../../packages/mistral
       '@ai-sdk/openai':
         specifier: latest
-        version: link:../../packages/openai
+        version: 0.0.18(zod@3.23.8)
       ai:
         specifier: latest
         version: link:../../packages/core
@@ -86,7 +86,7 @@ importers:
     dependencies:
       '@ai-sdk/openai':
         specifier: latest
-        version: link:../../packages/openai
+        version: 0.0.18(zod@3.23.8)
       '@radix-ui/react-icons':
         specifier: ^1.3.0
         version: 1.3.0(react@18.2.0)
@@ -437,7 +437,7 @@ importers:
     dependencies:
       '@ai-sdk/openai':
         specifier: latest
-        version: link:../../packages/openai
+        version: 0.0.18(zod@3.23.8)
       ai:
         specifier: latest
         version: link:../../packages/core
@@ -544,7 +544,7 @@ importers:
     dependencies:
       '@ai-sdk/openai':
         specifier: latest
-        version: link:../../packages/openai
+        version: 0.0.18(zod@3.23.8)
       ai:
         specifier: latest
         version: link:../../packages/core
@@ -694,7 +694,7 @@ importers:
     dependencies:
       '@ai-sdk/anthropic':
         specifier: latest
-        version: link:../../packages/anthropic
+        version: 0.0.19(zod@3.23.8)
       '@ai-sdk/google':
         specifier: latest
         version: link:../../packages/google
@@ -703,7 +703,7 @@ importers:
         version: link:../../packages/mistral
       '@ai-sdk/openai':
         specifier: latest
-        version: link:../../packages/openai
+        version: 0.0.18(zod@3.23.8)
       ai:
         specifier: latest
         version: link:../../packages/core
@@ -782,7 +782,7 @@ importers:
     dependencies:
       '@ai-sdk/openai':
         specifier: latest
-        version: link:../../packages/openai
+        version: 0.0.18(zod@3.23.8)
       '@solidjs/meta':
         specifier: 0.29.3
         version: 0.29.3(solid-js@1.8.7)
@@ -828,7 +828,7 @@ importers:
     dependencies:
       '@ai-sdk/openai':
         specifier: latest
-        version: link:../../packages/openai
+        version: 0.0.18(zod@3.23.8)
       ai:
         specifier: latest
         version: link:../../packages/core
@@ -878,6 +878,9 @@ importers:
       '@ai-sdk/provider-utils':
         specifier: 0.0.13
         version: link:../provider-utils
+      google-auth-library:
+        specifier: ^9.10.0
+        version: 9.10.0
     devDependencies:
       '@types/node':
         specifier: ^18
@@ -894,6 +897,40 @@ importers:
       zod:
         specifier: 3.23.8
         version: 3.23.8
+
+  packages/anthropic-vertex:
+    dependencies:
+      '@ai-sdk/provider':
+        specifier: 0.0.10
+        version: link:../provider
+      '@ai-sdk/provider-utils':
+        specifier: 0.0.13
+        version: link:../provider-utils
+      '@anthropic-ai/vertex-sdk':
+        specifier: ^0.4.0
+        version: 0.4.0
+      '@google-cloud/vertexai':
+        specifier: 1.2.0
+        version: 1.2.0
+      json-schema:
+        specifier: 0.4.0
+        version: 0.4.0
+    devDependencies:
+      '@types/json-schema':
+        specifier: 7.0.15
+        version: 7.0.15
+      '@types/node':
+        specifier: ^18
+        version: 18.18.9
+      '@vercel/ai-tsconfig':
+        specifier: workspace:*
+        version: link:../../tools/tsconfig
+      tsup:
+        specifier: ^8
+        version: 8.0.2(typescript@5.1.3)
+      typescript:
+        specifier: 5.1.3
+        version: 5.1.3
 
   packages/core:
     dependencies:
@@ -1232,6 +1269,74 @@ packages:
     resolution: {integrity: sha512-rE0Pygv0sEZ4vBWHlAgJLGDU7Pm8xoO6p3wsEceb7GYAjScrOHpEo8KK/eVkAcnSM+slAEtXjA2JpdjLp4fJQQ==}
     dev: true
 
+  /@ai-sdk/anthropic@0.0.19(zod@3.23.8):
+    resolution: {integrity: sha512-6Sd1gng/7NOwLSGXjEZClSPtl291zt5JAv0TreH5y0pJgRS5ZcXPKPMNtS590bIMPR+Ioh/No5nq39tVakgqeA==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      zod: ^3.0.0
+    dependencies:
+      '@ai-sdk/provider': 0.0.10
+      '@ai-sdk/provider-utils': 0.0.13(zod@3.23.8)
+      zod: 3.23.8
+    dev: false
+
+  /@ai-sdk/openai@0.0.18(zod@3.23.8):
+    resolution: {integrity: sha512-5iJ+/mbns0uLbNpACMYGUONUqQmqGJYrPbQvmGC+XVD4DZLvyZqBi0NDoQguOrZTz6u5O7rl51o9PDO+bEtmcA==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      zod: ^3.0.0
+    dependencies:
+      '@ai-sdk/provider': 0.0.8
+      '@ai-sdk/provider-utils': 0.0.11(zod@3.23.8)
+      zod: 3.23.8
+    dev: false
+
+  /@ai-sdk/provider-utils@0.0.11(zod@3.23.8):
+    resolution: {integrity: sha512-JRDrqL2FGDmLh+a4R5qbS8UrWN9Lt7DpDIY1x6owgXjXkz3Umm1czs1X32VlL0M1dpoSxu4hGBFtXd56+kDzXA==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      zod: ^3.0.0
+    peerDependenciesMeta:
+      zod:
+        optional: true
+    dependencies:
+      '@ai-sdk/provider': 0.0.8
+      eventsource-parser: 1.1.2
+      nanoid: 3.3.6
+      secure-json-parse: 2.7.0
+      zod: 3.23.8
+    dev: false
+
+  /@ai-sdk/provider-utils@0.0.13(zod@3.23.8):
+    resolution: {integrity: sha512-cB2dPm9flj+yin5sjBLFcXdW8sZtAXLE/OLKgz9uHpHM55s7mnwZrDGfO6ot/ukHTxDDJunZLW7qSjgK/u0F1g==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      zod: ^3.0.0
+    peerDependenciesMeta:
+      zod:
+        optional: true
+    dependencies:
+      '@ai-sdk/provider': 0.0.10
+      eventsource-parser: 1.1.2
+      nanoid: 3.3.6
+      secure-json-parse: 2.7.0
+      zod: 3.23.8
+    dev: false
+
+  /@ai-sdk/provider@0.0.10:
+    resolution: {integrity: sha512-NzkrtREQpHID1cTqY/C4CI30PVOaXWKYytDR2EcytmFgnP7Z6+CrGIA/YCnNhYAuUm6Nx+nGpRL/Hmyrv7NYzg==}
+    engines: {node: '>=18'}
+    dependencies:
+      json-schema: 0.4.0
+    dev: false
+
+  /@ai-sdk/provider@0.0.8:
+    resolution: {integrity: sha512-+gcMvyPUDfDXV9caN3CG5Le0M5K4CjqTdMV1ODg/AosApQiJW9ByN5imJPdI043zVdt+HS9WG+s0j4am7ca4bg==}
+    engines: {node: '>=18'}
+    dependencies:
+      json-schema: 0.4.0
+    dev: false
+
   /@alloc/quick-lru@5.2.0:
     resolution: {integrity: sha512-UrcABB+4bUrFABwbluTIBErXwvbsU/V7TZWfmbgJfbkwiBuziS9gxdODUyuiecfdGQ85jglMW6juS3+z5TsKLw==}
     engines: {node: '>=10'}
@@ -1260,7 +1365,6 @@ packages:
       web-streams-polyfill: 3.2.1
     transitivePeerDependencies:
       - encoding
-    dev: true
 
   /@anthropic-ai/sdk@0.9.1:
     resolution: {integrity: sha512-wa1meQ2WSfoY8Uor3EdrJq0jTiZJoKoSii2ZVWRY1oN4Tlr5s59pADg9T79FTbPe1/se5c3pBeZgJL63wmuoBA==}
@@ -1276,6 +1380,16 @@ packages:
       web-streams-polyfill: 3.2.1
     transitivePeerDependencies:
       - encoding
+
+  /@anthropic-ai/vertex-sdk@0.4.0:
+    resolution: {integrity: sha512-E/FL/P1+wDNrhuVg7DYmbiLdW6+xU9d2Vn/dmpJbKF7Vt81SnGxUFYn9zjDk2QOptvQFSOcUb5OCtpEvej+daQ==}
+    dependencies:
+      '@anthropic-ai/sdk': 0.18.0
+      google-auth-library: 9.10.0
+    transitivePeerDependencies:
+      - encoding
+      - supports-color
+    dev: false
 
   /@aws-crypto/crc32@3.0.0:
     resolution: {integrity: sha512-IzSgsrxUcsrejQbPVilIKy16kAT52EwB6zSaI+M3xxIhKh5+aldEyvI+z6erM7TCLB2BJsFrtHjp6/4/sr+3dA==}
