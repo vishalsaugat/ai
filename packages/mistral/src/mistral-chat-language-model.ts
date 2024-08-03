@@ -3,10 +3,10 @@ import {
   LanguageModelV1CallWarning,
   LanguageModelV1FinishReason,
   LanguageModelV1StreamPart,
-  UnsupportedFunctionalityError,
 } from '@ai-sdk/provider';
 import {
   ParseResult,
+  combineHeaders,
   createEventSourceResponseHandler,
   createJsonResponseHandler,
   postJsonToApi,
@@ -24,7 +24,7 @@ type MistralChatConfig = {
   provider: string;
   baseURL: string;
   headers: () => Record<string, string | undefined>;
-  generateId: () => string;
+  fetch?: typeof fetch;
 };
 
 export class MistralChatLanguageModel implements LanguageModelV1 {
@@ -56,13 +56,23 @@ export class MistralChatLanguageModel implements LanguageModelV1 {
     maxTokens,
     temperature,
     topP,
+    topK,
     frequencyPenalty,
     presencePenalty,
+    stopSequences,
+    responseFormat,
     seed,
   }: Parameters<LanguageModelV1['doGenerate']>[0]) {
     const type = mode.type;
 
     const warnings: LanguageModelV1CallWarning[] = [];
+
+    if (topK != null) {
+      warnings.push({
+        type: 'unsupported-setting',
+        setting: 'topK',
+      });
+    }
 
     if (frequencyPenalty != null) {
       warnings.push({
@@ -78,6 +88,25 @@ export class MistralChatLanguageModel implements LanguageModelV1 {
       });
     }
 
+    if (stopSequences != null) {
+      warnings.push({
+        type: 'unsupported-setting',
+        setting: 'stopSequences',
+      });
+    }
+
+    if (
+      responseFormat != null &&
+      responseFormat.type === 'json' &&
+      responseFormat.schema != null
+    ) {
+      warnings.push({
+        type: 'unsupported-setting',
+        setting: 'responseFormat',
+        details: 'JSON response format schema is not supported',
+      });
+    }
+
     const baseArgs = {
       // model id:
       model: this.modelId,
@@ -90,6 +119,10 @@ export class MistralChatLanguageModel implements LanguageModelV1 {
       temperature,
       top_p: topP,
       random_seed: seed,
+
+      // response format:
+      response_format:
+        responseFormat?.type === 'json' ? { type: 'json_object' } : undefined,
 
       // messages:
       messages: convertToMistralChatMessages(prompt),
@@ -124,12 +157,6 @@ export class MistralChatLanguageModel implements LanguageModelV1 {
         };
       }
 
-      case 'object-grammar': {
-        throw new UnsupportedFunctionalityError({
-          functionality: 'object-grammar mode',
-        });
-      }
-
       default: {
         const _exhaustiveCheck: never = type;
         throw new Error(`Unsupported type: ${_exhaustiveCheck}`);
@@ -144,13 +171,14 @@ export class MistralChatLanguageModel implements LanguageModelV1 {
 
     const { responseHeaders, value: response } = await postJsonToApi({
       url: `${this.config.baseURL}/chat/completions`,
-      headers: this.config.headers(),
+      headers: combineHeaders(this.config.headers(), options.headers),
       body: args,
       failedResponseHandler: mistralFailedResponseHandler,
       successfulResponseHandler: createJsonResponseHandler(
         mistralChatResponseSchema,
       ),
       abortSignal: options.abortSignal,
+      fetch: this.config.fetch,
     });
 
     const { messages: rawPrompt, ...rawSettings } = args;
@@ -160,7 +188,7 @@ export class MistralChatLanguageModel implements LanguageModelV1 {
       text: choice.message.content ?? undefined,
       toolCalls: choice.message.tool_calls?.map(toolCall => ({
         toolCallType: 'function',
-        toolCallId: this.config.generateId(),
+        toolCallId: toolCall.id,
         toolName: toolCall.function.name,
         args: toolCall.function.arguments!,
       })),
@@ -182,7 +210,7 @@ export class MistralChatLanguageModel implements LanguageModelV1 {
 
     const { responseHeaders, value: response } = await postJsonToApi({
       url: `${this.config.baseURL}/chat/completions`,
-      headers: this.config.headers(),
+      headers: combineHeaders(this.config.headers(), options.headers),
       body: {
         ...args,
         stream: true,
@@ -192,6 +220,7 @@ export class MistralChatLanguageModel implements LanguageModelV1 {
         mistralChatChunkSchema,
       ),
       abortSignal: options.abortSignal,
+      fetch: this.config.fetch,
     });
 
     const { messages: rawPrompt, ...rawSettings } = args;
@@ -201,8 +230,6 @@ export class MistralChatLanguageModel implements LanguageModelV1 {
       promptTokens: Number.NaN,
       completionTokens: Number.NaN,
     };
-
-    const generateId = this.config.generateId;
 
     return {
       stream: response.pipeThrough(
@@ -246,22 +273,18 @@ export class MistralChatLanguageModel implements LanguageModelV1 {
 
             if (delta.tool_calls != null) {
               for (const toolCall of delta.tool_calls) {
-                // mistral tool calls come in one piece
-
-                const toolCallId = generateId(); // delta and tool call must have same id
-
+                // mistral tool calls come in one piece:
                 controller.enqueue({
                   type: 'tool-call-delta',
                   toolCallType: 'function',
-                  toolCallId,
+                  toolCallId: toolCall.id,
                   toolName: toolCall.function.name,
                   argsTextDelta: toolCall.function.arguments,
                 });
-
                 controller.enqueue({
                   type: 'tool-call',
                   toolCallType: 'function',
-                  toolCallId,
+                  toolCallId: toolCall.id,
                   toolName: toolCall.function.name,
                   args: toolCall.function.arguments,
                 });
@@ -292,17 +315,14 @@ const mistralChatResponseSchema = z.object({
         tool_calls: z
           .array(
             z.object({
-              function: z.object({
-                name: z.string(),
-                arguments: z.string(),
-              }),
+              id: z.string(),
+              function: z.object({ name: z.string(), arguments: z.string() }),
             }),
           )
-          .optional()
-          .nullable(),
+          .nullish(),
       }),
       index: z.number(),
-      finish_reason: z.string().optional().nullable(),
+      finish_reason: z.string().nullish(),
     }),
   ),
   object: z.literal('chat.completion'),
@@ -320,17 +340,17 @@ const mistralChatChunkSchema = z.object({
     z.object({
       delta: z.object({
         role: z.enum(['assistant']).optional(),
-        content: z.string().nullable().optional(),
+        content: z.string().nullish(),
         tool_calls: z
           .array(
             z.object({
+              id: z.string(),
               function: z.object({ name: z.string(), arguments: z.string() }),
             }),
           )
-          .optional()
-          .nullable(),
+          .nullish(),
       }),
-      finish_reason: z.string().nullable().optional(),
+      finish_reason: z.string().nullish(),
       index: z.number(),
     }),
   ),
@@ -339,8 +359,7 @@ const mistralChatChunkSchema = z.object({
       prompt_tokens: z.number(),
       completion_tokens: z.number(),
     })
-    .optional()
-    .nullable(),
+    .nullish(),
 });
 
 function prepareToolsAndToolChoice(

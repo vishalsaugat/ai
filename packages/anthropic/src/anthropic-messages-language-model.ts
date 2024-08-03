@@ -8,6 +8,7 @@ import {
 } from '@ai-sdk/provider';
 import {
   ParseResult,
+  combineHeaders,
   createEventSourceResponseHandler,
   createJsonResponseHandler,
   postJsonToApi,
@@ -25,12 +26,14 @@ import { mapAnthropicStopReason } from './map-anthropic-stop-reason';
 type AnthropicMessagesConfig = {
   provider: string;
   baseURL: string;
-  headers: () => Record<string, string | undefined | any>;
+  headers: () => Record<string, string | undefined>;
+  fetch?: typeof fetch;
 };
 
 export class AnthropicMessagesLanguageModel implements LanguageModelV1 {
   readonly specificationVersion = 'v1';
   readonly defaultObjectGenerationMode = 'tool';
+  readonly supportsImageUrls = false;
 
   readonly modelId: AnthropicMessagesModelId;
   readonly settings: AnthropicMessagesSettings;
@@ -57,8 +60,11 @@ export class AnthropicMessagesLanguageModel implements LanguageModelV1 {
     maxTokens,
     temperature,
     topP,
+    topK,
     frequencyPenalty,
     presencePenalty,
+    stopSequences,
+    responseFormat,
     seed,
   }: Parameters<LanguageModelV1['doGenerate']>[0]) {
     const type = mode.type;
@@ -86,7 +92,15 @@ export class AnthropicMessagesLanguageModel implements LanguageModelV1 {
       });
     }
 
-    const messagesPrompt = await convertToAnthropicMessagesPrompt({ prompt });
+    if (responseFormat != null && responseFormat.type !== 'text') {
+      warnings.push({
+        type: 'unsupported-setting',
+        setting: 'responseFormat',
+        details: 'JSON response format is not supported.',
+      });
+    }
+
+    const messagesPrompt = convertToAnthropicMessagesPrompt(prompt);
 
     const baseArgs = {
       "anthropic_version": "vertex-2023-10-16",
@@ -94,12 +108,13 @@ export class AnthropicMessagesLanguageModel implements LanguageModelV1 {
       // model: this.modelId,
 
       // model specific settings:
-      top_k: this.settings.topK,
+      top_k: topK ?? this.settings.topK,
 
       // standardized settings:
       max_tokens: maxTokens ?? 4096, // 4096: max model output tokens
       temperature,
       top_p: topP,
+      stop_sequences: stopSequences,
 
       // prompt:
       system: messagesPrompt.system,
@@ -123,25 +138,14 @@ export class AnthropicMessagesLanguageModel implements LanguageModelV1 {
       case 'object-tool': {
         const { name, description, parameters } = mode.tool;
 
-        // add instruction to use tool:
-        baseArgs.messages[baseArgs.messages.length - 1].content.push({
-          type: 'text',
-          text: `\n\nUse the '${name}' tool.`,
-        });
-
         return {
           args: {
             ...baseArgs,
             tools: [{ name, description, input_schema: parameters }],
+            tool_choice: { type: 'tool', name },
           },
           warnings,
         };
-      }
-
-      case 'object-grammar': {
-        throw new UnsupportedFunctionalityError({
-          functionality: 'grammar-mode object generation',
-        });
       }
 
       default: {
@@ -168,14 +172,15 @@ export class AnthropicMessagesLanguageModel implements LanguageModelV1 {
     }
 
     const { responseHeaders, value: response } = await postJsonToApi({
-      url: `${this.config.baseURL}`,
-      headers: otherHeaders,
+      url: `${this.config.baseURL}/messages`,
+      headers: combineHeaders(this.config.headers(), options.headers),
       body: args,
       failedResponseHandler: anthropicFailedResponseHandler,
       successfulResponseHandler: createJsonResponseHandler(
         anthropicMessagesResponseSchema,
       ),
       abortSignal: options.abortSignal,
+      fetch: this.config.fetch,
     });
 
     const { messages: rawPrompt, ...rawSettings } = args;
@@ -235,8 +240,8 @@ export class AnthropicMessagesLanguageModel implements LanguageModelV1 {
     }
 
     const { responseHeaders, value: response } = await postJsonToApi({
-      url: `${this.config.baseURL}`,
-      headers: otherHeaders,
+      url: `${this.config.baseURL}/messages`,
+      headers: combineHeaders(this.config.headers(), options.headers),
       body: {
         ...args,
         stream: true,
@@ -246,6 +251,7 @@ export class AnthropicMessagesLanguageModel implements LanguageModelV1 {
         anthropicMessagesChunkSchema,
       ),
       abortSignal: options.abortSignal,
+      fetch: this.config.fetch,
     });
 
     const { messages: rawPrompt, ...rawSettings } = args;
@@ -383,6 +389,11 @@ export class AnthropicMessagesLanguageModel implements LanguageModelV1 {
                 return;
               }
 
+              case 'error': {
+                controller.enqueue({ type: 'error', error: value.error });
+                return;
+              }
+
               default: {
                 const _exhaustiveCheck: never = value;
                 throw new Error(`Unsupported chunk type: ${_exhaustiveCheck}`);
@@ -467,6 +478,13 @@ const anthropicMessagesChunkSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('content_block_stop'),
     index: z.number(),
+  }),
+  z.object({
+    type: z.literal('error'),
+    error: z.object({
+      type: z.string(),
+      message: z.string(),
+    }),
   }),
   z.object({
     type: z.literal('message_delta'),

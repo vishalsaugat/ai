@@ -5,7 +5,7 @@ description: API reference for the useCompletion hook.
 
 # `useCompletion()`
 
-Allows you to create text completion based capibilities for your application. It enables the streaming of text completions from your AI provider, manages the state for chat input, and updates the UI automatically as new messages are received.
+Allows you to create text completion based capabilities for your application. It enables the streaming of text completions from your AI provider, manages the state for chat input, and updates the UI automatically as new messages are received.
 
 ## Import
 
@@ -19,21 +19,21 @@ Allows you to create text completion based capibilities for your application. It
   </Tab>
   <Tab>
     <Snippet
-      text="import { useCompletion } from 'ai/svelte'"
+      text="import { useCompletion } from '@ai-sdk/svelte'"
       dark
       prompt={false}
     />
   </Tab>
   <Tab>
     <Snippet
-      text="import { useCompletion } from 'ai/vue'"
+      text="import { useCompletion } from '@ai-sdk/vue'"
       dark
       prompt={false}
     />
   </Tab>
   <Tab>
     <Snippet
-      text="import { useCompletion } from 'ai/solid'"
+      text="import { useCompletion } from '@ai-sdk/solid'"
       dark
       prompt={false}
     />
@@ -110,11 +110,18 @@ Allows you to create text completion based capibilities for your application. It
         "An optional boolean that determines whether to send extra fields you've added to `messages`. Defaults to `false` and only the `content` and `role` fields will be sent to the API endpoint.",
     },
     {
-      name: 'streamMode',
-      type: "'text' | 'stream-data'",
+      name: 'streamProtocol',
+      type: "'text' | 'data'",
       optional: true,
       description:
-        'An optional literal that sets the mode of the stream to be used. Defaults to `stream-data`. If set to `text`, the stream will be treated as a text stream.',
+        'An optional literal that sets the type of stream to be used. Defaults to `data`. If set to `text`, the stream will be treated as a text stream.',
+    },
+    {
+      name: 'fetch',
+      type: 'FetchFunction',
+      optional: true,
+      description:
+        'Optional. A custom fetch function to be used for the API call. Defaults to the global fetch function.',
     },
   ]}
 />
@@ -167,7 +174,7 @@ Allows you to create text completion based capibilities for your application. It
     },
     {
       name: 'handleSubmit',
-      type: '(event: React.FormEvent<HTMLFormElement>) => void',
+      type: '(event?: { preventDefault?: () => void }) => void',
       description:
         'Form submission handler that automatically resets the input field and appends a user message.',
     },

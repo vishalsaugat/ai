@@ -1,11 +1,11 @@
-import { useSWR } from 'sswr';
-import { Readable, Writable, derived, get, writable } from 'svelte/store';
-import { callCompletionApi } from '../shared/call-completion-api';
 import type {
   JSONValue,
   RequestOptions,
   UseCompletionOptions,
-} from '../shared/types';
+} from '@ai-sdk/ui-utils';
+import { callCompletionApi } from '@ai-sdk/ui-utils';
+import { useSWR } from 'sswr';
+import { Readable, Writable, derived, get, writable } from 'svelte/store';
 
 export type { UseCompletionOptions };
 
@@ -40,7 +40,7 @@ export type UseCompletionHelpers = {
    * </form>
    * ```
    */
-  handleSubmit: (e: any) => void;
+  handleSubmit: (event?: { preventDefault?: () => void }) => void;
   /** Whether the API request is in progress */
   isLoading: Readable<boolean | undefined>;
 
@@ -52,6 +52,9 @@ let uniqueId = 0;
 
 const store: Record<string, any> = {};
 
+/**
+ * @deprecated Use `useCompletion` from `@ai-sdk/svelte` instead.
+ */
 export function useCompletion({
   api = '/api/completion',
   id,
@@ -61,10 +64,17 @@ export function useCompletion({
   headers,
   body,
   streamMode,
+  streamProtocol,
   onResponse,
   onFinish,
   onError,
+  fetch,
 }: UseCompletionOptions = {}): UseCompletionHelpers {
+  // streamMode is deprecated, use streamProtocol instead.
+  if (streamMode) {
+    streamProtocol ??= streamMode === 'text' ? 'text' : undefined;
+  }
+
   // Generate an unique id for the completion if not provided.
   const completionId = id || `completion-${uniqueId++}`;
 
@@ -114,7 +124,7 @@ export function useCompletion({
         ...body,
         ...options?.body,
       },
-      streamMode,
+      streamProtocol,
       setCompletion: mutate,
       setLoading: loadingState => loading.set(loadingState),
       setError: err => error.set(err),
@@ -127,6 +137,7 @@ export function useCompletion({
       onData(data) {
         streamData.set([...(existingData || []), ...(data || [])]);
       },
+      fetch,
     });
   };
 
@@ -143,11 +154,11 @@ export function useCompletion({
 
   const input = writable(initialInput);
 
-  const handleSubmit = (e: any) => {
-    e.preventDefault();
+  const handleSubmit = (event?: { preventDefault?: () => void }) => {
+    event?.preventDefault?.();
+
     const inputValue = get(input);
-    if (!inputValue) return;
-    return complete(inputValue);
+    return inputValue ? complete(inputValue) : undefined;
   };
 
   const isLoading = derived(

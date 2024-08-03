@@ -13,7 +13,11 @@ import { getValidatedPrompt } from '../../core/prompt/get-validated-prompt';
 import { prepareCallSettings } from '../../core/prompt/prepare-call-settings';
 import { prepareToolsAndToolChoice } from '../../core/prompt/prepare-tools-and-tool-choice';
 import { Prompt } from '../../core/prompt/prompt';
-import { CoreToolChoice } from '../../core/types';
+import { CallWarning, CoreToolChoice, FinishReason } from '../../core/types';
+import {
+  CompletionTokenUsage,
+  calculateCompletionTokenUsage,
+} from '../../core/types/token-usage';
 import { retryWithExponentialBackoff } from '../../core/util/retry-with-exponential-backoff';
 import { createStreamableUI } from '../streamable';
 import { createResolvablePromise } from '../utils';
@@ -82,8 +86,10 @@ export async function streamUI<
   messages,
   maxRetries,
   abortSignal,
+  headers,
   initial,
   text,
+  onFinish,
   ...settings
 }: CallSettings &
   Prompt & {
@@ -100,12 +106,42 @@ export async function streamUI<
     };
 
     /**
-The tool choice strategy. Default: 'auto'.
+     * The tool choice strategy. Default: 'auto'.
      */
     toolChoice?: CoreToolChoice<TOOLS>;
 
     text?: RenderText;
     initial?: ReactNode;
+    /**
+     * Callback that is called when the LLM response and the final object validation are finished.
+     */
+    onFinish?: (event: {
+      /**
+       * The reason why the generation finished.
+       */
+      finishReason: FinishReason;
+      /**
+       * The token usage of the generated response.
+       */
+      usage: CompletionTokenUsage;
+      /**
+       * The final ui node that was generated.
+       */
+      value: ReactNode;
+      /**
+       * Warnings from the model provider (e.g. unsupported settings)
+       */
+      warnings?: CallWarning[];
+      /**
+       * Optional raw response data.
+       */
+      rawResponse?: {
+        /**
+         * Response headers.
+         */
+        headers?: Record<string, string>;
+      };
+    }) => Promise<void> | void;
   }): Promise<RenderResult> {
   // TODO: Remove these errors after the experimental phase.
   if (typeof model === 'string') {
@@ -218,7 +254,7 @@ The tool choice strategy. Default: 'auto'.
 
   const retry = retryWithExponentialBackoff({ maxRetries });
   const validatedPrompt = getValidatedPrompt({ system, prompt, messages });
-  const result = await retry(() =>
+  const result = await retry(async () =>
     model.doStream({
       mode: {
         type: 'regular',
@@ -226,8 +262,12 @@ The tool choice strategy. Default: 'auto'.
       },
       ...prepareCallSettings(settings),
       inputFormat: validatedPrompt.type,
-      prompt: convertToLanguageModelPrompt(validatedPrompt),
+      prompt: await convertToLanguageModelPrompt({
+        prompt: validatedPrompt,
+        modelSupportsImageUrls: model.supportsImageUrls,
+      }),
       abortSignal,
+      headers,
     }),
   );
 
@@ -311,7 +351,13 @@ The tool choice strategy. Default: 'auto'.
           }
 
           case 'finish': {
-            // Nothing to do here.
+            onFinish?.({
+              finishReason: value.finishReason,
+              usage: calculateCompletionTokenUsage(value.usage),
+              value: ui.value,
+              warnings: result.warnings,
+              rawResponse: result.rawResponse,
+            });
           }
         }
       }

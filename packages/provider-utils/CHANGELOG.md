@@ -1,5 +1,73 @@
 # @ai-sdk/provider-utils
 
+## 1.0.5
+
+### Patch Changes
+
+- a8d1c9e9: feat (ai/core): parallel image download
+- Updated dependencies [a8d1c9e9]
+  - @ai-sdk/provider@0.0.14
+
+## 1.0.4
+
+### Patch Changes
+
+- 4f88248f: feat (core): support json schema
+
+## 1.0.3
+
+### Patch Changes
+
+- Updated dependencies [2b9da0f0]
+- Updated dependencies [a5b58845]
+- Updated dependencies [4aa8deb3]
+- Updated dependencies [13b27ec6]
+  - @ai-sdk/provider@0.0.13
+
+## 1.0.2
+
+### Patch Changes
+
+- Updated dependencies [b7290943]
+  - @ai-sdk/provider@0.0.12
+
+## 1.0.1
+
+### Patch Changes
+
+- d481729f: fix (ai/provider-utils): generalize to Error (DomException not always available)
+
+## 1.0.0
+
+### Major Changes
+
+- 5edc6110: feat (provider-utils): change getRequestHeader() test helper to return Record (breaking change)
+
+### Patch Changes
+
+- 5edc6110: feat (provider-utils): add combineHeaders helper
+- Updated dependencies [5edc6110]
+  - @ai-sdk/provider@0.0.11
+
+## 0.0.16
+
+### Patch Changes
+
+- 02f6a088: feat (provider-utils): add convertArrayToAsyncIterable test helper
+
+## 0.0.15
+
+### Patch Changes
+
+- 85712895: feat (@ai-sdk/provider-utils): add createJsonStreamResponseHandler
+- 85712895: chore (@ai-sdk/provider-utils): move test helper to provider utils
+
+## 0.0.14
+
+### Patch Changes
+
+- 7910ae84: feat (providers): support custom fetch implementations
+
 ## 0.0.13
 
 ### Patch Changes

@@ -5,7 +5,15 @@ description: Learn how to use Cohere with the Vercel AI SDK.
 
 # Cohere
 
-Vercel AI SDK provides a set of utilities to make it easy to use Cohere's API. In this guide, we'll walk through how to use the utilities to create a text completion app.
+<Note type="warning">
+  The legacy Cohere integration is not compatible with the AI SDK 3.1 functions.
+  It is recommended to use the [AI SDK Cohere
+  Provider](../ai-sdk-providers/cohere) instead.
+</Note>
+
+Vercel AI SDK provides a set of utilities to make it easy to use Cohere's API. In
+this guide, we'll walk through how to use the utilities to create a text completion
+app.
 
 ## Guide: Chat Bot
 
@@ -18,7 +26,7 @@ Create a Next.js application and install `ai`:
 ```sh
 pnpm dlx create-next-app my-ai-app
 cd my-ai-app
-pnpm install ai
+pnpm add ai
 ```
 
 ### Add your Cohere API Key to `.env`
@@ -38,10 +46,6 @@ For this example, we'll create a route handler at `app/api/chat/route.ts` that a
 ```tsx filename="app/api/chat/route.ts" showLineNumbers
 import { CohereStream, StreamingTextResponse } from 'ai';
 import { CohereClient, Cohere } from 'cohere-ai';
-
-// IMPORTANT! Set the dynamic to force-dynamic
-// Prevent nextjs to cache this route
-export const dynamic = 'force-dynamic';
 
 if (!process.env.COHERE_API_KEY) {
   throw new Error('Missing COHERE_API_KEY environment variable');
@@ -154,7 +158,7 @@ Create a Next.js application and install `ai`:
 ```sh
 pnpm dlx create-next-app my-ai-app
 cd my-ai-app
-pnpm install ai
+pnpm add ai
 ```
 
 ### Add your Cohere API Key to `.env`

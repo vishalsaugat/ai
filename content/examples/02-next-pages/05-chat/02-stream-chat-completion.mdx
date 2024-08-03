@@ -1,6 +1,6 @@
 ---
 title: Stream Chat Completion
-description: Learn to stream chat completions using the Vercel AI SDK in your Next.js pages router application
+description: Learn to stream chat completions using the Vercel AI SDK in your Next.js Pages Router application
 ---
 
 # Stream Chat Completion
@@ -71,6 +71,10 @@ export async function POST(req: Request) {
     messages,
   });
 
-  return result.toAIStreamResponse();
+  return result.toDataStreamResponse();
 }
 ```
+
+---
+
+<GithubLink link="https://github.com/vercel/ai/blob/main/examples/next-openai-pages/pages/chat/stream-chat/index.tsx" />

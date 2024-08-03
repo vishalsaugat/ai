@@ -2,7 +2,7 @@ import { LanguageModelV1Prompt } from '@ai-sdk/provider';
 import {
   JsonTestServer,
   StreamingTestServer,
-  convertStreamToArray,
+  convertReadableStreamToArray,
 } from '@ai-sdk/provider-utils/test';
 import { createMistral } from './mistral-provider';
 
@@ -68,6 +68,51 @@ describe('doGenerate', () => {
     expect(text).toStrictEqual('Hello, World!');
   });
 
+  it('should extract tool call response', async () => {
+    server.responseBodyJson = {
+      id: 'b3999b8c93e04e11bcbff7bcab829667',
+      object: 'chat.completion',
+      created: 1722349660,
+      model: 'mistral-large-latest',
+      choices: [
+        {
+          index: 0,
+          message: {
+            role: 'assistant',
+            content: '',
+            tool_calls: [
+              {
+                id: 'gSIMJiOkT',
+                function: {
+                  name: 'weatherTool',
+                  arguments: '{"location": "paris"}',
+                },
+              },
+            ],
+          },
+          finish_reason: 'tool_calls',
+          logprobs: null,
+        },
+      ],
+      usage: { prompt_tokens: 124, total_tokens: 146, completion_tokens: 22 },
+    };
+
+    const { toolCalls } = await model.doGenerate({
+      inputFormat: 'prompt',
+      mode: { type: 'regular' },
+      prompt: TEST_PROMPT,
+    });
+
+    expect(toolCalls).toStrictEqual([
+      {
+        toolCallId: 'gSIMJiOkT',
+        toolCallType: 'function',
+        toolName: 'weatherTool',
+        args: '{"location": "paris"}',
+      },
+    ]);
+  });
+
   it('should extract usage', async () => {
     prepareJsonResponse({
       content: '',
@@ -101,6 +146,7 @@ describe('doGenerate', () => {
 
     expect(rawResponse?.headers).toStrictEqual({
       // default headers:
+      'content-length': '314',
       'content-type': 'application/json',
 
       // custom header
@@ -173,13 +219,13 @@ describe('doGenerate', () => {
     });
   });
 
-  it('should pass custom headers', async () => {
+  it('should pass headers', async () => {
     prepareJsonResponse({ content: '' });
 
     const provider = createMistral({
       apiKey: 'test-api-key',
       headers: {
-        'Custom-Header': 'test-header',
+        'Custom-Provider-Header': 'provider-header-value',
       },
     });
 
@@ -187,26 +233,19 @@ describe('doGenerate', () => {
       inputFormat: 'prompt',
       mode: { type: 'regular' },
       prompt: TEST_PROMPT,
+      headers: {
+        'Custom-Request-Header': 'request-header-value',
+      },
     });
 
     const requestHeaders = await server.getRequestHeaders();
-    expect(requestHeaders.get('Custom-Header')).toStrictEqual('test-header');
-  });
 
-  it('should pass the api key as Authorization header', async () => {
-    prepareJsonResponse({ content: '' });
-
-    const mistral = createMistral({ apiKey: 'test-api-key' });
-
-    await mistral.chat('mistral-small-latest').doGenerate({
-      inputFormat: 'prompt',
-      mode: { type: 'regular' },
-      prompt: TEST_PROMPT,
+    expect(requestHeaders).toStrictEqual({
+      authorization: 'Bearer test-api-key',
+      'content-type': 'application/json',
+      'custom-provider-header': 'provider-header-value',
+      'custom-request-header': 'request-header-value',
     });
-
-    expect(
-      (await server.getRequestHeaders()).get('Authorization'),
-    ).toStrictEqual('Bearer test-api-key');
   });
 });
 
@@ -246,7 +285,7 @@ describe('doStream', () => {
       prompt: TEST_PROMPT,
     });
 
-    expect(await convertStreamToArray(stream)).toStrictEqual([
+    expect(await convertReadableStreamToArray(stream)).toStrictEqual([
       { type: 'text-delta', textDelta: '' },
       { type: 'text-delta', textDelta: 'Hello' },
       { type: 'text-delta', textDelta: ', ' },
@@ -265,7 +304,7 @@ describe('doStream', () => {
       `data: {"id":"ad6f7ce6543c4d0890280ae184fe4dd8","object":"chat.completion.chunk","created":1711365023,"model":"mistral-large-latest",` +
         `"choices":[{"index":0,"delta":{"role":"assistant","content":""},"finish_reason":null,"logprobs":null}]}\n\n`,
       `data: {"id":"ad6f7ce6543c4d0890280ae184fe4dd8","object":"chat.completion.chunk","created":1711365023,"model":"mistral-large-latest",` +
-        `"choices":[{"index":0,"delta":{"content":null,"tool_calls":[{"function":{"name":"test-tool","arguments":` +
+        `"choices":[{"index":0,"delta":{"content":null,"tool_calls":[{"id":"yfBEybNYi","function":{"name":"test-tool","arguments":` +
         `"{\\"value\\":\\"Sparkle Day\\"}"` +
         `}}]},"finish_reason":"tool_calls","logprobs":null}],"usage":{"prompt_tokens":183,"total_tokens":316,"completion_tokens":133}}\n\n`,
       'data: [DONE]\n\n',
@@ -273,7 +312,6 @@ describe('doStream', () => {
 
     const { stream } = await createMistral({
       apiKey: 'test-api-key',
-      generateId: () => 'test-id',
     })
       .chat('mistral-large-latest')
       .doStream({
@@ -297,21 +335,21 @@ describe('doStream', () => {
         prompt: TEST_PROMPT,
       });
 
-    expect(await convertStreamToArray(stream)).toStrictEqual([
+    expect(await convertReadableStreamToArray(stream)).toStrictEqual([
       {
         type: 'text-delta',
         textDelta: '',
       },
       {
         type: 'tool-call-delta',
-        toolCallId: 'test-id',
+        toolCallId: 'yfBEybNYi',
         toolCallType: 'function',
         toolName: 'test-tool',
         argsTextDelta: '{"value":"Sparkle Day"}',
       },
       {
         type: 'tool-call',
-        toolCallId: 'test-id',
+        toolCallId: 'yfBEybNYi',
         toolCallType: 'function',
         toolName: 'test-tool',
         args: '{"value":"Sparkle Day"}',
@@ -364,13 +402,13 @@ describe('doStream', () => {
     });
   });
 
-  it('should pass custom headers', async () => {
+  it('should pass headers', async () => {
     prepareStreamResponse({ content: [] });
 
     const provider = createMistral({
       apiKey: 'test-api-key',
       headers: {
-        'Custom-Header': 'test-header',
+        'Custom-Provider-Header': 'provider-header-value',
       },
     });
 
@@ -378,25 +416,18 @@ describe('doStream', () => {
       inputFormat: 'prompt',
       mode: { type: 'regular' },
       prompt: TEST_PROMPT,
+      headers: {
+        'Custom-Request-Header': 'request-header-value',
+      },
     });
 
     const requestHeaders = await server.getRequestHeaders();
-    expect(requestHeaders.get('Custom-Header')).toStrictEqual('test-header');
-  });
 
-  it('should pass the api key as Authorization header', async () => {
-    prepareStreamResponse({ content: [''] });
-
-    const provider = createMistral({ apiKey: 'test-api-key' });
-
-    await provider.chat('mistral-small-latest').doStream({
-      inputFormat: 'prompt',
-      mode: { type: 'regular' },
-      prompt: TEST_PROMPT,
+    expect(requestHeaders).toStrictEqual({
+      authorization: 'Bearer test-api-key',
+      'content-type': 'application/json',
+      'custom-provider-header': 'provider-header-value',
+      'custom-request-header': 'request-header-value',
     });
-
-    expect(
-      (await server.getRequestHeaders()).get('Authorization'),
-    ).toStrictEqual('Bearer test-api-key');
   });
 });

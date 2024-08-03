@@ -44,13 +44,13 @@ Install `ai` and `@ai-sdk/openai`, Vercel AI SDK's OpenAI provider.
 <div className="my-4">
   <Tabs items={['pnpm', 'npm', 'yarn']}>
     <Tab>
-      <Snippet text="pnpm install ai @ai-sdk/openai zod" dark />
+      <Snippet text="pnpm add ai @ai-sdk/openai @ai-sdk/vue zod" dark />
     </Tab>
     <Tab>
-      <Snippet text="npm install ai @ai-sdk/openai zod" dark />
+      <Snippet text="npm install ai @ai-sdk/openai @ai-sdk/vue zod" dark />
     </Tab>
     <Tab>
-      <Snippet text="yarn add ai @ai-sdk/openai zod" dark />
+      <Snippet text="yarn add ai @ai-sdk/openai @ai-sdk/vue zod" dark />
     </Tab>
   </Tabs>
 </div>
@@ -91,7 +91,7 @@ export default defineNuxtConfig({
 Create an API route, `server/api/chat.ts` and add the following code:
 
 ```tsx filename="server/api/chat.ts"
-import { StreamingTextResponse, streamText } from 'ai';
+import { streamText } from 'ai';
 import { createOpenAI } from '@ai-sdk/openai';
 
 export default defineLazyEventHandler(async () => {
@@ -109,7 +109,7 @@ export default defineLazyEventHandler(async () => {
       messages,
     });
 
-    return new StreamingTextResponse(result.toAIStream());
+    return result.toDataStreamResponse();
   });
 });
 ```
@@ -119,7 +119,7 @@ Let's take a look at what is happening in this code:
 1. First, you create an OpenAI provider instance with the `createOpenAI` function that is imported from the `@ai-sdk/openai` package.
 2. Next, you define an Event Handler and extract `messages` from the body of the request. The `messages` variable contains a history of the conversation with you and the chatbot and will provide the chatbot with the necessary context to make the next generation.
 3. Next, you call the [`streamText`](/docs/reference/ai-sdk-core/stream-text) function which is imported from the `ai` package. To use this function, you pass it a configuration object that contains a `model` provider (defined in step 1) and `messages` (defined in step 2). You can use pass additional [settings](/docs/ai-sdk-core/settings) in this configuration object to further customise the models behaviour.
-4. The `streamText` function returns a [`StreamTextResult`](/docs/reference/ai-sdk-core/stream-text#result-object). This result object contains the [ `toAIStreamResponse` ](/docs/reference/ai-sdk-core/stream-text#to-ai-stream-response) function which converts the result to a streamed response object.
+4. The `streamText` function returns a [`StreamTextResult`](/docs/reference/ai-sdk-core/stream-text#result-object). This result object contains the [ `toDataStreamResponse` ](/docs/reference/ai-sdk-core/stream-text#to-ai-stream-response) function which converts the result to a streamed response object.
 5. Return the result to the client to stream the response.
 
 ## Wire up the UI
@@ -130,14 +130,14 @@ Update your root page (`pages/index.vue`) with the following code to show a list
 
 ```tsx filename="pages/index.vue"
 <script setup lang="ts">
-import { useChat } from 'ai/vue';
+import { useChat } from '@ai-sdk/vue';
 
 const { messages, input, handleSubmit } = useChat();
 </script>
 
 <template>
   <div class="flex flex-col w-full max-w-md py-24 mx-auto stretch">
-    <div v-for="m in messages" key="m.id" class="whitespace-pre-wrap">
+    <div v-for="m in messages" :key="m.id" class="whitespace-pre-wrap">
       {{ m.role === 'user' ? 'User: ' : 'AI: ' }}
       {{ m.content }}
     </div>
@@ -166,7 +166,7 @@ With that, you have built everything you need for your chatbot! To start your ap
 
 <Snippet text="pnpm run dev" />
 
-Head to your browser and open http://localhost:5173. You should see an input field. Test it out by entering a message and see the AI chatbot respond in real-time! Vercel AI SDK makes it fast and easy to build AI chat interfaces with Nuxt.
+Head to your browser and open http://localhost:3000. You should see an input field. Test it out by entering a message and see the AI chatbot respond in real-time! Vercel AI SDK makes it fast and easy to build AI chat interfaces with Nuxt.
 
 ## Stream Data Alongside Response
 
@@ -176,8 +176,8 @@ Depending on your use case, you may want to stream additional data alongside the
 
 Make the following changes to your API route (`pages/api/chat.ts`)
 
-```ts filename="server/api/chat.ts" highlight="1,19-29"
-import { StreamingTextResponse, streamText, StreamData } from 'ai';
+```ts filename="server/api/chat.ts"
+import { streamText, StreamData } from 'ai';
 import { createOpenAI } from '@ai-sdk/openai';
 
 export default defineLazyEventHandler(async () => {
@@ -190,22 +190,18 @@ export default defineLazyEventHandler(async () => {
   return defineEventHandler(async (event: any) => {
     const { messages } = await readBody(event);
 
+    const data = new StreamData();
+    data.append({ test: 'value' });
+
     const result = await streamText({
       model: openai('gpt-4-turbo'),
+      onFinish() {
+        data.close();
+      },
       messages,
     });
 
-    const data = new StreamData();
-
-    data.append({ test: 'value' });
-
-    const stream = result.toAIStream({
-      onFinal(_) {
-        data.close();
-      },
-    });
-
-    return new StreamingTextResponse(stream, {}, data);
+    return result.toDataStreamResponse({ data });
   });
 });
 ```
@@ -214,9 +210,8 @@ In this code, you:
 
 1. Create a new instance of `StreamData`.
 2. Append the data you want to stream alongside the model's response.
-3. Create a new AI stream with the `toAIStream` method on the `StreamTextResult` object.
-4. Listen for the `onFinal` callback on the AI Stream created above.
-5. Pass the data alongside the stream to the new `StreamingTextResponse`
+3. Listen for the `onFinish` callback on `streamText` and close the stream data.
+4. Pass the data into the `toDataStreamResponse` method.
 
 ### Update your frontend
 
@@ -224,7 +219,7 @@ To access this data on the frontend, the `useChat` hook returns an optional valu
 
 ```tsx filename="pages/index.vue" highlight="4, 9"
 <script setup lang="ts">
-import { useChat } from 'ai/vue';
+import { useChat } from '@ai-sdk/vue';
 
 const { messages, input, handleSubmit, data } = useChat();
 </script>
@@ -232,7 +227,7 @@ const { messages, input, handleSubmit, data } = useChat();
 <template>
   <div class="flex flex-col w-full max-w-md py-24 mx-auto stretch">
     <pre>{{ JSON.stringify(data, null, 2) }}</pre>
-    <div v-for="m in messages" key="m.id" class="whitespace-pre-wrap">
+    <div v-for="m in messages" :key="m.id" class="whitespace-pre-wrap">
       {{ m.role === 'user' ? 'User: ' : 'AI: ' }}
       {{ m.content }}
     </div>
@@ -248,7 +243,7 @@ const { messages, input, handleSubmit, data } = useChat();
 </template>
 ```
 
-Head back to your browser (http://localhost:5173) and enter a new message. You should see a JSON object appear with the value you sent from your API route!
+Head back to your browser (http://localhost:3000) and enter a new message. You should see a JSON object appear with the value you sent from your API route!
 
 ## Where to Next?
 

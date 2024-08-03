@@ -6,7 +6,7 @@ dotenv.config();
 
 async function main() {
   const result = await generateText({
-    model: google('models/gemini-pro-vision'),
+    model: google('models/gemini-1.5-flash'),
     maxTokens: 512,
     messages: [
       {
@@ -15,9 +15,8 @@ async function main() {
           { type: 'text', text: 'Describe the image in detail.' },
           {
             type: 'image',
-            image: new URL(
+            image:
               'https://github.com/vercel/ai/blob/main/examples/ai-core/data/comic-cat.png?raw=true',
-            ),
           },
         ],
       },

@@ -11,8 +11,34 @@ Get the current AI state.
 
 <Snippet text={`import { getAIState } from "ai/rsc"`} prompt={false} />
 
-<ReferenceTable packageName="rsc" functionName="getAIState" />
+## API Signature
+
+### Parameters
+
+<PropertiesTable
+  content={[
+    {
+      name: 'key',
+      type: 'string',
+      isOptional: true,
+      description:
+        "Returns the value of the specified key in the AI state, if it's an object.",
+    },
+  ]}
+/>
+
+### Returns
+
+The AI state.
 
 ## Examples
 
-<ExamplesList packageName="rsc" functionName="getAIState" />
+<ExampleLinks
+  examples={[
+    {
+      title:
+        'Learn to render a React component during a tool call made by a language model in Next.js',
+      link: '/examples/next-app/tools/render-interface-during-tool-call',
+    },
+  ]}
+/>

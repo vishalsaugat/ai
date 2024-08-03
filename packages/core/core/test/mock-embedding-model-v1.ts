@@ -1,5 +1,6 @@
 import { EmbeddingModelV1 } from '@ai-sdk/provider';
 import { Embedding } from '../types';
+import { EmbeddingTokenUsage } from '../types/token-usage';
 
 export class MockEmbeddingModelV1<VALUE> implements EmbeddingModelV1<VALUE> {
   readonly specificationVersion = 'v1';
@@ -20,13 +21,15 @@ export class MockEmbeddingModelV1<VALUE> implements EmbeddingModelV1<VALUE> {
   }: {
     provider?: EmbeddingModelV1<VALUE>['provider'];
     modelId?: EmbeddingModelV1<VALUE>['modelId'];
-    maxEmbeddingsPerCall?: EmbeddingModelV1<VALUE>['maxEmbeddingsPerCall'];
+    maxEmbeddingsPerCall?:
+      | EmbeddingModelV1<VALUE>['maxEmbeddingsPerCall']
+      | null;
     supportsParallelCalls?: EmbeddingModelV1<VALUE>['supportsParallelCalls'];
     doEmbed?: EmbeddingModelV1<VALUE>['doEmbed'];
-  }) {
+  } = {}) {
     this.provider = provider;
     this.modelId = modelId;
-    this.maxEmbeddingsPerCall = maxEmbeddingsPerCall;
+    this.maxEmbeddingsPerCall = maxEmbeddingsPerCall ?? undefined;
     this.supportsParallelCalls = supportsParallelCalls;
     this.doEmbed = doEmbed;
   }
@@ -35,10 +38,11 @@ export class MockEmbeddingModelV1<VALUE> implements EmbeddingModelV1<VALUE> {
 export function mockEmbed<VALUE>(
   expectedValues: Array<VALUE>,
   embeddings: Array<Embedding>,
+  usage?: EmbeddingTokenUsage,
 ): EmbeddingModelV1<VALUE>['doEmbed'] {
   return async ({ values }) => {
     assert.deepStrictEqual(expectedValues, values);
-    return { embeddings };
+    return { embeddings, usage };
   };
 }
 

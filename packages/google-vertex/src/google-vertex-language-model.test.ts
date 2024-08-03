@@ -1,5 +1,5 @@
 import { LanguageModelV1Prompt } from '@ai-sdk/provider';
-import { convertStreamToArray } from '@ai-sdk/provider-utils/test';
+import { convertReadableStreamToArray } from '@ai-sdk/provider-utils/test';
 import {
   FinishReason,
   GenerateContentResponse,
@@ -191,6 +191,7 @@ describe('doGenerate', () => {
       temperature: 0.5,
       maxTokens: 100,
       topP: 0.9,
+      stopSequences: ['abc', 'def'],
     });
 
     expect(mockVertexAI.lastModelParams).toStrictEqual({
@@ -200,9 +201,53 @@ describe('doGenerate', () => {
         temperature: 0.5,
         topK: 0.1,
         topP: 0.9,
+        stopSequences: ['abc', 'def'],
       },
       tools: undefined,
       safetySettings: undefined,
+    });
+  });
+
+  it('should send the messages', async () => {
+    const { model } = createModel({
+      generateContent: async request => {
+        expect(request).toStrictEqual({
+          contents: [{ role: 'user', parts: [{ text: 'Hello' }] }],
+          systemInstruction: {
+            role: 'system',
+            parts: [{ text: 'test system instruction' }],
+          },
+        });
+
+        return {
+          response: {
+            candidates: [
+              {
+                content: {
+                  parts: [{ text: 'Hello, World!' }],
+                  role: 'model',
+                },
+                index: 0,
+                finishReason: 'STOP' as FinishReason,
+              },
+            ],
+            usageMetadata: {
+              promptTokenCount: 0,
+              candidatesTokenCount: 0,
+              totalTokenCount: 0,
+            },
+          },
+        };
+      },
+    });
+
+    await model.doGenerate({
+      inputFormat: 'prompt',
+      mode: { type: 'regular' },
+      prompt: [
+        { role: 'system', content: 'test system instruction' },
+        { role: 'user', content: [{ type: 'text', text: 'Hello' }] },
+      ],
     });
   });
 });
@@ -250,7 +295,7 @@ describe('doStream', () => {
       prompt: TEST_PROMPT,
     });
 
-    expect(await convertStreamToArray(stream)).toStrictEqual([
+    expect(await convertReadableStreamToArray(stream)).toStrictEqual([
       { type: 'text-delta', textDelta: 'Hello, ' },
       { type: 'text-delta', textDelta: 'World!' },
       { type: 'text-delta', textDelta: '' },

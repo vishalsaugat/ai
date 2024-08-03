@@ -1,6 +1,6 @@
 ---
 title: Call Tools
-description: Learn to call tools using the Vercel AI SDK in your Next.js application
+description: Learn to call tools using the Vercel AI SDK in your Next.js App Router application
 ---
 
 # Call Tools
@@ -34,8 +34,7 @@ Let's create a simple conversation between a user and model and place a button t
 import { useState } from 'react';
 import { Message, continueConversation } from './actions';
 
-// Force the page to be dynamic and allow streaming responses up to 30 seconds
-export const dynamic = 'force-dynamic';
+// Allow streaming responses up to 30 seconds
 export const maxDuration = 30;
 
 export default function Home() {

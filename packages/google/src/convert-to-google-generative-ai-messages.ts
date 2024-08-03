@@ -1,32 +1,38 @@
-import { LanguageModelV1Prompt } from '@ai-sdk/provider';
-import { convertUint8ArrayToBase64, download } from '@ai-sdk/provider-utils';
 import {
+  LanguageModelV1Prompt,
+  UnsupportedFunctionalityError,
+} from '@ai-sdk/provider';
+import { convertUint8ArrayToBase64 } from '@ai-sdk/provider-utils';
+import {
+  GoogleGenerativeAIContent,
   GoogleGenerativeAIContentPart,
   GoogleGenerativeAIPrompt,
 } from './google-generative-ai-prompt';
 
-export async function convertToGoogleGenerativeAIMessages({
-  prompt,
-  downloadImplementation = download,
-}: {
-  prompt: LanguageModelV1Prompt;
-  downloadImplementation?: typeof download;
-}): Promise<GoogleGenerativeAIPrompt> {
-  const messages: GoogleGenerativeAIPrompt = [];
+export function convertToGoogleGenerativeAIMessages(
+  prompt: LanguageModelV1Prompt,
+): GoogleGenerativeAIPrompt {
+  const systemInstructionParts: Array<{ text: string }> = [];
+  const contents: Array<GoogleGenerativeAIContent> = [];
+  let systemMessagesAllowed = true;
 
   for (const { role, content } of prompt) {
     switch (role) {
       case 'system': {
-        // system message becomes user message:
-        messages.push({ role: 'user', parts: [{ text: content }] });
+        if (!systemMessagesAllowed) {
+          throw new UnsupportedFunctionalityError({
+            functionality:
+              'system messages are only supported at the beginning of the conversation',
+          });
+        }
 
-        // required for to ensure turn-taking:
-        messages.push({ role: 'model', parts: [{ text: '' }] });
-
+        systemInstructionParts.push({ text: content });
         break;
       }
 
       case 'user': {
+        systemMessagesAllowed = false;
+
         const parts: GoogleGenerativeAIContentPart[] = [];
 
         for (const part of content) {
@@ -36,25 +42,17 @@ export async function convertToGoogleGenerativeAIMessages({
               break;
             }
             case 'image': {
-              let data: Uint8Array;
-              let mimeType: string | undefined;
-
               if (part.image instanceof URL) {
-                const downloadResult = await downloadImplementation({
-                  url: part.image,
+                // The AI SDK automatically downloads images for user image parts with URLs
+                throw new UnsupportedFunctionalityError({
+                  functionality: 'Image URLs in user messages',
                 });
-
-                data = downloadResult.data;
-                mimeType = downloadResult.mimeType;
-              } else {
-                data = part.image;
-                mimeType = part.mimeType;
               }
 
               parts.push({
                 inlineData: {
-                  mimeType: mimeType ?? 'image/jpeg',
-                  data: convertUint8ArrayToBase64(data),
+                  mimeType: part.mimeType ?? 'image/jpeg',
+                  data: convertUint8ArrayToBase64(part.image),
                 },
               });
 
@@ -63,12 +61,14 @@ export async function convertToGoogleGenerativeAIMessages({
           }
         }
 
-        messages.push({ role: 'user', parts });
+        contents.push({ role: 'user', parts });
         break;
       }
 
       case 'assistant': {
-        messages.push({
+        systemMessagesAllowed = false;
+
+        contents.push({
           role: 'model',
           parts: content
             .map(part => {
@@ -96,7 +96,9 @@ export async function convertToGoogleGenerativeAIMessages({
       }
 
       case 'tool': {
-        messages.push({
+        systemMessagesAllowed = false;
+
+        contents.push({
           role: 'user',
           parts: content.map(part => ({
             functionResponse: {
@@ -114,5 +116,11 @@ export async function convertToGoogleGenerativeAIMessages({
     }
   }
 
-  return messages;
+  return {
+    systemInstruction:
+      systemInstructionParts.length > 0
+        ? { parts: systemInstructionParts }
+        : undefined,
+    contents,
+  };
 }

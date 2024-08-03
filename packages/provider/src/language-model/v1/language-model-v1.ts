@@ -35,7 +35,15 @@ model. `undefined` can be returned if object generation is not supported.
 This is needed to generate the best objects possible w/o requiring the
 user to explicitly specify the object generation mode.
    */
-  readonly defaultObjectGenerationMode: 'json' | 'tool' | 'grammar' | undefined;
+  readonly defaultObjectGenerationMode: 'json' | 'tool' | undefined;
+
+  /**
+Flag whether this model supports image URLs. Default is `true`.
+
+When the flag is set to `false`, the AI SDK will download the image and
+pass the image data to the model.
+   */
+  readonly supportsImageUrls?: boolean;
 
   /**
 Generates a language model output (non-streaming).

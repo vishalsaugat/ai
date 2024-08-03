@@ -1,5 +1,130 @@
 # @ai-sdk/openai
 
+## 0.0.40
+
+### Patch Changes
+
+- Updated dependencies [a8d1c9e9]
+  - @ai-sdk/provider-utils@1.0.5
+  - @ai-sdk/provider@0.0.14
+
+## 0.0.39
+
+### Patch Changes
+
+- Updated dependencies [4f88248f]
+  - @ai-sdk/provider-utils@1.0.4
+
+## 0.0.38
+
+### Patch Changes
+
+- 2b9da0f0: feat (core): support stopSequences setting.
+- 909b9d27: feat (ai/openai): Support legacy function calls
+- a5b58845: feat (core): support topK setting
+- 4aa8deb3: feat (provider): support responseFormat setting in provider api
+- 13b27ec6: chore (ai/core): remove grammar mode
+- Updated dependencies [2b9da0f0]
+- Updated dependencies [a5b58845]
+- Updated dependencies [4aa8deb3]
+- Updated dependencies [13b27ec6]
+  - @ai-sdk/provider@0.0.13
+  - @ai-sdk/provider-utils@1.0.3
+
+## 0.0.37
+
+### Patch Changes
+
+- 89947fc5: chore (provider/openai): update model list for type-ahead support
+
+## 0.0.36
+
+### Patch Changes
+
+- b7290943: feat (ai/core): add token usage to embed and embedMany
+- Updated dependencies [b7290943]
+  - @ai-sdk/provider@0.0.12
+  - @ai-sdk/provider-utils@1.0.2
+
+## 0.0.35
+
+### Patch Changes
+
+- Updated dependencies [d481729f]
+  - @ai-sdk/provider-utils@1.0.1
+
+## 0.0.34
+
+### Patch Changes
+
+- 5edc6110: feat (ai/core): add custom request header support
+- Updated dependencies [5edc6110]
+- Updated dependencies [5edc6110]
+- Updated dependencies [5edc6110]
+  - @ai-sdk/provider@0.0.11
+  - @ai-sdk/provider-utils@1.0.0
+
+## 0.0.33
+
+### Patch Changes
+
+- Updated dependencies [02f6a088]
+  - @ai-sdk/provider-utils@0.0.16
+
+## 0.0.32
+
+### Patch Changes
+
+- 1b37b8b9: fix (@ai-sdk/openai): only send logprobs settings when logprobs are requested
+
+## 0.0.31
+
+### Patch Changes
+
+- eba071dd: feat (@ai-sdk/azure): add azure openai completion support
+- 1ea890fe: feat (@ai-sdk/azure): add azure openai completion support
+
+## 0.0.30
+
+### Patch Changes
+
+- Updated dependencies [85712895]
+- Updated dependencies [85712895]
+  - @ai-sdk/provider-utils@0.0.15
+
+## 0.0.29
+
+### Patch Changes
+
+- 4728c37f: feat (core): add text embedding model support to provider registry
+- 7910ae84: feat (providers): support custom fetch implementations
+- Updated dependencies [7910ae84]
+  - @ai-sdk/provider-utils@0.0.14
+
+## 0.0.28
+
+### Patch Changes
+
+- f9db8fd6: feat (@ai-sdk/openai): add parallelToolCalls setting
+
+## 0.0.27
+
+### Patch Changes
+
+- fc9552ec: fix (@ai-sdk/azure): allow for nullish delta
+
+## 0.0.26
+
+### Patch Changes
+
+- 7530f861: fix (@ai-sdk/openai): add internal dist to bundle
+
+## 0.0.25
+
+### Patch Changes
+
+- 8b1362a7: chore (@ai-sdk/openai): expose models under /internal for reuse in other providers
+
 ## 0.0.24
 
 ### Patch Changes

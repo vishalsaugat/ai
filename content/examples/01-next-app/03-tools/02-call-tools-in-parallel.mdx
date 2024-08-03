@@ -1,6 +1,6 @@
 ---
 title: Call Tools in Parallel
-description: Learn to call tools in parallel using the Vercel AI SDK in your Next.js application
+description: Learn to call tools in parallel using the Vercel AI SDK in your Next.js App Router application
 ---
 
 # Call Tools in Parallel
@@ -35,8 +35,7 @@ Let's modify our previous example to call `getWeather` tool for multiple cities 
 import { useState } from 'react';
 import { Message, continueConversation } from './actions';
 
-// Force the page to be dynamic and allow streaming responses up to 30 seconds
-export const dynamic = 'force-dynamic';
+// Allow streaming responses up to 30 seconds
 export const maxDuration = 30;
 
 export default function Home() {
@@ -120,7 +119,7 @@ export async function continueConversation(history: Message[]) {
         }),
         execute: async ({ city, unit }) => {
           const weather = getWeather({ city, unit });
-          return `It is currently 25°${weather.value} and ${weather.description} in ${city}!`;
+          return `It is currently ${weather.value}°${unit} and ${weather.description} in ${city}!`;
         },
       },
     },

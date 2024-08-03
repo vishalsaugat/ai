@@ -1,6 +1,6 @@
 ---
 title: Stream Chat Completion
-description: Learn to stream chat completions using the Vercel AI SDK in your Next.js application
+description: Learn to stream chat completions using the Vercel AI SDK in your Next.js App Router application
 ---
 
 # Stream Chat Completion
@@ -33,8 +33,7 @@ import { useState } from 'react';
 import { Message, continueConversation } from './actions';
 import { readStreamableValue } from 'ai/rsc';
 
-// Force the page to be dynamic and allow streaming responses up to 30 seconds
-export const dynamic = 'force-dynamic';
+// Allow streaming responses up to 30 seconds
 export const maxDuration = 30;
 
 export default function Home() {
