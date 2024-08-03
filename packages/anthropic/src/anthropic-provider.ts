@@ -1,4 +1,5 @@
 import { GoogleAuthOptions } from 'google-auth-library';
+import { loadApiKey, withoutTrailingSlash } from '@ai-sdk/provider-utils';
 import { AnthropicMessagesLanguageModel } from './anthropic-messages-language-model';
 import {
   AnthropicMessagesModelId,
