@@ -91,12 +91,6 @@ export function createAnthropic(
     'https://api.anthropic.com/v1';
 
   const getHeaders = () => ({
-    'anthropic-version': '2023-06-01',
-    'x-api-key': loadApiKey({
-      apiKey: options.apiKey,
-      environmentVariableName: 'ANTHROPIC_API_KEY',
-      description: 'Anthropic',
-    }),
     ...options.headers,
   });
 
