@@ -189,7 +189,7 @@ export class AnthropicMessagesLanguageModel implements LanguageModelV1 {
     }
 
     const { responseHeaders, value: response } = await postJsonToApi({
-      url: `${this.config.baseURL}/messages`,
+      url: `${this.config.baseURL}`,
       headers: this.getHeaders(options.headers),
       body: args,
       failedResponseHandler: anthropicFailedResponseHandler,
@@ -268,7 +268,7 @@ export class AnthropicMessagesLanguageModel implements LanguageModelV1 {
     }
 
     const { responseHeaders, value: response } = await postJsonToApi({
-      url: `${this.config.baseURL}/messages`,
+      url: `${this.config.baseURL}`,
       headers: this.getHeaders(options.headers),
       body: { ...args, stream: true },
       failedResponseHandler: anthropicFailedResponseHandler,
