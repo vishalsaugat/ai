@@ -8,7 +8,7 @@ const dummyEmbeddings = [
 ];
 const testValues = ['sunny day at the beach', 'rainy day in the city'];
 
-const provider = createOpenAI({ apiKey: 'test-api-key' });
+const provider = createOpenAI({ apiKey: 'Bearer test-api-key' });
 const model = provider.embedding('text-embedding-3-large');
 
 describe('doEmbed', () => {
@@ -103,7 +103,7 @@ describe('doEmbed', () => {
     prepareJsonResponse();
 
     const provider = createOpenAI({
-      apiKey: 'test-api-key',
+      apiKey: 'Bearer test-api-key',
       organization: 'test-organization',
       project: 'test-project',
       headers: {

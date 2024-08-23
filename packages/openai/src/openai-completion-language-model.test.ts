@@ -39,7 +39,7 @@ const TEST_LOGPROBS = {
 };
 
 const provider = createOpenAI({
-  apiKey: 'test-api-key',
+  apiKey: 'Bearer test-api-key',
   compatibility: 'strict',
 });
 
@@ -123,7 +123,7 @@ describe('doGenerate', () => {
   it('should extract logprobs', async () => {
     prepareJsonResponse({ logprobs: TEST_LOGPROBS });
 
-    const provider = createOpenAI({ apiKey: 'test-api-key' });
+    const provider = createOpenAI({ apiKey: 'Bearer test-api-key' });
 
     const response = await provider
       .completion('gpt-3.5-turbo', { logprobs: 1 })
@@ -213,7 +213,7 @@ describe('doGenerate', () => {
     prepareJsonResponse({ content: '' });
 
     const provider = createOpenAI({
-      apiKey: 'test-api-key',
+      apiKey: 'Bearer test-api-key',
       organization: 'test-organization',
       project: 'test-project',
       headers: {
@@ -432,7 +432,7 @@ describe('doStream', () => {
     prepareStreamResponse({ content: [] });
 
     const provider = createOpenAI({
-      apiKey: 'test-api-key',
+      apiKey: 'Bearer test-api-key',
       organization: 'test-organization',
       project: 'test-project',
       headers: {
