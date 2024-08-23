@@ -30,6 +30,7 @@ type AnthropicMessagesConfig = {
   baseURL: string;
   headers: () => Record<string, string | undefined | any>;
   fetch?: FetchFunction;
+  googleAuthOptions?: GoogleAuthOptions;
 };
 
 export class AnthropicMessagesLanguageModel implements LanguageModelV1 {
@@ -177,7 +178,8 @@ export class AnthropicMessagesLanguageModel implements LanguageModelV1 {
   ): Promise<Awaited<ReturnType<LanguageModelV1['doGenerate']>>> {
     const { args, warnings } = await this.getArgs(options);
 
-    let { googleAuthOptions, ...otherHeaders } = this.config.headers();
+    let { ...otherHeaders } = this.config.headers();
+    const { googleAuthOptions } = this.config;
     if (googleAuthOptions) {
       const googleAuth = new GoogleAuth({
         scopes: 'https://www.googleapis.com/auth/cloud-platform',
@@ -256,7 +258,8 @@ export class AnthropicMessagesLanguageModel implements LanguageModelV1 {
   ): Promise<Awaited<ReturnType<LanguageModelV1['doStream']>>> {
     const { args, warnings } = await this.getArgs(options);
 
-    let { googleAuthOptions, ...otherHeaders } = this.config.headers();
+    let { ...otherHeaders } = this.config.headers();
+    const { googleAuthOptions } = this.config;
     if (googleAuthOptions) {
       const googleAuth = new GoogleAuth({
         scopes: 'https://www.googleapis.com/auth/cloud-platform',

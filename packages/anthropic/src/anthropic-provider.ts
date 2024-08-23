@@ -103,6 +103,7 @@ export function createAnthropic(
       baseURL,
       headers: getHeaders,
       fetch: options.fetch,
+      googleAuthOptions: options.googleAuthOptions,
     });
 
   const provider = function (
