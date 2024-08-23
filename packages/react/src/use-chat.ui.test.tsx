@@ -121,7 +121,7 @@ describe('stream data stream', () => {
   );
 
   it(
-    'should show error response',
+    'should show error response when there is a server error',
     withTestServer(
       { type: 'error', url: '/api/chat', status: 404, content: 'Not found' },
       async () => {
@@ -130,6 +130,25 @@ describe('stream data stream', () => {
         await screen.findByTestId('error');
         expect(screen.getByTestId('error')).toHaveTextContent(
           'Error: Not found',
+        );
+      },
+    ),
+  );
+
+  it(
+    'should show error response when there is a streaming error',
+    withTestServer(
+      {
+        type: 'stream-values',
+        url: '/api/chat',
+        content: ['3:"custom error message"\n'],
+      },
+      async () => {
+        await userEvent.click(screen.getByTestId('do-append'));
+
+        await screen.findByTestId('error');
+        expect(screen.getByTestId('error')).toHaveTextContent(
+          'Error: custom error message',
         );
       },
     ),
@@ -1121,6 +1140,21 @@ describe('file attachments with data url', () => {
         const submitButton = screen.getByTestId('submit-button');
         await userEvent.click(submitButton);
 
+        await screen.findByTestId('message-0');
+        expect(screen.getByTestId('message-0')).toHaveTextContent(
+          'User: Message with text attachment',
+        );
+
+        await screen.findByTestId('attachment-0');
+        expect(screen.getByTestId('attachment-0')).toHaveTextContent(
+          'test file content',
+        );
+
+        await screen.findByTestId('message-1');
+        expect(screen.getByTestId('message-1')).toHaveTextContent(
+          'AI: Response to message with text attachment',
+        );
+
         expect(await call(0).getRequestBodyJson()).toStrictEqual({
           messages: [
             {
@@ -1136,21 +1170,6 @@ describe('file attachments with data url', () => {
             },
           ],
         });
-
-        await screen.findByTestId('message-0');
-        expect(screen.getByTestId('message-0')).toHaveTextContent(
-          'User: Message with text attachment',
-        );
-
-        await screen.findByTestId('attachment-0');
-        expect(screen.getByTestId('attachment-0')).toHaveTextContent(
-          'test file content',
-        );
-
-        await screen.findByTestId('message-1');
-        expect(screen.getByTestId('message-1')).toHaveTextContent(
-          'AI: Response to message with text attachment',
-        );
       },
     ),
   );
@@ -1177,22 +1196,6 @@ describe('file attachments with data url', () => {
         const submitButton = screen.getByTestId('submit-button');
         await userEvent.click(submitButton);
 
-        expect(await call(0).getRequestBodyJson()).toStrictEqual({
-          messages: [
-            {
-              role: 'user',
-              content: 'Message with image attachment',
-              experimental_attachments: [
-                {
-                  name: 'test.png',
-                  contentType: 'image/png',
-                  url: 'data:image/png;base64,dGVzdCBpbWFnZSBjb250ZW50',
-                },
-              ],
-            },
-          ],
-        });
-
         await screen.findByTestId('message-0');
         expect(screen.getByTestId('message-0')).toHaveTextContent(
           'User: Message with image attachment',
@@ -1208,6 +1211,22 @@ describe('file attachments with data url', () => {
         expect(screen.getByTestId('message-1')).toHaveTextContent(
           'AI: Response to message with image attachment',
         );
+
+        expect(await call(0).getRequestBodyJson()).toStrictEqual({
+          messages: [
+            {
+              role: 'user',
+              content: 'Message with image attachment',
+              experimental_attachments: [
+                {
+                  name: 'test.png',
+                  contentType: 'image/png',
+                  url: 'data:image/png;base64,dGVzdCBpbWFnZSBjb250ZW50',
+                },
+              ],
+            },
+          ],
+        });
       },
     ),
   );
@@ -1300,22 +1319,6 @@ describe('file attachments with url', () => {
         const submitButton = screen.getByTestId('submit-button');
         await userEvent.click(submitButton);
 
-        expect(await call(0).getRequestBodyJson()).toStrictEqual({
-          messages: [
-            {
-              role: 'user',
-              content: 'Message with image attachment',
-              experimental_attachments: [
-                {
-                  name: 'test.png',
-                  contentType: 'image/png',
-                  url: 'https://example.com/image.png',
-                },
-              ],
-            },
-          ],
-        });
-
         await screen.findByTestId('message-0');
         expect(screen.getByTestId('message-0')).toHaveTextContent(
           'User: Message with image attachment',
@@ -1331,6 +1334,119 @@ describe('file attachments with url', () => {
         expect(screen.getByTestId('message-1')).toHaveTextContent(
           'AI: Response to message with image attachment',
         );
+
+        expect(await call(0).getRequestBodyJson()).toStrictEqual({
+          messages: [
+            {
+              role: 'user',
+              content: 'Message with image attachment',
+              experimental_attachments: [
+                {
+                  name: 'test.png',
+                  contentType: 'image/png',
+                  url: 'https://example.com/image.png',
+                },
+              ],
+            },
+          ],
+        });
+      },
+    ),
+  );
+});
+
+describe('attachments with empty submit', () => {
+  const TestComponent = () => {
+    const { messages, handleSubmit } = useChat();
+
+    return (
+      <div>
+        {messages.map((m, idx) => (
+          <div data-testid={`message-${idx}`} key={m.id}>
+            {m.role === 'user' ? 'User: ' : 'AI: '}
+            {m.content}
+            {m.experimental_attachments?.map(attachment => (
+              <img
+                key={attachment.name}
+                src={attachment.url}
+                alt={attachment.name}
+                data-testid={`attachment-${idx}`}
+              />
+            ))}
+          </div>
+        ))}
+
+        <form
+          onSubmit={event => {
+            handleSubmit(event, {
+              allowEmptySubmit: true,
+              experimental_attachments: [
+                {
+                  name: 'test.png',
+                  contentType: 'image/png',
+                  url: 'https://example.com/image.png',
+                },
+              ],
+            });
+          }}
+          data-testid="chat-form"
+        >
+          <button type="submit" data-testid="submit-button">
+            Send
+          </button>
+        </form>
+      </div>
+    );
+  };
+
+  beforeEach(() => {
+    render(<TestComponent />);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    cleanup();
+  });
+
+  it(
+    'should handle image file attachment and submission',
+    withTestServer(
+      {
+        url: '/api/chat',
+        type: 'stream-values',
+        content: ['0:"Response to message with image attachment"\n'],
+      },
+      async ({ call }) => {
+        const submitButton = screen.getByTestId('submit-button');
+        await userEvent.click(submitButton);
+
+        await screen.findByTestId('message-0');
+        expect(screen.getByTestId('message-0')).toHaveTextContent('User:');
+
+        await screen.findByTestId('attachment-0');
+        expect(screen.getByTestId('attachment-0')).toHaveAttribute(
+          'src',
+          expect.stringContaining('https://example.com/image.png'),
+        );
+
+        await screen.findByTestId('message-1');
+        expect(screen.getByTestId('message-1')).toHaveTextContent('AI:');
+
+        expect(await call(0).getRequestBodyJson()).toStrictEqual({
+          messages: [
+            {
+              role: 'user',
+              content: '',
+              experimental_attachments: [
+                {
+                  name: 'test.png',
+                  contentType: 'image/png',
+                  url: 'https://example.com/image.png',
+                },
+              ],
+            },
+          ],
+        });
       },
     ),
   );

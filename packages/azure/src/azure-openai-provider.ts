@@ -1,12 +1,12 @@
 import {
   OpenAIChatLanguageModel,
   OpenAIChatSettings,
+  OpenAICompletionLanguageModel,
+  OpenAICompletionSettings,
   OpenAIEmbeddingModel,
   OpenAIEmbeddingSettings,
-  OpenAICompletionSettings,
-  OpenAICompletionLanguageModel,
 } from '@ai-sdk/openai/internal';
-import { loadApiKey, loadSetting } from '@ai-sdk/provider-utils';
+import { FetchFunction, loadApiKey, loadSetting } from '@ai-sdk/provider-utils';
 
 export interface AzureOpenAIProvider {
   (
@@ -85,7 +85,7 @@ Custom headers to include in the requests.
 Custom fetch implementation. You can use it as a middleware to intercept requests,
 or to provide a custom fetch implementation for e.g. testing.
     */
-  fetch?: typeof fetch;
+  fetch?: FetchFunction;
 }
 
 /**
@@ -113,8 +113,8 @@ export function createAzure(
 
   const url = ({ path, modelId }: { path: string; modelId: string }) =>
     options.baseURL
-      ? `${options.baseURL}/${modelId}${path}?api-version=2024-05-01-preview`
-      : `https://${getResourceName()}.openai.azure.com/openai/deployments/${modelId}${path}?api-version=2024-05-01-preview`;
+      ? `${options.baseURL}/${modelId}${path}?api-version=2024-06-01`
+      : `https://${getResourceName()}.openai.azure.com/openai/deployments/${modelId}${path}?api-version=2024-06-01`;
 
   const createChatModel = (
     deploymentName: string,

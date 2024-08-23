@@ -1,5 +1,5 @@
 import { GoogleAuthOptions } from 'google-auth-library';
-import { loadApiKey, withoutTrailingSlash } from '@ai-sdk/provider-utils';
+import { loadApiKey, withoutTrailingSlash, FetchFunction } from '@ai-sdk/provider-utils';
 import { AnthropicMessagesLanguageModel } from './anthropic-messages-language-model';
 import {
   AnthropicMessagesModelId,
@@ -75,7 +75,7 @@ Custom headers to include in the requests.
 Custom fetch implementation. You can use it as a middleware to intercept requests,
 or to provide a custom fetch implementation for e.g. testing.
     */
-  fetch?: typeof fetch;
+  fetch?: FetchFunction;
 
   generateId?: () => string;
 }

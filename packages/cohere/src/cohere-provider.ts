@@ -1,10 +1,11 @@
 import {
+  FetchFunction,
   generateId,
   loadApiKey,
   withoutTrailingSlash,
 } from '@ai-sdk/provider-utils';
-import { CohereChatModelId, CohereChatSettings } from './cohere-chat-settings';
 import { CohereChatLanguageModel } from './cohere-chat-language-model';
+import { CohereChatModelId, CohereChatSettings } from './cohere-chat-settings';
 
 export interface CohereProvider {
   (
@@ -30,7 +31,7 @@ The default prefix is `https://api.cohere.com/v1`.
 
   /**
 API key that is being send using the `Authorization` header.
-It defaults to the `MISTRAL_API_KEY` environment variable.
+It defaults to the `COHERE_API_KEY` environment variable.
    */
   apiKey?: string;
 
@@ -43,7 +44,7 @@ Custom headers to include in the requests.
 Custom fetch implementation. You can use it as a middleware to intercept requests,
 or to provide a custom fetch implementation for e.g. testing.
     */
-  fetch?: typeof fetch;
+  fetch?: FetchFunction;
 
   generateId?: () => string;
 }
@@ -71,7 +72,7 @@ export function createCohere(
     settings: CohereChatSettings = {},
   ) =>
     new CohereChatLanguageModel(modelId, settings, {
-      provider: 'mistral.chat',
+      provider: 'cohere.chat',
       baseURL,
       headers: getHeaders,
       generateId: options.generateId ?? generateId,
