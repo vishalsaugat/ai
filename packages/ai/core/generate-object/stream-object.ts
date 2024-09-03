@@ -36,6 +36,7 @@ import {
   AsyncIterableStream,
   createAsyncIterableStream,
 } from '../util/async-iterable-stream';
+import { now as originalNow } from '../util/now';
 import { prepareResponseHeaders } from '../util/prepare-response-headers';
 import { injectJsonInstruction } from './inject-json-instruction';
 import { OutputStrategy, getOutputStrategy } from './output-strategy';
@@ -146,6 +147,13 @@ Optional telemetry configuration (experimental).
 Callback that is called when the LLM response and the final object validation are finished.
      */
       onFinish?: OnFinishCallback<OBJECT>;
+
+      /**
+       * Internal. For test use only. May change without notice.
+       */
+      _internal?: {
+        now?: () => number;
+      };
     },
 ): Promise<StreamObjectResult<DeepPartial<OBJECT>, OBJECT, never>>;
 /**
@@ -209,6 +217,13 @@ Optional telemetry configuration (experimental).
 Callback that is called when the LLM response and the final object validation are finished.
      */
       onFinish?: OnFinishCallback<Array<ELEMENT>>;
+
+      /**
+       * Internal. For test use only. May change without notice.
+       */
+      _internal?: {
+        now?: () => number;
+      };
     },
 ): Promise<
   StreamObjectResult<
@@ -249,6 +264,13 @@ Optional telemetry configuration (experimental).
 Callback that is called when the LLM response and the final object validation are finished.
      */
       onFinish?: OnFinishCallback<JSONValue>;
+
+      /**
+       * Internal. For test use only. May change without notice.
+       */
+      _internal?: {
+        now?: () => number;
+      };
     },
 ): Promise<StreamObjectResult<JSONValue, JSONValue, never>>;
 export async function streamObject<SCHEMA, PARTIAL, RESULT, ELEMENT_STREAM>({
@@ -266,6 +288,7 @@ export async function streamObject<SCHEMA, PARTIAL, RESULT, ELEMENT_STREAM>({
   headers,
   experimental_telemetry: telemetry,
   onFinish,
+  _internal: { now = originalNow } = {},
   ...settings
 }: Omit<CallSettings, 'stopSequences'> &
   Prompt & {
@@ -296,6 +319,9 @@ export async function streamObject<SCHEMA, PARTIAL, RESULT, ELEMENT_STREAM>({
       warnings?: CallWarning[];
       experimental_providerMetadata: ProviderMetadata | undefined;
     }) => Promise<void> | void;
+    _internal?: {
+      now?: () => number;
+    };
   }): Promise<StreamObjectResult<PARTIAL, RESULT, ELEMENT_STREAM>> {
   validateObjectGenerationInput({
     output,
@@ -467,11 +493,10 @@ export async function streamObject<SCHEMA, PARTIAL, RESULT, ELEMENT_STREAM>({
         }
       }
 
-      // const result = await retry(() => model.doStream(callOptions));
       const {
         result: { stream, warnings, rawResponse },
         doStreamSpan,
-        startTimestamp,
+        startTimestampMs,
       } = await retry(() =>
         recordSpan({
           name: 'ai.streamObject.doStream',
@@ -492,17 +517,20 @@ export async function streamObject<SCHEMA, PARTIAL, RESULT, ELEMENT_STREAM>({
               'ai.settings.mode': mode,
 
               // standardized gen-ai llm span attributes:
-              'gen_ai.request.model': model.modelId,
               'gen_ai.system': model.provider,
+              'gen_ai.request.model': model.modelId,
+              'gen_ai.request.frequency_penalty': settings.frequencyPenalty,
               'gen_ai.request.max_tokens': settings.maxTokens,
+              'gen_ai.request.presence_penalty': settings.presencePenalty,
               'gen_ai.request.temperature': settings.temperature,
+              'gen_ai.request.top_k': settings.topK,
               'gen_ai.request.top_p': settings.topP,
             },
           }),
           tracer,
           endWhenDone: false,
           fn: async doStreamSpan => ({
-            startTimestamp: performance.now(), // get before the call
+            startTimestampMs: now(),
             doStreamSpan,
             result: await model.doStream(callOptions),
           }),
@@ -518,7 +546,8 @@ export async function streamObject<SCHEMA, PARTIAL, RESULT, ELEMENT_STREAM>({
         rootSpan,
         doStreamSpan,
         telemetry,
-        startTimestamp,
+        startTimestampMs,
+        now,
       });
     },
   });
@@ -557,7 +586,8 @@ class DefaultStreamObjectResult<PARTIAL, RESULT, ELEMENT_STREAM>
     rootSpan,
     doStreamSpan,
     telemetry,
-    startTimestamp,
+    startTimestampMs,
+    now,
   }: {
     stream: ReadableStream<
       string | Omit<LanguageModelV1StreamPart, 'text-delta'>
@@ -573,7 +603,8 @@ class DefaultStreamObjectResult<PARTIAL, RESULT, ELEMENT_STREAM>
     rootSpan: Span;
     doStreamSpan: Span;
     telemetry: TelemetrySettings | undefined;
-    startTimestamp: number; // performance.now() timestamp
+    startTimestampMs: number;
+    now: () => number;
   }) {
     this.warnings = warnings;
     this.rawResponse = rawResponse;
@@ -603,13 +634,14 @@ class DefaultStreamObjectResult<PARTIAL, RESULT, ELEMENT_STREAM>
 
     // pipe chunks through a transformation stream that extracts metadata:
     let accumulatedText = '';
-    let delta = '';
+    let textDelta = '';
 
     // Keep track of raw parse result before type validation, since e.g. Zod might
     // change the object by mapping properties.
     let latestObjectJson: JSONValue | undefined = undefined;
     let latestObject: PARTIAL | undefined = undefined;
-    let firstChunk = true;
+    let isFirstChunk = true;
+    let isFirstDelta = true;
 
     const self = this;
     this.originalStream = stream.pipeThrough(
@@ -619,10 +651,10 @@ class DefaultStreamObjectResult<PARTIAL, RESULT, ELEMENT_STREAM>
       >({
         async transform(chunk, controller): Promise<void> {
           // Telemetry event for first chunk:
-          if (firstChunk) {
-            const msToFirstChunk = performance.now() - startTimestamp;
+          if (isFirstChunk) {
+            const msToFirstChunk = now() - startTimestampMs;
 
-            firstChunk = false;
+            isFirstChunk = false;
 
             doStreamSpan.addEvent('ai.stream.firstChunk', {
               'ai.stream.msToFirstChunk': msToFirstChunk,
@@ -636,7 +668,7 @@ class DefaultStreamObjectResult<PARTIAL, RESULT, ELEMENT_STREAM>
           // process partial text chunks
           if (typeof chunk === 'string') {
             accumulatedText += chunk;
-            delta += chunk;
+            textDelta += chunk;
 
             const { value: currentObjectJson, state: parseState } =
               parsePartialJson(accumulatedText);
@@ -647,16 +679,19 @@ class DefaultStreamObjectResult<PARTIAL, RESULT, ELEMENT_STREAM>
             ) {
               const validationResult = outputStrategy.validatePartialResult({
                 value: currentObjectJson,
-                parseState,
+                textDelta,
+                latestObject,
+                isFirstDelta,
+                isFinalDelta: parseState === 'successful-parse',
               });
 
               if (
                 validationResult.success &&
-                !isDeepEqualData(latestObject, validationResult.value)
+                !isDeepEqualData(latestObject, validationResult.value.partial)
               ) {
                 // inside inner check to correctly parse the final element in array mode:
                 latestObjectJson = currentObjectJson;
-                latestObject = validationResult.value;
+                latestObject = validationResult.value.partial;
 
                 controller.enqueue({
                   type: 'object',
@@ -665,10 +700,11 @@ class DefaultStreamObjectResult<PARTIAL, RESULT, ELEMENT_STREAM>
 
                 controller.enqueue({
                   type: 'text-delta',
-                  textDelta: delta,
+                  textDelta: validationResult.value.textDelta,
                 });
 
-                delta = '';
+                textDelta = '';
+                isFirstDelta = false;
               }
             }
 
@@ -678,11 +714,8 @@ class DefaultStreamObjectResult<PARTIAL, RESULT, ELEMENT_STREAM>
           switch (chunk.type) {
             case 'finish': {
               // send final text delta:
-              if (delta !== '') {
-                controller.enqueue({
-                  type: 'text-delta',
-                  textDelta: delta,
-                });
+              if (textDelta !== '') {
+                controller.enqueue({ type: 'text-delta', textDelta });
               }
 
               // store finish reason for telemetry:
@@ -733,16 +766,21 @@ class DefaultStreamObjectResult<PARTIAL, RESULT, ELEMENT_STREAM>
               selectTelemetryAttributes({
                 telemetry,
                 attributes: {
-                  'ai.finishReason': finishReason,
-                  'ai.usage.promptTokens': finalUsage.promptTokens,
-                  'ai.usage.completionTokens': finalUsage.completionTokens,
-                  'ai.result.object': {
+                  'ai.response.finishReason': finishReason,
+                  'ai.response.object': {
                     output: () => JSON.stringify(object),
                   },
 
+                  'ai.usage.promptTokens': finalUsage.promptTokens,
+                  'ai.usage.completionTokens': finalUsage.completionTokens,
+
+                  // deprecated
+                  'ai.finishReason': finishReason,
+                  'ai.result.object': { output: () => JSON.stringify(object) },
+
                   // standardized gen-ai llm span attributes:
-                  'gen_ai.usage.prompt_tokens': finalUsage.promptTokens,
-                  'gen_ai.usage.completion_tokens': finalUsage.completionTokens,
+                  'gen_ai.usage.input_tokens': finalUsage.promptTokens,
+                  'gen_ai.usage.output_tokens': finalUsage.completionTokens,
                   'gen_ai.response.finish_reasons': [finishReason],
                 },
               }),
@@ -758,9 +796,12 @@ class DefaultStreamObjectResult<PARTIAL, RESULT, ELEMENT_STREAM>
                 attributes: {
                   'ai.usage.promptTokens': finalUsage.promptTokens,
                   'ai.usage.completionTokens': finalUsage.completionTokens,
-                  'ai.result.object': {
+                  'ai.response.object': {
                     output: () => JSON.stringify(object),
                   },
+
+                  // deprecated
+                  'ai.result.object': { output: () => JSON.stringify(object) },
                 },
               }),
             );

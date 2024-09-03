@@ -1,19 +1,28 @@
 import { GoogleAuthOptions } from 'google-auth-library';
-import { loadApiKey, withoutTrailingSlash, FetchFunction } from '@ai-sdk/provider-utils';
+import {
+  LanguageModelV1,
+  NoSuchModelError,
+  ProviderV1,
+} from '@ai-sdk/provider';
+import {
+  FetchFunction,
+  loadApiKey,
+  withoutTrailingSlash,
+} from '@ai-sdk/provider-utils';
 import { AnthropicMessagesLanguageModel } from './anthropic-messages-language-model';
 import {
   AnthropicMessagesModelId,
   AnthropicMessagesSettings,
 } from './anthropic-messages-settings';
 
-export interface AnthropicProvider {
+export interface AnthropicProvider extends ProviderV1 {
   /**
 Creates a model for text generation.
 */
   (
     modelId: AnthropicMessagesModelId,
     settings?: AnthropicMessagesSettings,
-  ): AnthropicMessagesLanguageModel;
+  ): LanguageModelV1;
 
   /**
 Creates a model for text generation.
@@ -21,23 +30,23 @@ Creates a model for text generation.
   languageModel(
     modelId: AnthropicMessagesModelId,
     settings?: AnthropicMessagesSettings,
-  ): AnthropicMessagesLanguageModel;
+  ): LanguageModelV1;
 
   /**
-Creates a model for text generation.
+@deprecated Use `.languageModel()` instead.
 */
   chat(
     modelId: AnthropicMessagesModelId,
     settings?: AnthropicMessagesSettings,
-  ): AnthropicMessagesLanguageModel;
+  ): LanguageModelV1;
 
   /**
-   * @deprecated Use `chat()` instead.
+@deprecated Use `.languageModel()` instead.
    */
   messages(
     modelId: AnthropicMessagesModelId,
     settings?: AnthropicMessagesSettings,
-  ): AnthropicMessagesLanguageModel;
+  ): LanguageModelV1;
 }
 
 export interface AnthropicProviderSettings {
@@ -57,14 +66,6 @@ API key that is being send using the `x-api-key` header.
 It defaults to the `ANTHROPIC_API_KEY` environment variable.
    */
   apiKey?: string;
-
-  /**
-  * Optional. The Authentication options provided by google-auth-library.
-  * Complete list of authentication options is documented in the
-  * GoogleAuthOptions interface:
-  * https://github.com/googleapis/google-auth-library-nodejs/blob/main/src/auth/googleauth.ts.
-   */
-  googleAuthOptions?: GoogleAuthOptions;
 
   /**
 Custom headers to include in the requests.
@@ -87,7 +88,7 @@ export function createAnthropic(
   options: AnthropicProviderSettings = {},
 ): AnthropicProvider {
   const baseURL =
-    options.baseURL ?? options.baseUrl ??
+    withoutTrailingSlash(options.baseURL ?? options.baseUrl) ??
     'https://api.anthropic.com/v1';
 
   const getHeaders = () => ({
@@ -103,7 +104,6 @@ export function createAnthropic(
       baseURL,
       headers: getHeaders,
       fetch: options.fetch,
-      googleAuthOptions: options.googleAuthOptions,
     });
 
   const provider = function (
@@ -122,6 +122,9 @@ export function createAnthropic(
   provider.languageModel = createChatModel;
   provider.chat = createChatModel;
   provider.messages = createChatModel;
+  provider.textEmbeddingModel = (modelId: string) => {
+    throw new NoSuchModelError({ modelId, modelType: 'textEmbeddingModel' });
+  };
 
   return provider as AnthropicProvider;
 }

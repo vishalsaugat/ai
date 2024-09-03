@@ -1097,7 +1097,7 @@ describe('output = "array"', () => {
       });
     });
 
-    it('should stream only complete objects', async () => {
+    it('should stream only complete objects in partialObjectStream', async () => {
       assert.deepStrictEqual(
         await convertAsyncIterableToArray(result.partialObjectStream),
         [
@@ -1109,6 +1109,18 @@ describe('output = "array"', () => {
             { content: 'element 2' },
             { content: 'element 3' },
           ],
+        ],
+      );
+    });
+
+    it('should stream only complete objects in textStream', async () => {
+      assert.deepStrictEqual(
+        await convertAsyncIterableToArray(result.textStream),
+        [
+          '[',
+          '{"content":"element 1"}',
+          ',{"content":"element 2"}',
+          ',{"content":"element 3"}]',
         ],
       );
     });
@@ -1140,6 +1152,123 @@ describe('output = "array"', () => {
           { content: 'element 2' },
           { content: 'element 3' },
         ],
+      );
+    });
+  });
+
+  describe('array with 2 elements streamed in 1 chunk', () => {
+    let result: StreamObjectResult<
+      { content: string }[],
+      { content: string }[],
+      AsyncIterableStream<{ content: string }>
+    >;
+
+    let onFinishResult: Parameters<
+      Required<Parameters<typeof streamObject>[0]>['onFinish']
+    >[0];
+
+    beforeEach(async () => {
+      result = await streamObject({
+        model: new MockLanguageModelV1({
+          doStream: async ({ prompt, mode }) => {
+            assert.deepStrictEqual(mode, {
+              type: 'object-json',
+              name: undefined,
+              description: undefined,
+              schema: {
+                $schema: 'http://json-schema.org/draft-07/schema#',
+                additionalProperties: false,
+                properties: {
+                  elements: {
+                    type: 'array',
+                    items: {
+                      type: 'object',
+                      properties: { content: { type: 'string' } },
+                      required: ['content'],
+                      additionalProperties: false,
+                    },
+                  },
+                },
+                required: ['elements'],
+                type: 'object',
+              },
+            });
+
+            assert.deepStrictEqual(prompt, [
+              {
+                role: 'system',
+                content:
+                  'JSON schema:\n' +
+                  `{\"$schema\":\"http://json-schema.org/draft-07/schema#\",\"type\":\"object\",\"properties\":{\"elements\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"content\":{\"type\":\"string\"}},\"required\":[\"content\"],\"additionalProperties\":false}}},\"required\":[\"elements\"],\"additionalProperties\":false}` +
+                  `\n` +
+                  'You MUST answer with a JSON object that matches the JSON schema above.',
+              },
+              { role: 'user', content: [{ type: 'text', text: 'prompt' }] },
+            ]);
+
+            return {
+              stream: convertArrayToReadableStream([
+                {
+                  type: 'text-delta',
+                  textDelta:
+                    '{"elements":[{"content":"element 1"},{"content":"element 2"}]}',
+                },
+                // finish
+                {
+                  type: 'finish',
+                  finishReason: 'stop',
+                  usage: { completionTokens: 10, promptTokens: 3 },
+                },
+              ]),
+              rawCall: { rawPrompt: 'prompt', rawSettings: {} },
+            };
+          },
+        }),
+        schema: z.object({ content: z.string() }),
+        output: 'array',
+        mode: 'json',
+        prompt: 'prompt',
+        onFinish: async event => {
+          onFinishResult = event as unknown as typeof onFinishResult;
+        },
+      });
+    });
+
+    it('should stream only complete objects in partialObjectStream', async () => {
+      assert.deepStrictEqual(
+        await convertAsyncIterableToArray(result.partialObjectStream),
+        [[{ content: 'element 1' }, { content: 'element 2' }]],
+      );
+    });
+
+    it('should stream only complete objects in textStream', async () => {
+      assert.deepStrictEqual(
+        await convertAsyncIterableToArray(result.textStream),
+        ['[{"content":"element 1"},{"content":"element 2"}]'],
+      );
+    });
+
+    it('should have the correct object result', async () => {
+      // consume stream
+      await convertAsyncIterableToArray(result.partialObjectStream);
+
+      expect(await result.object).toStrictEqual([
+        { content: 'element 1' },
+        { content: 'element 2' },
+      ]);
+    });
+
+    it('should call onFinish callback with full array', async () => {
+      expect(onFinishResult.object).toStrictEqual([
+        { content: 'element 1' },
+        { content: 'element 2' },
+      ]);
+    });
+
+    it('should stream elements individually in elementStream', async () => {
+      assert.deepStrictEqual(
+        await convertAsyncIterableToArray(result.elementStream),
+        [{ content: 'element 1' }, { content: 'element 2' }],
       );
     });
   });
@@ -1231,12 +1360,13 @@ describe('telemetry', () => {
       schema: z.object({ content: z.string() }),
       mode: 'json',
       prompt: 'prompt',
+      _internal: { now: () => 0 },
     });
 
     // consume stream
     await convertAsyncIterableToArray(result.partialObjectStream);
 
-    assert.deepStrictEqual(tracer.jsonSpans, []);
+    expect(tracer.jsonSpans).toMatchSnapshot();
   });
 
   it('should record telemetry data when enabled with mode "json"', async () => {
@@ -1264,6 +1394,11 @@ describe('telemetry', () => {
       schemaDescription: 'test description',
       mode: 'json',
       prompt: 'prompt',
+      topK: 0.1,
+      topP: 0.2,
+      frequencyPenalty: 0.3,
+      presencePenalty: 0.4,
+      temperature: 0.5,
       headers: {
         header1: 'value1',
         header2: 'value2',
@@ -1276,76 +1411,13 @@ describe('telemetry', () => {
           test2: false,
         },
       },
+      _internal: { now: () => 0 },
     });
 
     // consume stream
     await convertAsyncIterableToArray(result.partialObjectStream);
 
-    expect(tracer.jsonSpans).toStrictEqual([
-      {
-        name: 'ai.streamObject',
-        attributes: {
-          'operation.name': 'ai.streamObject test-function-id',
-          'resource.name': 'test-function-id',
-          'ai.operationId': 'ai.streamObject',
-          'ai.model.id': 'mock-model-id',
-          'ai.model.provider': 'mock-provider',
-          'ai.prompt': '{"prompt":"prompt"}',
-          'ai.request.headers.header1': 'value1',
-          'ai.request.headers.header2': 'value2',
-          'ai.telemetry.functionId': 'test-function-id',
-          'ai.telemetry.metadata.test1': 'value1',
-          'ai.telemetry.metadata.test2': false,
-          'ai.result.object': '{"content":"Hello, world!"}',
-          'ai.usage.completionTokens': 10,
-          'ai.usage.promptTokens': 3,
-          'ai.settings.mode': 'json',
-          'ai.settings.output': 'object',
-          'ai.schema':
-            '{"type":"object","properties":{"content":{"type":"string"}},"required":["content"],"additionalProperties":false,"$schema":"http://json-schema.org/draft-07/schema#"}',
-          'ai.schema.name': 'test-name',
-          'ai.schema.description': 'test description',
-        },
-        events: [],
-      },
-      {
-        name: 'ai.streamObject.doStream',
-        attributes: {
-          'operation.name': 'ai.streamObject.doStream test-function-id',
-          'resource.name': 'test-function-id',
-          'ai.operationId': 'ai.streamObject.doStream',
-          'ai.model.id': 'mock-model-id',
-          'ai.model.provider': 'mock-provider',
-          'ai.request.headers.header1': 'value1',
-          'ai.request.headers.header2': 'value2',
-          'ai.result.object': '{"content":"Hello, world!"}',
-          'ai.telemetry.functionId': 'test-function-id',
-          'ai.telemetry.metadata.test1': 'value1',
-          'ai.telemetry.metadata.test2': false,
-          'ai.usage.completionTokens': 10,
-          'ai.usage.promptTokens': 3,
-          'ai.settings.mode': 'json',
-          'ai.prompt.format': 'prompt',
-          'ai.prompt.messages':
-            '[{"role":"system","content":"JSON schema:\\n{\\"type\\":\\"object\\",\\"properties\\":{\\"content\\":{\\"type\\":\\"string\\"}},\\"required\\":[\\"content\\"],\\"additionalProperties\\":false,\\"$schema\\":\\"http://json-schema.org/draft-07/schema#\\"}\\nYou MUST answer with a JSON object that matches the JSON schema above."},{"role":"user","content":[{"type":"text","text":"prompt"}]}]',
-          'ai.finishReason': 'stop',
-          'ai.stream.msToFirstChunk': expect.any(Number),
-          'gen_ai.request.model': 'mock-model-id',
-          'gen_ai.system': 'mock-provider',
-          'gen_ai.usage.completion_tokens': 10,
-          'gen_ai.usage.prompt_tokens': 3,
-          'gen_ai.response.finish_reasons': ['stop'],
-        },
-        events: [
-          {
-            name: 'ai.stream.firstChunk',
-            attributes: {
-              'ai.stream.msToFirstChunk': expect.any(Number),
-            },
-          },
-        ],
-      },
-    ]);
+    expect(tracer.jsonSpans).toMatchSnapshot();
   });
 
   it('should record telemetry data when enabled with mode "tool"', async () => {
@@ -1409,6 +1481,11 @@ describe('telemetry', () => {
       schemaDescription: 'test description',
       mode: 'tool',
       prompt: 'prompt',
+      topK: 0.1,
+      topP: 0.2,
+      frequencyPenalty: 0.3,
+      presencePenalty: 0.4,
+      temperature: 0.5,
       headers: {
         header1: 'value1',
         header2: 'value2',
@@ -1421,76 +1498,13 @@ describe('telemetry', () => {
           test2: false,
         },
       },
+      _internal: { now: () => 0 },
     });
 
     // consume stream
     await convertAsyncIterableToArray(result.partialObjectStream);
 
-    expect(tracer.jsonSpans).toStrictEqual([
-      {
-        name: 'ai.streamObject',
-        attributes: {
-          'operation.name': 'ai.streamObject test-function-id',
-          'resource.name': 'test-function-id',
-          'ai.operationId': 'ai.streamObject',
-          'ai.model.id': 'mock-model-id',
-          'ai.model.provider': 'mock-provider',
-          'ai.prompt': '{"prompt":"prompt"}',
-          'ai.request.headers.header1': 'value1',
-          'ai.request.headers.header2': 'value2',
-          'ai.telemetry.functionId': 'test-function-id',
-          'ai.telemetry.metadata.test1': 'value1',
-          'ai.telemetry.metadata.test2': false,
-          'ai.result.object': '{"content":"Hello, world!"}',
-          'ai.usage.completionTokens': 10,
-          'ai.usage.promptTokens': 3,
-          'ai.settings.mode': 'tool',
-          'ai.settings.output': 'object',
-          'ai.schema':
-            '{"type":"object","properties":{"content":{"type":"string"}},"required":["content"],"additionalProperties":false,"$schema":"http://json-schema.org/draft-07/schema#"}',
-          'ai.schema.name': 'test-name',
-          'ai.schema.description': 'test description',
-        },
-        events: [],
-      },
-      {
-        name: 'ai.streamObject.doStream',
-        attributes: {
-          'operation.name': 'ai.streamObject.doStream test-function-id',
-          'resource.name': 'test-function-id',
-          'ai.operationId': 'ai.streamObject.doStream',
-          'ai.model.id': 'mock-model-id',
-          'ai.model.provider': 'mock-provider',
-          'ai.request.headers.header1': 'value1',
-          'ai.request.headers.header2': 'value2',
-          'ai.result.object': '{"content":"Hello, world!"}',
-          'ai.telemetry.functionId': 'test-function-id',
-          'ai.telemetry.metadata.test1': 'value1',
-          'ai.telemetry.metadata.test2': false,
-          'ai.usage.completionTokens': 10,
-          'ai.usage.promptTokens': 3,
-          'ai.settings.mode': 'tool',
-          'ai.prompt.format': 'prompt',
-          'ai.prompt.messages':
-            '[{"role":"user","content":[{"type":"text","text":"prompt"}]}]',
-          'ai.finishReason': 'stop',
-          'ai.stream.msToFirstChunk': expect.any(Number),
-          'gen_ai.request.model': 'mock-model-id',
-          'gen_ai.system': 'mock-provider',
-          'gen_ai.usage.completion_tokens': 10,
-          'gen_ai.usage.prompt_tokens': 3,
-          'gen_ai.response.finish_reasons': ['stop'],
-        },
-        events: [
-          {
-            name: 'ai.stream.firstChunk',
-            attributes: {
-              'ai.stream.msToFirstChunk': expect.any(Number),
-            },
-          },
-        ],
-      },
-    ]);
+    expect(tracer.jsonSpans).toMatchSnapshot();
   });
 
   it('should not record telemetry inputs / outputs when disabled with mode "json"', async () => {
@@ -1521,54 +1535,13 @@ describe('telemetry', () => {
         recordInputs: false,
         recordOutputs: false,
       },
+      _internal: { now: () => 0 },
     });
 
     // consume stream
     await convertAsyncIterableToArray(result.partialObjectStream);
 
-    expect(tracer.jsonSpans).toStrictEqual([
-      {
-        name: 'ai.streamObject',
-        attributes: {
-          'operation.name': 'ai.streamObject',
-          'ai.operationId': 'ai.streamObject',
-          'ai.model.id': 'mock-model-id',
-          'ai.model.provider': 'mock-provider',
-          'ai.usage.completionTokens': 10,
-          'ai.usage.promptTokens': 3,
-          'ai.settings.mode': 'json',
-          'ai.settings.output': 'object',
-        },
-        events: [],
-      },
-      {
-        name: 'ai.streamObject.doStream',
-        attributes: {
-          'operation.name': 'ai.streamObject.doStream',
-          'ai.operationId': 'ai.streamObject.doStream',
-          'ai.model.id': 'mock-model-id',
-          'ai.model.provider': 'mock-provider',
-          'ai.usage.completionTokens': 10,
-          'ai.usage.promptTokens': 3,
-          'ai.settings.mode': 'json',
-          'ai.finishReason': 'stop',
-          'ai.stream.msToFirstChunk': expect.any(Number),
-          'gen_ai.request.model': 'mock-model-id',
-          'gen_ai.system': 'mock-provider',
-          'gen_ai.usage.completion_tokens': 10,
-          'gen_ai.usage.prompt_tokens': 3,
-          'gen_ai.response.finish_reasons': ['stop'],
-        },
-        events: [
-          {
-            name: 'ai.stream.firstChunk',
-            attributes: {
-              'ai.stream.msToFirstChunk': expect.any(Number),
-            },
-          },
-        ],
-      },
-    ]);
+    expect(tracer.jsonSpans).toMatchSnapshot();
   });
 
   it('should not record telemetry inputs / outputs when disabled with mode "tool"', async () => {
@@ -1635,53 +1608,12 @@ describe('telemetry', () => {
         recordInputs: false,
         recordOutputs: false,
       },
+      _internal: { now: () => 0 },
     });
 
     // consume stream
     await convertAsyncIterableToArray(result.partialObjectStream);
 
-    expect(tracer.jsonSpans).toStrictEqual([
-      {
-        name: 'ai.streamObject',
-        attributes: {
-          'operation.name': 'ai.streamObject',
-          'ai.operationId': 'ai.streamObject',
-          'ai.model.id': 'mock-model-id',
-          'ai.model.provider': 'mock-provider',
-          'ai.usage.completionTokens': 10,
-          'ai.usage.promptTokens': 3,
-          'ai.settings.mode': 'tool',
-          'ai.settings.output': 'object',
-        },
-        events: [],
-      },
-      {
-        name: 'ai.streamObject.doStream',
-        attributes: {
-          'operation.name': 'ai.streamObject.doStream',
-          'ai.operationId': 'ai.streamObject.doStream',
-          'ai.model.id': 'mock-model-id',
-          'ai.model.provider': 'mock-provider',
-          'ai.finishReason': 'stop',
-          'ai.usage.completionTokens': 10,
-          'ai.usage.promptTokens': 3,
-          'ai.settings.mode': 'tool',
-          'ai.stream.msToFirstChunk': expect.any(Number),
-          'gen_ai.request.model': 'mock-model-id',
-          'gen_ai.system': 'mock-provider',
-          'gen_ai.usage.completion_tokens': 10,
-          'gen_ai.usage.prompt_tokens': 3,
-          'gen_ai.response.finish_reasons': ['stop'],
-        },
-        events: [
-          {
-            name: 'ai.stream.firstChunk',
-            attributes: {
-              'ai.stream.msToFirstChunk': expect.any(Number),
-            },
-          },
-        ],
-      },
-    ]);
+    expect(tracer.jsonSpans).toMatchSnapshot();
   });
 });

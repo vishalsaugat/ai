@@ -1,5 +1,76 @@
 # ai
 
+## 3.3.26
+
+### Patch Changes
+
+- Updated dependencies [4ab883f]
+  - @ai-sdk/react@0.0.54
+
+## 3.3.25
+
+### Patch Changes
+
+- 4f1530f: feat (ai/core): add OpenTelemetry Semantic Conventions for GenAI operations to v1.27.0 of standard
+- dad775f: feat (ai/core): add finish event and avg output tokens per second (telemetry)
+
+## 3.3.24
+
+### Patch Changes
+
+- d87a655: fix (ai/core): provide fallback when globalThis.performance is not available
+
+## 3.3.23
+
+### Patch Changes
+
+- b55e6f7: fix (ai/core): streamObject text stream in array mode must not include elements: prefix.
+
+## 3.3.22
+
+### Patch Changes
+
+- a5a56fd: fix (ai/core): only send roundtrip-finish event after async tool calls are done
+
+## 3.3.21
+
+### Patch Changes
+
+- aa2dc58: feat (ai/core): add maxToolRoundtrips to streamText
+- Updated dependencies [aa2dc58]
+  - @ai-sdk/ui-utils@0.0.40
+  - @ai-sdk/react@0.0.53
+  - @ai-sdk/solid@0.0.43
+  - @ai-sdk/svelte@0.0.45
+  - @ai-sdk/vue@0.0.45
+
+## 3.3.20
+
+### Patch Changes
+
+- 7807677: fix (rsc): Deep clone currentState in getMutableState()
+
+## 3.3.19
+
+### Patch Changes
+
+- 7235de0: fix (ai/core): convertToCoreMessages accepts Message[]
+
+## 3.3.18
+
+### Patch Changes
+
+- 9e3b5a5: feat (ai/core): add experimental_customProvider
+- 26515cb: feat (ai/provider): introduce ProviderV1 specification
+- Updated dependencies [26515cb]
+  - @ai-sdk/provider@0.0.22
+  - @ai-sdk/provider-utils@1.0.17
+  - @ai-sdk/ui-utils@0.0.39
+  - @ai-sdk/react@0.0.52
+  - @ai-sdk/solid@0.0.42
+  - @ai-sdk/svelte@0.0.44
+  - @ai-sdk/vue@0.0.44
+
 ## 3.3.17
 
 ### Patch Changes

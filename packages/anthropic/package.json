@@ -1,13 +1,14 @@
 {
   "name": "@vishalai/anthropic",
-  "version": "0.0.52",
+  "version": "0.0.53",
   "license": "Apache-2.0",
   "sideEffects": false,
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
   "files": [
-    "dist/**/*"
+    "dist/**/*",
+    "CHANGELOG.md"
   ],
   "scripts": {
     "build": "tsup",
@@ -30,8 +31,8 @@
   },
   "dependencies": {
     "google-auth-library": "^9.10.0",
-    "@ai-sdk/provider": "0.0.21",
-    "@ai-sdk/provider-utils": "1.0.16"
+    "@ai-sdk/provider": "0.0.22",
+    "@ai-sdk/provider-utils": "1.0.17"
   },
   "devDependencies": {
     "@types/node": "^18",
