@@ -113,6 +113,27 @@ const provider = createOpenAI({
 
 const model = provider.chat('gpt-3.5-turbo');
 
+describe('settings', () => {
+  it('should set supportsImageUrls to true by default', () => {
+    const defaultModel = provider.chat('gpt-3.5-turbo');
+    expect(defaultModel.supportsImageUrls).toBe(true);
+  });
+
+  it('should set supportsImageUrls to false when downloadImages is true', () => {
+    const modelWithDownloadImages = provider.chat('gpt-3.5-turbo', {
+      downloadImages: true,
+    });
+    expect(modelWithDownloadImages.supportsImageUrls).toBe(false);
+  });
+
+  it('should set supportsImageUrls to true when downloadImages is false', () => {
+    const modelWithoutDownloadImages = provider.chat('gpt-3.5-turbo', {
+      downloadImages: false,
+    });
+    expect(modelWithoutDownloadImages.supportsImageUrls).toBe(true);
+  });
+});
+
 describe('doGenerate', () => {
   const server = new JsonTestServer(
     'https://api.openai.com/v1/chat/completions',
@@ -131,6 +152,9 @@ describe('doGenerate', () => {
     },
     logprobs = null,
     finish_reason = 'stop',
+    id = 'chatcmpl-95ZTZkhr0mHNKqerQfiwkuox3PHAd',
+    created = 1711115037,
+    model = 'gpt-3.5-turbo-0125',
   }: {
     content?: string;
     tool_calls?: Array<{
@@ -149,6 +173,9 @@ describe('doGenerate', () => {
       prompt_tokens?: number;
       total_tokens?: number;
       completion_tokens?: number;
+      completion_tokens_details?: {
+        reasoning_tokens?: number;
+      };
     };
     logprobs?: {
       content:
@@ -160,12 +187,15 @@ describe('doGenerate', () => {
         | null;
     } | null;
     finish_reason?: string;
+    created?: number;
+    id?: string;
+    model?: string;
   } = {}) {
     server.responseBodyJson = {
-      id: 'chatcmpl-95ZTZkhr0mHNKqerQfiwkuox3PHAd',
+      id,
       object: 'chat.completion',
-      created: 1711115037,
-      model: 'gpt-3.5-turbo-0125',
+      created,
+      model,
       choices: [
         {
           index: 0,
@@ -211,6 +241,26 @@ describe('doGenerate', () => {
     expect(usage).toStrictEqual({
       promptTokens: 20,
       completionTokens: 5,
+    });
+  });
+
+  it('should send additional response information', async () => {
+    prepareJsonResponse({
+      id: 'test-id',
+      created: 123,
+      model: 'test-model',
+    });
+
+    const { response } = await model.doGenerate({
+      inputFormat: 'prompt',
+      mode: { type: 'regular' },
+      prompt: TEST_PROMPT,
+    });
+
+    expect(response).toStrictEqual({
+      id: 'test-id',
+      timestamp: new Date(123 * 1000),
+      modelId: 'test-model',
     });
   });
 
@@ -788,6 +838,216 @@ describe('doGenerate', () => {
       },
     ]);
   });
+
+  describe('reasoning models', () => {
+    it('should clear out temperature, top_p, frequency_penalty, presence_penalty', async () => {
+      prepareJsonResponse();
+
+      const model = provider.chat('o1-preview');
+
+      await model.doGenerate({
+        inputFormat: 'prompt',
+        mode: { type: 'regular' },
+        prompt: TEST_PROMPT,
+        temperature: 0.5,
+        topP: 0.7,
+        frequencyPenalty: 0.2,
+        presencePenalty: 0.3,
+      });
+
+      expect(await server.getRequestBodyJson()).toStrictEqual({
+        model: 'o1-preview',
+        messages: [{ role: 'user', content: 'Hello' }],
+      });
+    });
+  });
+
+  it('should return the reasoning tokens in the provider metadata', async () => {
+    prepareJsonResponse({
+      usage: {
+        prompt_tokens: 15,
+        completion_tokens: 20,
+        total_tokens: 35,
+        completion_tokens_details: {
+          reasoning_tokens: 10,
+        },
+      },
+    });
+
+    const model = provider.chat('o1-preview');
+
+    const result = await model.doGenerate({
+      inputFormat: 'prompt',
+      mode: { type: 'regular' },
+      prompt: TEST_PROMPT,
+    });
+
+    expect(result.providerMetadata).toStrictEqual({
+      openai: {
+        reasoningTokens: 10,
+      },
+    });
+  });
+
+  it('should send max_completion_tokens extension setting', async () => {
+    prepareJsonResponse({ model: 'o1-preview' });
+
+    const model = provider.chat('o1-preview');
+
+    await model.doGenerate({
+      inputFormat: 'prompt',
+      mode: { type: 'regular' },
+      prompt: TEST_PROMPT,
+      providerMetadata: {
+        openai: {
+          maxCompletionTokens: 255,
+        },
+      },
+    });
+
+    expect(await server.getRequestBodyJson()).toStrictEqual({
+      model: 'o1-preview',
+      messages: [{ role: 'user', content: 'Hello' }],
+      max_completion_tokens: 255,
+    });
+  });
+
+  describe('should simulate streaming for reasoning models', () => {
+    it('should stream text delta', async () => {
+      prepareJsonResponse({ content: 'Hello, World!', model: 'o1-preview' });
+
+      const model = provider.chat('o1-preview');
+
+      const { stream } = await model.doStream({
+        inputFormat: 'prompt',
+        mode: { type: 'regular' },
+        prompt: TEST_PROMPT,
+      });
+
+      expect(await convertReadableStreamToArray(stream)).toStrictEqual([
+        {
+          type: 'response-metadata',
+          id: 'chatcmpl-95ZTZkhr0mHNKqerQfiwkuox3PHAd',
+          modelId: 'o1-preview',
+          timestamp: expect.any(Date),
+        },
+        { type: 'text-delta', textDelta: 'Hello, World!' },
+        {
+          type: 'finish',
+          finishReason: 'stop',
+          usage: { promptTokens: 4, completionTokens: 30 },
+          logprobs: undefined,
+          providerMetadata: undefined,
+        },
+      ]);
+    });
+
+    it('should stream tool calls', async () => {
+      prepareJsonResponse({
+        model: 'o1-preview',
+        tool_calls: [
+          {
+            id: 'call_O17Uplv4lJvD6DVdIvFFeRMw',
+            type: 'function',
+            function: {
+              name: 'test-tool',
+              arguments: '{"value":"Sparkle Day"}',
+            },
+          },
+        ],
+      });
+
+      const model = provider.chat('o1-preview');
+
+      const { stream } = await model.doStream({
+        inputFormat: 'prompt',
+        mode: {
+          type: 'regular',
+          tools: [
+            {
+              type: 'function',
+              name: 'test-tool',
+              parameters: {
+                type: 'object',
+                properties: { value: { type: 'string' } },
+                required: ['value'],
+                additionalProperties: false,
+                $schema: 'http://json-schema.org/draft-07/schema#',
+              },
+            },
+          ],
+        },
+        prompt: TEST_PROMPT,
+      });
+
+      expect(await convertReadableStreamToArray(stream)).toStrictEqual([
+        {
+          type: 'response-metadata',
+          id: 'chatcmpl-95ZTZkhr0mHNKqerQfiwkuox3PHAd',
+          modelId: 'o1-preview',
+          timestamp: expect.any(Date),
+        },
+        {
+          type: 'tool-call',
+          toolCallId: 'call_O17Uplv4lJvD6DVdIvFFeRMw',
+          toolCallType: 'function',
+          toolName: 'test-tool',
+          args: '{"value":"Sparkle Day"}',
+        },
+        {
+          type: 'finish',
+          finishReason: 'stop',
+          usage: { promptTokens: 4, completionTokens: 30 },
+          logprobs: undefined,
+          providerMetadata: undefined,
+        },
+      ]);
+    });
+
+    it('should send reasoning tokens', async () => {
+      prepareJsonResponse({
+        content: 'Hello, World!',
+        model: 'o1-preview',
+        usage: {
+          prompt_tokens: 15,
+          completion_tokens: 20,
+          total_tokens: 35,
+          completion_tokens_details: {
+            reasoning_tokens: 10,
+          },
+        },
+      });
+
+      const model = provider.chat('o1-preview');
+
+      const { stream } = await model.doStream({
+        inputFormat: 'prompt',
+        mode: { type: 'regular' },
+        prompt: TEST_PROMPT,
+      });
+
+      expect(await convertReadableStreamToArray(stream)).toStrictEqual([
+        {
+          type: 'response-metadata',
+          id: 'chatcmpl-95ZTZkhr0mHNKqerQfiwkuox3PHAd',
+          modelId: 'o1-preview',
+          timestamp: expect.any(Date),
+        },
+        { type: 'text-delta', textDelta: 'Hello, World!' },
+        {
+          type: 'finish',
+          finishReason: 'stop',
+          usage: { promptTokens: 15, completionTokens: 20 },
+          logprobs: undefined,
+          providerMetadata: {
+            openai: {
+              reasoningTokens: 10,
+            },
+          },
+        },
+      ]);
+    });
+  });
 });
 
 describe('doStream', () => {
@@ -865,6 +1125,12 @@ describe('doStream', () => {
 
     // note: space moved to last chunk bc of trimming
     expect(await convertReadableStreamToArray(stream)).toStrictEqual([
+      {
+        type: 'response-metadata',
+        id: 'chatcmpl-96aZqmeDpA9IPD6tACY8djkMsJCMP',
+        modelId: 'gpt-3.5-turbo-0613',
+        timestamp: new Date('2023-12-15T16:17:00.000Z'),
+      },
       { type: 'text-delta', textDelta: '' },
       { type: 'text-delta', textDelta: 'Hello' },
       { type: 'text-delta', textDelta: ', ' },
@@ -935,6 +1201,12 @@ describe('doStream', () => {
 
     expect(await convertReadableStreamToArray(stream)).toStrictEqual([
       {
+        type: 'response-metadata',
+        id: 'chatcmpl-96aZqmeDpA9IPD6tACY8djkMsJCMP',
+        modelId: 'gpt-3.5-turbo-0125',
+        timestamp: new Date('2024-03-25T09:06:38.000Z'),
+      },
+      {
         type: 'tool-call-delta',
         toolCallId: 'call_O17Uplv4lJvD6DVdIvFFeRMw',
         toolCallType: 'function',
@@ -947,6 +1219,140 @@ describe('doStream', () => {
         toolCallType: 'function',
         toolName: 'test-tool',
         argsTextDelta: 'value',
+      },
+      {
+        type: 'tool-call-delta',
+        toolCallId: 'call_O17Uplv4lJvD6DVdIvFFeRMw',
+        toolCallType: 'function',
+        toolName: 'test-tool',
+        argsTextDelta: '":"',
+      },
+      {
+        type: 'tool-call-delta',
+        toolCallId: 'call_O17Uplv4lJvD6DVdIvFFeRMw',
+        toolCallType: 'function',
+        toolName: 'test-tool',
+        argsTextDelta: 'Spark',
+      },
+      {
+        type: 'tool-call-delta',
+        toolCallId: 'call_O17Uplv4lJvD6DVdIvFFeRMw',
+        toolCallType: 'function',
+        toolName: 'test-tool',
+        argsTextDelta: 'le',
+      },
+      {
+        type: 'tool-call-delta',
+        toolCallId: 'call_O17Uplv4lJvD6DVdIvFFeRMw',
+        toolCallType: 'function',
+        toolName: 'test-tool',
+        argsTextDelta: ' Day',
+      },
+      {
+        type: 'tool-call-delta',
+        toolCallId: 'call_O17Uplv4lJvD6DVdIvFFeRMw',
+        toolCallType: 'function',
+        toolName: 'test-tool',
+        argsTextDelta: '"}',
+      },
+      {
+        type: 'tool-call',
+        toolCallId: 'call_O17Uplv4lJvD6DVdIvFFeRMw',
+        toolCallType: 'function',
+        toolName: 'test-tool',
+        args: '{"value":"Sparkle Day"}',
+      },
+      {
+        type: 'finish',
+        finishReason: 'tool-calls',
+        logprobs: undefined,
+        usage: { promptTokens: 53, completionTokens: 17 },
+      },
+    ]);
+  });
+
+  it('should stream tool call deltas when tool call arguments are passed in the first chunk', async () => {
+    server.responseChunks = [
+      `data: {"id":"chatcmpl-96aZqmeDpA9IPD6tACY8djkMsJCMP","object":"chat.completion.chunk","created":1711357598,"model":"gpt-3.5-turbo-0125",` +
+        `"system_fingerprint":"fp_3bc1b5746c","choices":[{"index":0,"delta":{"role":"assistant","content":null,` +
+        `"tool_calls":[{"index":0,"id":"call_O17Uplv4lJvD6DVdIvFFeRMw","type":"function","function":{"name":"test-tool","arguments":"{\\""}}]},` +
+        `"logprobs":null,"finish_reason":null}]}\n\n`,
+      `data: {"id":"chatcmpl-96aZqmeDpA9IPD6tACY8djkMsJCMP","object":"chat.completion.chunk","created":1711357598,"model":"gpt-3.5-turbo-0125",` +
+        `"system_fingerprint":"fp_3bc1b5746c","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"va"}}]},` +
+        `"logprobs":null,"finish_reason":null}]}\n\n`,
+      `data: {"id":"chatcmpl-96aZqmeDpA9IPD6tACY8djkMsJCMP","object":"chat.completion.chunk","created":1711357598,"model":"gpt-3.5-turbo-0125",` +
+        `"system_fingerprint":"fp_3bc1b5746c","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"lue"}}]},` +
+        `"logprobs":null,"finish_reason":null}]}\n\n`,
+      `data: {"id":"chatcmpl-96aZqmeDpA9IPD6tACY8djkMsJCMP","object":"chat.completion.chunk","created":1711357598,"model":"gpt-3.5-turbo-0125",` +
+        `"system_fingerprint":"fp_3bc1b5746c","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\\":\\""}}]},` +
+        `"logprobs":null,"finish_reason":null}]}\n\n`,
+      `data: {"id":"chatcmpl-96aZqmeDpA9IPD6tACY8djkMsJCMP","object":"chat.completion.chunk","created":1711357598,"model":"gpt-3.5-turbo-0125",` +
+        `"system_fingerprint":"fp_3bc1b5746c","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"Spark"}}]},` +
+        `"logprobs":null,"finish_reason":null}]}\n\n`,
+      `data: {"id":"chatcmpl-96aZqmeDpA9IPD6tACY8djkMsJCMP","object":"chat.completion.chunk","created":1711357598,"model":"gpt-3.5-turbo-0125",` +
+        `"system_fingerprint":"fp_3bc1b5746c","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"le"}}]},` +
+        `"logprobs":null,"finish_reason":null}]}\n\n`,
+      `data: {"id":"chatcmpl-96aZqmeDpA9IPD6tACY8djkMsJCMP","object":"chat.completion.chunk","created":1711357598,"model":"gpt-3.5-turbo-0125",` +
+        `"system_fingerprint":"fp_3bc1b5746c","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":" Day"}}]},` +
+        `"logprobs":null,"finish_reason":null}]}\n\n`,
+      `data: {"id":"chatcmpl-96aZqmeDpA9IPD6tACY8djkMsJCMP","object":"chat.completion.chunk","created":1711357598,"model":"gpt-3.5-turbo-0125",` +
+        `"system_fingerprint":"fp_3bc1b5746c","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\\"}"}}]},` +
+        `"logprobs":null,"finish_reason":null}]}\n\n`,
+      `data: {"id":"chatcmpl-96aZqmeDpA9IPD6tACY8djkMsJCMP","object":"chat.completion.chunk","created":1711357598,"model":"gpt-3.5-turbo-0125",` +
+        `"system_fingerprint":"fp_3bc1b5746c","choices":[{"index":0,"delta":{},"logprobs":null,"finish_reason":"tool_calls"}]}\n\n`,
+      `data: {"id":"chatcmpl-96aZqmeDpA9IPD6tACY8djkMsJCMP","object":"chat.completion.chunk","created":1711357598,"model":"gpt-3.5-turbo-0125",` +
+        `"system_fingerprint":"fp_3bc1b5746c","choices":[],"usage":{"prompt_tokens":53,"completion_tokens":17,"total_tokens":70}}\n\n`,
+      'data: [DONE]\n\n',
+    ];
+
+    const { stream } = await model.doStream({
+      inputFormat: 'prompt',
+      mode: {
+        type: 'regular',
+        tools: [
+          {
+            type: 'function',
+            name: 'test-tool',
+            parameters: {
+              type: 'object',
+              properties: { value: { type: 'string' } },
+              required: ['value'],
+              additionalProperties: false,
+              $schema: 'http://json-schema.org/draft-07/schema#',
+            },
+          },
+        ],
+      },
+      prompt: TEST_PROMPT,
+    });
+
+    expect(await convertReadableStreamToArray(stream)).toStrictEqual([
+      {
+        type: 'response-metadata',
+        id: 'chatcmpl-96aZqmeDpA9IPD6tACY8djkMsJCMP',
+        modelId: 'gpt-3.5-turbo-0125',
+        timestamp: new Date('2024-03-25T09:06:38.000Z'),
+      },
+      {
+        type: 'tool-call-delta',
+        toolCallId: 'call_O17Uplv4lJvD6DVdIvFFeRMw',
+        toolCallType: 'function',
+        toolName: 'test-tool',
+        argsTextDelta: '{"',
+      },
+      {
+        type: 'tool-call-delta',
+        toolCallId: 'call_O17Uplv4lJvD6DVdIvFFeRMw',
+        toolCallType: 'function',
+        toolName: 'test-tool',
+        argsTextDelta: 'va',
+      },
+      {
+        type: 'tool-call-delta',
+        toolCallId: 'call_O17Uplv4lJvD6DVdIvFFeRMw',
+        toolCallType: 'function',
+        toolName: 'test-tool',
+        argsTextDelta: 'lue',
       },
       {
         type: 'tool-call-delta',
@@ -1035,6 +1441,12 @@ describe('doStream', () => {
 
     expect(await convertReadableStreamToArray(stream)).toStrictEqual([
       {
+        type: 'response-metadata',
+        id: 'chatcmpl-96aZqmeDpA9IPD6tACY8djkMsJCMP',
+        modelId: 'gpt-3.5-turbo-0125',
+        timestamp: new Date('2024-03-25T09:06:38.000Z'),
+      },
+      {
         type: 'tool-call-delta',
         toolCallId: 'call_O17Uplv4lJvD6DVdIvFFeRMw',
         toolCallType: 'function',
@@ -1097,6 +1509,12 @@ describe('doStream', () => {
     });
 
     expect(await convertReadableStreamToArray(stream)).toStrictEqual([
+      {
+        type: 'response-metadata',
+        id: 'chatcmpl-9o4RjdXk92In6yOzgND3bJxtedhS2',
+        modelId: 'gpt-4-turbo-2024-04-09',
+        timestamp: new Date('2024-07-23T07:41:59.000Z'),
+      },
       {
         type: 'tool-call-delta',
         toolCallId: expect.any(String),

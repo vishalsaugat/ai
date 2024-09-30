@@ -1,5 +1,47 @@
 # @ai-sdk/amazon-bedrock
 
+## 0.0.28
+
+### Patch Changes
+
+- Updated dependencies [d595d0d]
+  - @ai-sdk/provider@0.0.24
+  - @ai-sdk/provider-utils@1.0.20
+
+## 0.0.27
+
+### Patch Changes
+
+- 8a15307: fix (provider/bedrock): support assistant messages with trailing whitespace
+
+## 0.0.26
+
+### Patch Changes
+
+- 8f080f4: fix (provider/bedrock): support parallel tool calls in streaming mode
+
+## 0.0.25
+
+### Patch Changes
+
+- Updated dependencies [273f696]
+  - @ai-sdk/provider-utils@1.0.19
+
+## 0.0.24
+
+### Patch Changes
+
+- 01fc6c0: feat (provider/amazon-bedrock): support guardrails
+
+## 0.0.23
+
+### Patch Changes
+
+- Updated dependencies [03313cd]
+- Updated dependencies [3be7c1c]
+  - @ai-sdk/provider-utils@1.0.18
+  - @ai-sdk/provider@0.0.23
+
 ## 0.0.22
 
 ### Patch Changes

@@ -1,5 +1,66 @@
 # @ai-sdk/openai
 
+## 0.0.63
+
+### Patch Changes
+
+- Updated dependencies [d595d0d]
+  - @ai-sdk/provider@0.0.24
+  - @ai-sdk/provider-utils@1.0.20
+
+## 0.0.62
+
+### Patch Changes
+
+- 7efa867: feat (provider/openai): simulated streaming for reasoning models
+
+## 0.0.61
+
+### Patch Changes
+
+- 8132a60: feat (provider/openai): support reasoning token usage and max_completion_tokens
+
+## 0.0.60
+
+### Patch Changes
+
+- Updated dependencies [273f696]
+  - @ai-sdk/provider-utils@1.0.19
+
+## 0.0.59
+
+### Patch Changes
+
+- a0991ec: feat (provider/openai): add o1-preview and o1-mini models
+
+## 0.0.58
+
+### Patch Changes
+
+- e0c36bd: feat (provider/openai): support image detail
+
+## 0.0.57
+
+### Patch Changes
+
+- d1aaeae: feat (provider/openai): support ai sdk image download
+
+## 0.0.56
+
+### Patch Changes
+
+- 03313cd: feat (ai): expose response id, response model, response timestamp in telemetry and api
+- Updated dependencies [03313cd]
+- Updated dependencies [3be7c1c]
+  - @ai-sdk/provider-utils@1.0.18
+  - @ai-sdk/provider@0.0.23
+
+## 0.0.55
+
+### Patch Changes
+
+- 28cbf2e: fix (provider/openai): support tool call deltas when arguments are sent in the first chunk
+
 ## 0.0.54
 
 ### Patch Changes

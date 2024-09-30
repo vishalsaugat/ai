@@ -6,6 +6,7 @@ import { MockLanguageModelV1 } from '../test/mock-language-model-v1';
 import { MockTracer } from '../test/mock-tracer';
 import { generateText } from './generate-text';
 import { GenerateTextResult } from './generate-text-result';
+import { StepResult } from './step-result';
 
 const dummyResponseValues = {
   rawCall: { rawPrompt: 'prompt', rawSettings: {} },
@@ -219,7 +220,7 @@ describe('result.responseMessages', () => {
   it('should contain assistant response message when there are no tool calls', async () => {
     const result = await generateText({
       model: new MockLanguageModelV1({
-        doGenerate: async ({}) => ({
+        doGenerate: async () => ({
           ...dummyResponseValues,
           text: 'Hello, world!',
         }),
@@ -227,18 +228,13 @@ describe('result.responseMessages', () => {
       prompt: 'test-input',
     });
 
-    assert.deepStrictEqual(result.responseMessages, [
-      {
-        role: 'assistant',
-        content: [{ type: 'text', text: 'Hello, world!' }],
-      },
-    ]);
+    expect(result.responseMessages).toMatchSnapshot();
   });
 
   it('should contain assistant response message and tool message when there are tool calls with results', async () => {
     const result = await generateText({
       model: new MockLanguageModelV1({
-        doGenerate: async ({}) => ({
+        doGenerate: async () => ({
           ...dummyResponseValues,
           text: 'Hello, world!',
           toolCalls: [
@@ -271,126 +267,25 @@ describe('result.responseMessages', () => {
       prompt: 'test-input',
     });
 
-    assert.deepStrictEqual(result.responseMessages, [
-      {
-        role: 'assistant',
-        content: [
-          { type: 'text', text: 'Hello, world!' },
-          {
-            type: 'tool-call',
-            toolCallId: 'call-1',
-            toolName: 'tool1',
-            args: { value: 'value' },
-          },
-        ],
-      },
-      {
-        role: 'tool',
-        content: [
-          {
-            type: 'tool-result',
-            toolCallId: 'call-1',
-            toolName: 'tool1',
-            result: 'result1',
-          },
-        ],
-      },
-    ]);
+    expect(result.responseMessages).toMatchSnapshot();
   });
+});
 
-  describe('options.maxToolRoundtrips', () => {
-    it('should contain assistant response message and tool message from all roundtrips', async () => {
-      let responseCount = 0;
-      const result = await generateText({
-        model: new MockLanguageModelV1({
-          doGenerate: async ({}) => {
-            switch (responseCount++) {
-              case 0:
-                return {
-                  ...dummyResponseValues,
-                  toolCalls: [
-                    {
-                      toolCallType: 'function',
-                      toolCallId: 'call-1',
-                      toolName: 'tool1',
-                      args: `{ "value": "value" }`,
-                    },
-                  ],
-                  toolResults: [
-                    {
-                      toolCallId: 'call-1',
-                      toolName: 'tool1',
-                      args: { value: 'value' },
-                      result: 'result1',
-                    },
-                  ],
-                };
-              case 1:
-                return {
-                  ...dummyResponseValues,
-                  text: 'Hello, world!',
-                };
-              default:
-                throw new Error(`Unexpected response count: ${responseCount}`);
-            }
-          },
-        }),
-        tools: {
-          tool1: {
-            parameters: z.object({ value: z.string() }),
-            execute: async args => {
-              assert.deepStrictEqual(args, { value: 'value' });
-              return 'result1';
-            },
-          },
-        },
-        prompt: 'test-input',
-        maxToolRoundtrips: 2,
-      });
-
-      assert.deepStrictEqual(result.responseMessages, [
-        {
-          role: 'assistant',
-          content: [
-            { type: 'text', text: '' },
-            {
-              type: 'tool-call',
-              toolCallId: 'call-1',
-              toolName: 'tool1',
-              args: { value: 'value' },
-            },
-          ],
-        },
-        {
-          role: 'tool',
-          content: [
-            {
-              type: 'tool-result',
-              toolCallId: 'call-1',
-              toolName: 'tool1',
-              result: 'result1',
-            },
-          ],
-        },
-        {
-          role: 'assistant',
-          content: [{ type: 'text', text: 'Hello, world!' }],
-        },
-      ]);
-    });
-  });
-
-  describe('single roundtrip', () => {
+describe('options.maxSteps', () => {
+  describe('2 steps: initial, tool-result', () => {
     let result: GenerateTextResult<any>;
+    let onStepFinishResults: StepResult<any>[];
 
     beforeEach(async () => {
+      onStepFinishResults = [];
+
       let responseCount = 0;
       result = await generateText({
         model: new MockLanguageModelV1({
           doGenerate: async ({ prompt, mode }) => {
             switch (responseCount++) {
               case 0:
-                assert.deepStrictEqual(mode, {
+                expect(mode).toStrictEqual({
                   type: 'regular',
                   toolChoice: { type: 'auto' },
                   tools: [
@@ -408,7 +303,8 @@ describe('result.responseMessages', () => {
                     },
                   ],
                 });
-                assert.deepStrictEqual(prompt, [
+
+                expect(prompt).toStrictEqual([
                   {
                     role: 'user',
                     content: [{ type: 'text', text: 'test-input' }],
@@ -434,14 +330,15 @@ describe('result.responseMessages', () => {
                     },
                   ],
                   finishReason: 'tool-calls',
-                  usage: {
-                    completionTokens: 5,
-                    promptTokens: 10,
-                    totalTokens: 15,
+                  usage: { completionTokens: 5, promptTokens: 10 },
+                  response: {
+                    id: 'test-id-1-from-model',
+                    timestamp: new Date(0),
+                    modelId: 'test-response-model-id',
                   },
                 };
               case 1:
-                assert.deepStrictEqual(mode, {
+                expect(mode).toStrictEqual({
                   type: 'regular',
                   toolChoice: { type: 'auto' },
                   tools: [
@@ -459,7 +356,8 @@ describe('result.responseMessages', () => {
                     },
                   ],
                 });
-                assert.deepStrictEqual(prompt, [
+
+                expect(prompt).toStrictEqual([
                   {
                     role: 'user',
                     content: [
@@ -477,6 +375,7 @@ describe('result.responseMessages', () => {
                         toolCallId: 'call-1',
                         toolName: 'tool1',
                         args: { value: 'value' },
+                        providerMetadata: undefined,
                       },
                     ],
                     providerMetadata: undefined,
@@ -498,6 +397,16 @@ describe('result.responseMessages', () => {
                 return {
                   ...dummyResponseValues,
                   text: 'Hello, world!',
+                  response: {
+                    id: 'test-id-2-from-model',
+                    timestamp: new Date(10000),
+                    modelId: 'test-response-model-id',
+                  },
+                  rawResponse: {
+                    headers: {
+                      'custom-response-header': 'response-header-value',
+                    },
+                  },
                 };
               default:
                 throw new Error(`Unexpected response count: ${responseCount}`);
@@ -514,23 +423,30 @@ describe('result.responseMessages', () => {
           },
         },
         prompt: 'test-input',
-        maxToolRoundtrips: 2,
+        maxSteps: 3,
+        onStepFinish: async event => {
+          onStepFinishResults.push(event);
+        },
       });
     });
 
-    it('should return text from last roundtrip', async () => {
+    it('result.text should return text from last step', async () => {
       assert.deepStrictEqual(result.text, 'Hello, world!');
     });
 
-    it('should return empty tool calls from last roundtrip', async () => {
+    it('result.toolCalls should return empty tool calls from last step', async () => {
       assert.deepStrictEqual(result.toolCalls, []);
     });
 
-    it('should return empty tool results from last roundtrip', async () => {
+    it('result.toolResults should return empty tool results from last step', async () => {
       assert.deepStrictEqual(result.toolResults, []);
     });
 
-    it('should sum token usage', () => {
+    it('result.responseMessages should contain response messages from all steps', () => {
+      expect(result.responseMessages).toMatchSnapshot();
+    });
+
+    it('result.usage should sum token usage', () => {
       assert.deepStrictEqual(result.usage, {
         completionTokens: 25,
         promptTokens: 20,
@@ -538,53 +454,232 @@ describe('result.responseMessages', () => {
       });
     });
 
-    it('should return information about all roundtrips', () => {
-      assert.deepStrictEqual(result.roundtrips, [
-        {
-          finishReason: 'tool-calls',
-          logprobs: undefined,
-          text: '',
-          toolCalls: [
-            {
-              args: {
-                value: 'value',
-              },
-              toolCallId: 'call-1',
-              toolName: 'tool1',
-              type: 'tool-call',
-            },
-          ],
-          toolResults: [
-            {
-              args: {
-                value: 'value',
-              },
-              result: 'result1',
-              toolCallId: 'call-1',
-              toolName: 'tool1',
-            },
-          ],
-          usage: {
-            completionTokens: 5,
-            promptTokens: 10,
-            totalTokens: 15,
+    it('result.steps should contain all steps', () => {
+      expect(result.steps).toMatchSnapshot();
+    });
+
+    it('onStepFinish should be called for each step', () => {
+      expect(onStepFinishResults).toMatchSnapshot();
+    });
+  });
+
+  describe('3 steps: initial, continue, continue', () => {
+    let result: GenerateTextResult<any>;
+    let onStepFinishResults: StepResult<any>[];
+
+    beforeEach(async () => {
+      onStepFinishResults = [];
+
+      let responseCount = 0;
+      result = await generateText({
+        model: new MockLanguageModelV1({
+          doGenerate: async ({ prompt, mode }) => {
+            switch (responseCount++) {
+              case 0:
+                expect(mode).toStrictEqual({
+                  type: 'regular',
+                  toolChoice: undefined,
+                  tools: undefined,
+                });
+                expect(prompt).toStrictEqual([
+                  {
+                    role: 'user',
+                    content: [{ type: 'text', text: 'test-input' }],
+                  },
+                ]);
+
+                return {
+                  ...dummyResponseValues,
+                  text: 'part 1 \n to-be-discarded',
+                  finishReason: 'length', // trigger continue
+                  usage: { completionTokens: 20, promptTokens: 10 },
+                  response: {
+                    id: 'test-id-1-from-model',
+                    timestamp: new Date(0),
+                    modelId: 'test-response-model-id',
+                  },
+                };
+              case 1:
+                expect(mode).toStrictEqual({
+                  type: 'regular',
+                  toolChoice: undefined,
+                  tools: undefined,
+                });
+                expect(prompt).toStrictEqual([
+                  {
+                    role: 'user',
+                    content: [{ type: 'text', text: 'test-input' }],
+                  },
+                  {
+                    role: 'assistant',
+                    content: [
+                      {
+                        type: 'text',
+                        text: 'part 1 \n ',
+                        providerMetadata: undefined,
+                      },
+                    ],
+                    providerMetadata: undefined,
+                  },
+                ]);
+
+                return {
+                  ...dummyResponseValues,
+                  text: 'no-whitespace',
+                  finishReason: 'length',
+                  response: {
+                    id: 'test-id-2-from-model',
+                    timestamp: new Date(10000),
+                    modelId: 'test-response-model-id',
+                  },
+                  usage: { completionTokens: 5, promptTokens: 30 },
+                  // test handling of custom response headers:
+                  rawResponse: {
+                    headers: {
+                      'custom-response-header': 'response-header-value',
+                    },
+                  },
+                };
+              case 2:
+                expect(mode).toStrictEqual({
+                  type: 'regular',
+                  toolChoice: undefined,
+                  tools: undefined,
+                });
+                expect(prompt).toStrictEqual([
+                  {
+                    role: 'user',
+                    content: [{ type: 'text', text: 'test-input' }],
+                  },
+                  {
+                    role: 'assistant',
+                    content: [
+                      {
+                        type: 'text',
+                        text: 'part 1 \n ',
+                        providerMetadata: undefined,
+                      },
+                      {
+                        type: 'text',
+                        text: 'no-whitespace',
+                        providerMetadata: undefined,
+                      },
+                    ],
+                    providerMetadata: undefined,
+                  },
+                ]);
+
+                return {
+                  ...dummyResponseValues,
+                  text: 'final value keep all whitespace\n end',
+                  finishReason: 'stop',
+                  response: {
+                    id: 'test-id-3-from-model',
+                    timestamp: new Date(20000),
+                    modelId: 'test-response-model-id',
+                  },
+                  usage: { completionTokens: 2, promptTokens: 3 },
+                };
+              default:
+                throw new Error(`Unexpected response count: ${responseCount}`);
+            }
           },
-          warnings: undefined,
+        }),
+        prompt: 'test-input',
+        maxSteps: 5,
+        experimental_continueSteps: true,
+        onStepFinish: async event => {
+          onStepFinishResults.push(event);
         },
+      });
+    });
+
+    it('result.text should return text from both steps separated by space', async () => {
+      expect(result.text).toStrictEqual(
+        'part 1 \n no-whitespacefinal value keep all whitespace\n end',
+      );
+    });
+
+    it('result.responseMessages should contain an assistant message with the combined text', () => {
+      expect(result.responseMessages).toStrictEqual([
         {
-          finishReason: 'stop',
-          logprobs: undefined,
-          text: 'Hello, world!',
-          toolCalls: [],
-          toolResults: [],
-          usage: {
-            completionTokens: 20,
-            promptTokens: 10,
-            totalTokens: 30,
-          },
-          warnings: undefined,
+          content: [
+            {
+              text: 'part 1 \n ',
+              type: 'text',
+            },
+            {
+              text: 'no-whitespace',
+              type: 'text',
+            },
+            {
+              text: 'final value keep all whitespace\n end',
+              type: 'text',
+            },
+          ],
+          role: 'assistant',
         },
       ]);
+    });
+
+    it('result.usage should sum token usage', () => {
+      expect(result.usage).toStrictEqual({
+        completionTokens: 27,
+        promptTokens: 43,
+        totalTokens: 70,
+      });
+    });
+
+    it('result.steps should contain all steps', () => {
+      expect(result.steps).toMatchSnapshot();
+    });
+
+    it('onStepFinish should be called for each step', () => {
+      expect(onStepFinishResults).toMatchSnapshot();
+    });
+  });
+});
+
+describe('result.response', () => {
+  it('should contain response information', async () => {
+    const result = await generateText({
+      model: new MockLanguageModelV1({
+        doGenerate: async ({ prompt, mode }) => {
+          assert.deepStrictEqual(mode, {
+            type: 'regular',
+            tools: undefined,
+            toolChoice: undefined,
+          });
+          assert.deepStrictEqual(prompt, [
+            { role: 'user', content: [{ type: 'text', text: 'prompt' }] },
+          ]);
+
+          return {
+            ...dummyResponseValues,
+            text: `Hello, world!`,
+            response: {
+              id: 'test-id-from-model',
+              timestamp: new Date(10000),
+              modelId: 'test-response-model-id',
+            },
+            rawResponse: {
+              headers: {
+                'custom-response-header': 'response-header-value',
+              },
+            },
+          };
+        },
+      }),
+      prompt: 'prompt',
+    });
+
+    expect(result.response).toStrictEqual({
+      id: 'test-id-from-model',
+      timestamp: new Date(10000),
+      modelId: 'test-response-model-id',
+      headers: {
+        'custom-response-header': 'response-header-value',
+      },
     });
   });
 });
@@ -609,6 +704,28 @@ describe('options.headers', () => {
     });
 
     assert.deepStrictEqual(result.text, 'Hello, world!');
+  });
+});
+
+describe('options.providerMetadata', () => {
+  it('should pass provider metadata to model', async () => {
+    const result = await generateText({
+      model: new MockLanguageModelV1({
+        doGenerate: async ({ providerMetadata }) => {
+          expect(providerMetadata).toStrictEqual({
+            aProvider: { someKey: 'someValue' },
+          });
+
+          return { ...dummyResponseValues, text: 'provider metadata test' };
+        },
+      }),
+      prompt: 'test-input',
+      experimental_providerMetadata: {
+        aProvider: { someKey: 'someValue' },
+      },
+    });
+
+    expect(result.text).toStrictEqual('provider metadata test');
   });
 });
 
@@ -644,6 +761,11 @@ describe('telemetry', () => {
         doGenerate: async ({}) => ({
           ...dummyResponseValues,
           text: `Hello, world!`,
+          response: {
+            id: 'test-id-from-model',
+            timestamp: new Date(10000),
+            modelId: 'test-response-model-id',
+          },
         }),
       }),
       prompt: 'prompt',
@@ -695,6 +817,10 @@ describe('telemetry', () => {
       experimental_telemetry: {
         isEnabled: true,
       },
+      _internal: {
+        generateId: () => 'test-id',
+        currentDate: () => new Date(0),
+      },
     });
 
     expect(tracer.jsonSpans).toMatchSnapshot();
@@ -726,6 +852,10 @@ describe('telemetry', () => {
         isEnabled: true,
         recordInputs: false,
         recordOutputs: false,
+      },
+      _internal: {
+        generateId: () => 'test-id',
+        currentDate: () => new Date(0),
       },
     });
 
@@ -804,6 +934,10 @@ describe('tools with custom schema', () => {
       },
       toolChoice: 'required',
       prompt: 'test-input',
+      _internal: {
+        generateId: () => 'test-id',
+        currentDate: () => new Date(0),
+      },
     });
 
     // test type inference

@@ -1,8 +1,8 @@
 import { Embedding } from '../types';
-import { EmbeddingTokenUsage } from '../types/token-usage';
+import { EmbeddingModelUsage } from '../types/usage';
 
 /**
-The result of a `embed` call.
+The result of an `embed` call.
 It contains the embedding, the value, and additional information.
  */
 export interface EmbedResult<VALUE> {
@@ -19,7 +19,7 @@ export interface EmbedResult<VALUE> {
   /**
   The embedding token usage.
     */
-  readonly usage: EmbeddingTokenUsage;
+  readonly usage: EmbeddingModelUsage;
 
   /**
   Optional raw response data.

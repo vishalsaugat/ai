@@ -2,6 +2,7 @@ import {
   LanguageModelV1Prompt,
   UnsupportedFunctionalityError,
 } from '@ai-sdk/provider';
+import { convertUint8ArrayToBase64 } from '@ai-sdk/provider-utils';
 import { MistralChatPrompt } from './mistral-chat-prompt';
 
 export function convertToMistralChatMessages(
@@ -19,20 +20,29 @@ export function convertToMistralChatMessages(
       case 'user': {
         messages.push({
           role: 'user',
-          content: content
-            .map(part => {
-              switch (part.type) {
-                case 'text': {
-                  return part.text;
-                }
-                case 'image': {
-                  throw new UnsupportedFunctionalityError({
-                    functionality: 'image-part',
-                  });
-                }
+          content: content.map(part => {
+            switch (part.type) {
+              case 'text': {
+                return { type: 'text', text: part.text };
               }
-            })
-            .join(''),
+              case 'image': {
+                return {
+                  type: 'image_url',
+                  image_url:
+                    part.image instanceof URL
+                      ? part.image.toString()
+                      : `data:${
+                          part.mimeType ?? 'image/jpeg'
+                        };base64,${convertUint8ArrayToBase64(part.image)}`,
+                };
+              }
+              case 'file': {
+                throw new UnsupportedFunctionalityError({
+                  functionality: 'File content parts in user messages',
+                });
+              }
+            }
+          }),
         });
         break;
       }

@@ -6,6 +6,7 @@ import {
   ConverseCommand,
   ConverseStreamCommand,
   ConverseStreamOutput,
+  ConverseStreamTrace,
   StopReason,
 } from '@aws-sdk/client-bedrock-runtime';
 import {
@@ -28,6 +29,34 @@ const provider = createAmazonBedrock({
 });
 
 const model = provider('anthropic.claude-3-haiku-20240307-v1:0');
+
+const mockTrace = {
+  guardrail: {
+    inputAssessment: {
+      '1abcd2ef34gh': {
+        contentPolicy: {
+          filters: [
+            {
+              action: 'BLOCKED' as const,
+              confidence: 'LOW' as const,
+              type: 'INSULTS' as const,
+            },
+          ],
+        },
+        wordPolicy: {
+          managedWordLists: [
+            {
+              action: 'BLOCKED' as const,
+              match: '<rude word>',
+              type: 'PROFANITY' as const,
+            },
+          ],
+          customWords: undefined,
+        },
+      },
+    },
+  },
+} as ConverseStreamTrace;
 
 describe('doGenerate', () => {
   beforeEach(() => {
@@ -206,6 +235,57 @@ describe('doGenerate', () => {
       }).length,
     ).toBe(1);
   });
+
+  it('should support guardrails', async () => {
+    bedrockMock.on(ConverseCommand).resolves({
+      output: {
+        message: { role: 'assistant', content: [{ text: 'Testing' }] },
+      },
+    });
+
+    // GuardrailConfiguration
+    const result = await provider('amazon.titan-tg1-large').doGenerate({
+      inputFormat: 'prompt',
+      mode: { type: 'regular' },
+      prompt: TEST_PROMPT,
+      providerMetadata: {
+        bedrock: {
+          guardrailConfig: {
+            guardrailIdentifier: '-1',
+            guardrailVersion: '1',
+            trace: 'enabled',
+          },
+        },
+      },
+    });
+
+    expect(
+      bedrockMock.commandCalls(ConverseCommand, {
+        modelId: 'amazon.titan-tg1-large',
+        messages: [{ role: 'user', content: [{ text: 'Hello' }] }],
+        system: [{ text: 'System Prompt' }],
+        guardrailConfig: {
+          guardrailIdentifier: '-1',
+          guardrailVersion: '1',
+          trace: 'enabled',
+        },
+      }).length,
+    ).toBe(1);
+  });
+
+  it('should include trace information in providerMetadata', async () => {
+    bedrockMock.on(ConverseCommand).resolves({
+      trace: mockTrace,
+    });
+
+    const response = await model.doGenerate({
+      inputFormat: 'prompt',
+      mode: { type: 'regular' },
+      prompt: TEST_PROMPT,
+    });
+
+    expect(response.providerMetadata?.bedrock.trace).toMatchObject(mockTrace);
+  });
 });
 
 describe('doStream', () => {
@@ -249,6 +329,7 @@ describe('doStream', () => {
         type: 'finish',
         finishReason: 'stop',
         usage: { promptTokens: 4, completionTokens: 34 },
+        providerMetadata: undefined,
       },
     ]);
   });
@@ -263,17 +344,17 @@ describe('doStream', () => {
       },
       {
         contentBlockDelta: {
-          contentBlockIndex: 1,
+          contentBlockIndex: 0,
           delta: { toolUse: { input: '{"value":' } },
         },
       },
       {
         contentBlockDelta: {
-          contentBlockIndex: 2,
+          contentBlockIndex: 0,
           delta: { toolUse: { input: '"Sparkle Day"}' } },
         },
       },
-      { contentBlockStop: { contentBlockIndex: 3 } },
+      { contentBlockStop: { contentBlockIndex: 0 } },
       { messageStop: { stopReason: 'tool_use' } },
     ];
 
@@ -329,6 +410,143 @@ describe('doStream', () => {
         type: 'finish',
         finishReason: 'tool-calls',
         usage: { promptTokens: NaN, completionTokens: NaN },
+        providerMetadata: undefined,
+      },
+    ]);
+  });
+
+  it('should stream parallel tool calls', async () => {
+    const streamData: ConverseStreamOutput[] = [
+      {
+        contentBlockStart: {
+          contentBlockIndex: 0,
+          start: {
+            toolUse: { toolUseId: 'tool-use-id-1', name: 'test-tool-1' },
+          },
+        },
+      },
+      {
+        contentBlockDelta: {
+          contentBlockIndex: 0,
+          delta: { toolUse: { input: '{"value1":' } },
+        },
+      },
+      {
+        contentBlockStart: {
+          contentBlockIndex: 1,
+          start: {
+            toolUse: { toolUseId: 'tool-use-id-2', name: 'test-tool-2' },
+          },
+        },
+      },
+      {
+        contentBlockDelta: {
+          contentBlockIndex: 1,
+          delta: { toolUse: { input: '{"value2":' } },
+        },
+      },
+      {
+        contentBlockDelta: {
+          contentBlockIndex: 1,
+          delta: { toolUse: { input: '"Sparkle Day"}' } },
+        },
+      },
+      {
+        contentBlockDelta: {
+          contentBlockIndex: 0,
+          delta: { toolUse: { input: '"Sparkle Day"}' } },
+        },
+      },
+      { contentBlockStop: { contentBlockIndex: 0 } },
+      { contentBlockStop: { contentBlockIndex: 1 } },
+      { messageStop: { stopReason: 'tool_use' } },
+    ];
+
+    bedrockMock.on(ConverseStreamCommand).resolves({
+      stream: convertArrayToAsyncIterable(streamData),
+    });
+
+    const { stream } = await model.doStream({
+      inputFormat: 'prompt',
+      mode: {
+        type: 'regular',
+        tools: [
+          {
+            type: 'function',
+            name: 'test-tool-1',
+            parameters: {
+              type: 'object',
+              properties: { value1: { type: 'string' } },
+              required: ['value'],
+              additionalProperties: false,
+              $schema: 'http://json-schema.org/draft-07/schema#',
+            },
+          },
+          {
+            type: 'function',
+            name: 'test-tool-2',
+            parameters: {
+              type: 'object',
+              properties: { value2: { type: 'string' } },
+              required: ['value'],
+              additionalProperties: false,
+              $schema: 'http://json-schema.org/draft-07/schema#',
+            },
+          },
+        ],
+        toolChoice: { type: 'tool', toolName: 'test-tool' },
+      },
+      prompt: TEST_PROMPT,
+    });
+
+    expect(await convertReadableStreamToArray(stream)).toStrictEqual([
+      {
+        type: 'tool-call-delta',
+        toolCallId: 'tool-use-id-1',
+        toolCallType: 'function',
+        toolName: 'test-tool-1',
+        argsTextDelta: '{"value1":',
+      },
+      {
+        type: 'tool-call-delta',
+        toolCallId: 'tool-use-id-2',
+        toolCallType: 'function',
+        toolName: 'test-tool-2',
+        argsTextDelta: '{"value2":',
+      },
+      {
+        type: 'tool-call-delta',
+        toolCallId: 'tool-use-id-2',
+        toolCallType: 'function',
+        toolName: 'test-tool-2',
+        argsTextDelta: '"Sparkle Day"}',
+      },
+      {
+        type: 'tool-call-delta',
+        toolCallId: 'tool-use-id-1',
+        toolCallType: 'function',
+        toolName: 'test-tool-1',
+        argsTextDelta: '"Sparkle Day"}',
+      },
+      {
+        type: 'tool-call',
+        toolCallId: 'tool-use-id-1',
+        toolCallType: 'function',
+        toolName: 'test-tool-1',
+        args: '{"value1":"Sparkle Day"}',
+      },
+      {
+        type: 'tool-call',
+        toolCallId: 'tool-use-id-2',
+        toolCallType: 'function',
+        toolName: 'test-tool-2',
+        args: '{"value2":"Sparkle Day"}',
+      },
+      {
+        type: 'finish',
+        finishReason: 'tool-calls',
+        usage: { promptTokens: NaN, completionTokens: NaN },
+        providerMetadata: undefined,
       },
     ]);
   });
@@ -370,6 +588,7 @@ describe('doStream', () => {
           completionTokens: NaN,
           promptTokens: NaN,
         },
+        providerMetadata: undefined,
       },
     ]);
   });
@@ -391,5 +610,75 @@ describe('doStream', () => {
         messages: [{ role: 'user', content: [{ text: 'Hello' }] }],
       }).length,
     ).toBe(1);
+  });
+
+  it('should support guardrails', async () => {
+    bedrockMock.on(ConverseStreamCommand).resolves({
+      stream: convertArrayToAsyncIterable([]),
+    });
+
+    await provider('amazon.titan-tg1-large').doStream({
+      inputFormat: 'prompt',
+      mode: { type: 'regular' },
+      prompt: TEST_PROMPT,
+      providerMetadata: {
+        bedrock: {
+          guardrailConfig: {
+            guardrailIdentifier: '-1',
+            guardrailVersion: '1',
+            trace: 'enabled',
+            streamProcessingMode: 'async',
+          },
+        },
+      },
+    });
+
+    expect(
+      bedrockMock.commandCalls(ConverseStreamCommand, {
+        modelId: 'amazon.titan-tg1-large',
+        messages: [{ role: 'user', content: [{ text: 'Hello' }] }],
+        system: [{ text: 'System Prompt' }],
+        guardrailConfig: {
+          guardrailIdentifier: '-1',
+          guardrailVersion: '1',
+          trace: 'enabled',
+          streamProcessingMode: 'async',
+        },
+      }).length,
+    ).toBe(1);
+  });
+
+  it('should include trace information in providerMetadata', async () => {
+    const streamData: ConverseStreamOutput[] = [
+      { contentBlockDelta: { contentBlockIndex: 0, delta: { text: 'Hello' } } },
+      {
+        metadata: {
+          usage: { inputTokens: 4, outputTokens: 34, totalTokens: 38 },
+          metrics: { latencyMs: 10 },
+          trace: mockTrace,
+        },
+      },
+      { messageStop: { stopReason: 'stop_sequence' } },
+    ];
+
+    bedrockMock.on(ConverseStreamCommand).resolves({
+      stream: convertArrayToAsyncIterable(streamData),
+    });
+
+    const { stream } = await model.doStream({
+      inputFormat: 'prompt',
+      mode: { type: 'regular' },
+      prompt: TEST_PROMPT,
+    });
+
+    expect(await convertReadableStreamToArray(stream)).toStrictEqual([
+      { type: 'text-delta', textDelta: 'Hello' },
+      {
+        type: 'finish',
+        finishReason: 'stop',
+        usage: { completionTokens: 34, promptTokens: 4 },
+        providerMetadata: { bedrock: { trace: mockTrace } },
+      },
+    ]);
   });
 });

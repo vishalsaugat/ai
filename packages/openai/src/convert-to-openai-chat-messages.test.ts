@@ -1,7 +1,7 @@
 import { convertToOpenAIChatMessages } from './convert-to-openai-chat-messages';
 
 describe('user messages', () => {
-  it('should convert messages with image parts to multiple parts', async () => {
+  it('should convert messages with image parts', async () => {
     const result = convertToOpenAIChatMessages({
       prompt: [
         {
@@ -43,6 +43,43 @@ describe('user messages', () => {
     });
 
     expect(result).toEqual([{ role: 'user', content: 'Hello' }]);
+  });
+
+  it('should add image detail when specified through extension', async () => {
+    const result = convertToOpenAIChatMessages({
+      prompt: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'image',
+              image: new Uint8Array([0, 1, 2, 3]),
+              mimeType: 'image/png',
+              providerMetadata: {
+                openai: {
+                  imageDetail: 'low',
+                },
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(result).toEqual([
+      {
+        role: 'user',
+        content: [
+          {
+            type: 'image_url',
+            image_url: {
+              url: 'data:image/png;base64,AAECAw==',
+              detail: 'low',
+            },
+          },
+        ],
+      },
+    ]);
   });
 });
 

@@ -1,5 +1,217 @@
 # ai
 
+## 3.4.7
+
+### Patch Changes
+
+- db04700: feat (core): support converting attachments to file parts
+- 988707c: feat (ai/core): automatically download files from urls
+
+## 3.4.6
+
+### Patch Changes
+
+- d595d0d: feat (ai/core): file content parts
+- Updated dependencies [d595d0d]
+  - @ai-sdk/provider@0.0.24
+  - @ai-sdk/provider-utils@1.0.20
+  - @ai-sdk/ui-utils@0.0.46
+  - @ai-sdk/react@0.0.62
+  - @ai-sdk/solid@0.0.49
+  - @ai-sdk/svelte@0.0.51
+  - @ai-sdk/vue@0.0.53
+
+## 3.4.5
+
+### Patch Changes
+
+- cd77c5d: feat (ai/core): add isContinued to steps
+- Updated dependencies [cd77c5d]
+  - @ai-sdk/ui-utils@0.0.45
+  - @ai-sdk/react@0.0.61
+  - @ai-sdk/solid@0.0.48
+  - @ai-sdk/svelte@0.0.50
+  - @ai-sdk/vue@0.0.52
+
+## 3.4.4
+
+### Patch Changes
+
+- 4db074b: fix (ai/core): correct whitespace in generateText continueSteps
+- 1297e1b: fix (ai/core): correct whitespace in streamText continueSteps
+
+## 3.4.3
+
+### Patch Changes
+
+- b270ae3: feat (ai/core): streamText continueSteps (experimental)
+- b270ae3: chore (ai/core): rename generateText continuationSteps to continueSteps
+
+## 3.4.2
+
+### Patch Changes
+
+- e6c7e98: feat (ai/core): add continuationSteps to generateText
+
+## 3.4.1
+
+### Patch Changes
+
+- Updated dependencies [7e7104f]
+  - @ai-sdk/react@0.0.60
+
+## 3.4.0
+
+### Minor Changes
+
+- c0cea03: release (ai): 3.4
+
+## 3.3.44
+
+### Patch Changes
+
+- Updated dependencies [d3933e0]
+  - @ai-sdk/vue@0.0.51
+
+## 3.3.43
+
+### Patch Changes
+
+- fea6bec: fix (ai/core): support tool calls without arguments
+
+## 3.3.42
+
+### Patch Changes
+
+- de37aee: feat (ai): Add support for LlamaIndex
+
+## 3.3.41
+
+### Patch Changes
+
+- Updated dependencies [692e265]
+  - @ai-sdk/vue@0.0.50
+
+## 3.3.40
+
+### Patch Changes
+
+- a91c308: feat (ai/core): add responseMessages to streamText
+
+## 3.3.39
+
+### Patch Changes
+
+- 33cf3e1: feat (ai/core): add providerMetadata to StepResult
+- 17ee757: feat (ai/core): add onStepFinish callback to generateText
+
+## 3.3.38
+
+### Patch Changes
+
+- 83da52c: feat (ai/core): add onStepFinish callback to streamText
+
+## 3.3.37
+
+### Patch Changes
+
+- Updated dependencies [273f696]
+  - @ai-sdk/provider-utils@1.0.19
+  - @ai-sdk/react@0.0.59
+  - @ai-sdk/solid@0.0.47
+  - @ai-sdk/svelte@0.0.49
+  - @ai-sdk/ui-utils@0.0.44
+  - @ai-sdk/vue@0.0.49
+
+## 3.3.36
+
+### Patch Changes
+
+- a3882f5: feat (ai/core): add steps property to streamText result and onFinish callback
+- 1f590ef: chore (ai): rename roundtrips to steps
+- 7e82d36: fix (ai/core): pass topK to providers
+- Updated dependencies [54862e4]
+- Updated dependencies [1f590ef]
+  - @ai-sdk/react@0.0.58
+  - @ai-sdk/ui-utils@0.0.43
+  - @ai-sdk/solid@0.0.46
+  - @ai-sdk/svelte@0.0.48
+  - @ai-sdk/vue@0.0.48
+
+## 3.3.35
+
+### Patch Changes
+
+- 14210d5: feat (ai/core): add sendUsage information to streamText data stream methods
+- Updated dependencies [14210d5]
+  - @ai-sdk/ui-utils@0.0.42
+  - @ai-sdk/react@0.0.57
+  - @ai-sdk/solid@0.0.45
+  - @ai-sdk/svelte@0.0.47
+  - @ai-sdk/vue@0.0.47
+
+## 3.3.34
+
+### Patch Changes
+
+- a0403d6: feat (react): support sending attachments using append
+- 678449a: feat (ai/core): export test helpers
+- ff22fac: fix (ai/rsc): streamUI onFinish is called when tool calls have finished
+- Updated dependencies [a0403d6]
+  - @ai-sdk/react@0.0.56
+
+## 3.3.33
+
+### Patch Changes
+
+- cbddc83: fix (ai/core): filter out empty text parts
+
+## 3.3.32
+
+### Patch Changes
+
+- ce7a4af: feat (ai/core): support providerMetadata in functions
+
+## 3.3.31
+
+### Patch Changes
+
+- 561fd7e: feat (ai/core): add output: enum to generateObject
+
+## 3.3.30
+
+### Patch Changes
+
+- 6ee1f8e: feat (ai/core): add toDataStream to streamText result
+
+## 3.3.29
+
+### Patch Changes
+
+- 1e3dfd2: feat (ai/core): enhance pipeToData/TextStreamResponse methods
+
+## 3.3.28
+
+### Patch Changes
+
+- db61c53: feat (ai/core): middleware support
+
+## 3.3.27
+
+### Patch Changes
+
+- 03313cd: feat (ai): expose response id, response model, response timestamp in telemetry and api
+- 3be7c1c: fix (provider/anthropic): support prompt caching on assistant messages
+- Updated dependencies [03313cd]
+- Updated dependencies [3be7c1c]
+  - @ai-sdk/provider-utils@1.0.18
+  - @ai-sdk/provider@0.0.23
+  - @ai-sdk/react@0.0.55
+  - @ai-sdk/solid@0.0.44
+  - @ai-sdk/svelte@0.0.46
+  - @ai-sdk/ui-utils@0.0.41
+  - @ai-sdk/vue@0.0.46
+
 ## 3.3.26
 
 ### Patch Changes

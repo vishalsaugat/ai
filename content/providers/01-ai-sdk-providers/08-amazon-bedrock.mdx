@@ -5,7 +5,7 @@ description: Learn how to use the Amazon Bedrock provider.
 
 # Amazon Bedrock Provider
 
-The Amazon Bedrock provider for the [Vercel AI SDK](https://sdk.vercel.ai/docs) contains language model support for the [Amazon Bedrock](https://aws.amazon.com/bedrock) APIs.
+The Amazon Bedrock provider for the [AI SDK](https://sdk.vercel.ai/docs) contains language model support for the [Amazon Bedrock](https://aws.amazon.com/bedrock) APIs.
 
 ## Setup
 
@@ -163,16 +163,46 @@ You can use Amazon Bedrock language models to generate text with the `generateTe
 
 ```ts
 import { bedrock } from '@ai-sdk/amazon-bedrock';
-import { generateText } from 'ai'
+import { generateText } from 'ai';
 
 const { text } = await generateText({
-  model: bedrock('meta.llama3-70b-instruct-v1:0')
-  prompt: 'Write a vegetarian lasagna recipe for 4 people.'
-})
+  model: bedrock('meta.llama3-70b-instruct-v1:0'),
+  prompt: 'Write a vegetarian lasagna recipe for 4 people.',
+});
 ```
 
 Amazon Bedrock language models can also be used in the `streamText` function
 (see [AI SDK Core](/docs/ai-sdk-core)).
+
+### Guardrails
+
+You can use the `bedrock` provider metadata to utilize [Amazon Bedrock Guardrails](https://aws.amazon.com/bedrock/guardrails/):
+
+```ts
+const result = await generateText({
+  bedrock('anthropic.claude-3-sonnet-20240229-v1:0'),
+  experimental_providerMetadata: {
+    bedrock: {
+      guardrailConfig: {
+        guardrailIdentifier: '1abcd2ef34gh',
+        guardrailVersion: '1',
+        trace: 'enabled' as const,
+        streamProcessingMode: 'async',
+      },
+    },
+  },
+});
+```
+
+Tracing information will be returned in the provider metadata if you have tracing enabled.
+
+```ts
+if (result.experimental_providerMetadata?.bedrock.trace) {
+  // ...
+}
+```
+
+See the [Amazon Bedrock Guardrails documentation](https://docs.aws.amazon.com/bedrock/latest/userguide/guardrails.html) for more information.
 
 ### Model Capabilities
 

@@ -1,4 +1,6 @@
+import { createIdGenerator } from '@ai-sdk/provider-utils';
 import { Tracer } from '@opentelemetry/api';
+import { InvalidArgumentError } from '../../errors';
 import { retryWithExponentialBackoff } from '../../util/retry-with-exponential-backoff';
 import { CoreAssistantMessage, CoreToolMessage } from '../prompt';
 import { CallSettings } from '../prompt/call-settings';
@@ -17,15 +19,20 @@ import { recordSpan } from '../telemetry/record-span';
 import { selectTelemetryAttributes } from '../telemetry/select-telemetry-attributes';
 import { TelemetrySettings } from '../telemetry/telemetry-settings';
 import { CoreTool } from '../tool/tool';
-import { CoreToolChoice, LanguageModel } from '../types';
+import { CoreToolChoice, LanguageModel, ProviderMetadata } from '../types';
 import {
-  CompletionTokenUsage,
-  calculateCompletionTokenUsage,
-} from '../types/token-usage';
+  LanguageModelUsage,
+  calculateLanguageModelUsage,
+} from '../types/usage';
+import { removeTextAfterLastWhitespace } from '../util/remove-text-after-last-whitespace';
 import { GenerateTextResult } from './generate-text-result';
+import { parseToolCall } from './parse-tool-call';
+import { StepResult } from './step-result';
 import { toResponseMessages } from './to-response-messages';
-import { ToToolCallArray, parseToolCall } from './tool-call';
+import { ToToolCallArray } from './tool-call';
 import { ToToolResultArray } from './tool-result';
+
+const originalGenerateId = createIdGenerator({ prefix: 'aitxt-', size: 24 });
 
 /**
 Generate a text and call tools for a given prompt using a language model.
@@ -66,7 +73,9 @@ If set and supported by the model, calls will generate deterministic results.
 @param abortSignal - An optional abort signal that can be used to cancel the call.
 @param headers - Additional HTTP headers to be sent with the request. Only applicable for HTTP-based providers.
 
-@param maxToolRoundtrips - Maximal number of automatic roundtrips for tool calls.
+@param maxSteps - Maximum number of sequential LLM calls (steps), e.g. when you use tool calls.
+
+@param onStepFinish - Callback that is called when each step (LLM call) is finished, including intermediate steps.
 
 @returns
 A result object that contains the generated text, the results of the tool calls, and additional information.
@@ -83,7 +92,17 @@ export async function generateText<TOOLS extends Record<string, CoreTool>>({
   headers,
   maxAutomaticRoundtrips = 0,
   maxToolRoundtrips = maxAutomaticRoundtrips,
+  maxSteps = maxToolRoundtrips != null ? maxToolRoundtrips + 1 : 1,
+  experimental_continuationSteps,
+  experimental_continueSteps: continueSteps = experimental_continuationSteps ??
+    false,
   experimental_telemetry: telemetry,
+  experimental_providerMetadata: providerMetadata,
+  _internal: {
+    generateId = originalGenerateId,
+    currentDate = () => new Date(),
+  } = {},
+  onStepFinish,
   ...settings
 }: CallSettings &
   Prompt & {
@@ -108,7 +127,7 @@ The tool choice strategy. Default: 'auto'.
     maxAutomaticRoundtrips?: number;
 
     /**
-Maximal number of automatic roundtrips for tool calls.
+Maximum number of automatic roundtrips for tool calls.
 
 An automatic tool call roundtrip is another LLM call with the
 tool call results when all tool calls of the last assistant
@@ -118,14 +137,65 @@ A maximum number is required to prevent infinite loops in the
 case of misconfigured tools.
 
 By default, it's set to 0, which will disable the feature.
+
+@deprecated Use `maxSteps` instead (which is `maxToolRoundtrips` + 1).
      */
     maxToolRoundtrips?: number;
 
     /**
-     * Optional telemetry configuration (experimental).
+Maximum number of sequential LLM calls (steps), e.g. when you use tool calls. Must be at least 1.
+
+A maximum number is required to prevent infinite loops in the case of misconfigured tools.
+
+By default, it's set to 1, which means that only a single LLM call is made.
+     */
+    maxSteps?: number;
+
+    /**
+@deprecated Use `experimental_continueSteps` instead.
+     */
+    experimental_continuationSteps?: boolean;
+
+    /**
+When enabled, the model will perform additional steps if the finish reason is "length" (experimental).
+
+By default, it's set to false.
+     */
+    experimental_continueSteps?: boolean;
+
+    /**
+Optional telemetry configuration (experimental).
      */
     experimental_telemetry?: TelemetrySettings;
+
+    /**
+Additional provider-specific metadata. They are passed through
+to the provider from the AI SDK and enable provider-specific
+functionality that can be fully encapsulated in the provider.
+ */
+    experimental_providerMetadata?: ProviderMetadata;
+
+    /**
+    Callback that is called when each step (LLM call) is finished, including intermediate steps.
+    */
+    onStepFinish?: (event: StepResult<TOOLS>) => Promise<void> | void;
+
+    /**
+     * Internal. For test use only. May change without notice.
+     */
+    _internal?: {
+      generateId?: () => string;
+      currentDate?: () => Date;
+    };
   }): Promise<GenerateTextResult<TOOLS>> {
+  if (maxSteps < 1) {
+    throw new InvalidArgumentError({
+      parameter: 'maxSteps',
+      value: maxSteps,
+      message: 'maxSteps must be at least 1',
+    });
+  }
+
   const baseTelemetryAttributes = getBaseTelemetryAttributes({
     model,
     telemetry,
@@ -148,7 +218,7 @@ By default, it's set to 0, which will disable the feature.
         'ai.prompt': {
           input: () => JSON.stringify({ system, prompt, messages }),
         },
-        'ai.settings.maxToolRoundtrips': maxToolRoundtrips,
+        'ai.settings.maxSteps': maxSteps,
       },
     }),
     tracer,
@@ -172,23 +242,26 @@ By default, it's set to 0, which will disable the feature.
 
       let currentModelResponse: Awaited<
         ReturnType<LanguageModel['doGenerate']>
-      >;
+      > & { response: { id: string; timestamp: Date; modelId: string } };
       let currentToolCalls: ToToolCallArray<TOOLS> = [];
       let currentToolResults: ToToolResultArray<TOOLS> = [];
-      let roundtripCount = 0;
+      let stepCount = 0;
       const responseMessages: Array<CoreAssistantMessage | CoreToolMessage> =
         [];
-      const roundtrips: GenerateTextResult<TOOLS>['roundtrips'] = [];
-      const usage: CompletionTokenUsage = {
+      let text = '';
+      const steps: GenerateTextResult<TOOLS>['steps'] = [];
+      const usage: LanguageModelUsage = {
         completionTokens: 0,
         promptTokens: 0,
         totalTokens: 0,
       };
 
+      let stepType: 'initial' | 'tool-result' | 'continue' | 'done' = 'initial';
+
       do {
-        // once we have a roundtrip, we need to switch to messages format:
+        // once we have a 2nd step, we need to switch to messages format:
         const currentInputFormat =
-          roundtripCount === 0 ? validatedPrompt.type : 'messages';
+          stepCount === 0 ? validatedPrompt.type : 'messages';
 
         currentModelResponse = await retry(() =>
           recordSpan({
@@ -225,9 +298,17 @@ By default, it's set to 0, which will disable the feature.
                 ...callSettings,
                 inputFormat: currentInputFormat,
                 prompt: promptMessages,
+                providerMetadata,
                 abortSignal,
                 headers,
               });
+
+              // Fill in default values:
+              const responseData = {
+                id: result.response?.id ?? generateId(),
+                timestamp: result.response?.timestamp ?? currentDate(),
+                modelId: result.response?.modelId ?? model.modelId,
+              };
 
               // Add response information to the span:
               span.setAttributes(
@@ -241,6 +322,10 @@ By default, it's set to 0, which will disable the feature.
                     'ai.response.toolCalls': {
                       output: () => JSON.stringify(result.toolCalls),
                     },
+                    'ai.response.id': responseData.id,
+                    'ai.response.model': responseData.modelId,
+                    'ai.response.timestamp':
+                      responseData.timestamp.toISOString(),
 
                     'ai.usage.promptTokens': result.usage.promptTokens,
                     'ai.usage.completionTokens': result.usage.completionTokens,
@@ -256,13 +341,15 @@ By default, it's set to 0, which will disable the feature.
 
                     // standardized gen-ai llm span attributes:
                     'gen_ai.response.finish_reasons': [result.finishReason],
+                    'gen_ai.response.id': responseData.id,
+                    'gen_ai.response.model': responseData.modelId,
                     'gen_ai.usage.input_tokens': result.usage.promptTokens,
                     'gen_ai.usage.output_tokens': result.usage.completionTokens,
                   },
                 }),
               );
 
-              return result;
+              return { ...result, response: responseData };
             },
           }),
         );
@@ -284,44 +371,116 @@ By default, it's set to 0, which will disable the feature.
               });
 
         // token usage:
-        const currentUsage = calculateCompletionTokenUsage(
+        const currentUsage = calculateLanguageModelUsage(
           currentModelResponse.usage,
         );
         usage.completionTokens += currentUsage.completionTokens;
         usage.promptTokens += currentUsage.promptTokens;
         usage.totalTokens += currentUsage.totalTokens;
 
-        // add roundtrip information:
-        roundtrips.push({
-          text: currentModelResponse.text ?? '',
+        // check if another step is needed:
+        let nextStepType: 'done' | 'continue' | 'tool-result' = 'done';
+        if (++stepCount < maxSteps) {
+          if (
+            continueSteps &&
+            currentModelResponse.finishReason === 'length' &&
+            // only use continue when there are no tool calls:
+            currentToolCalls.length === 0
+          ) {
+            nextStepType = 'continue';
+          } else if (
+            // there are tool calls:
+            currentToolCalls.length > 0 &&
+            // all current tool calls have results:
+            currentToolResults.length === currentToolCalls.length
+          ) {
+            nextStepType = 'tool-result';
+          }
+        }
+
+        // text:
+        const stepText =
+          nextStepType === 'continue'
+            ? removeTextAfterLastWhitespace(currentModelResponse.text ?? '')
+            : currentModelResponse.text ?? '';
+
+        // text updates
+        text =
+          nextStepType === 'continue' || stepType === 'continue'
+            ? text + stepText
+            : stepText;
+
+        // Add step information:
+        const currentStep: StepResult<TOOLS> = {
+          stepType,
+          text: stepText,
           toolCalls: currentToolCalls,
           toolResults: currentToolResults,
           finishReason: currentModelResponse.finishReason,
           usage: currentUsage,
           warnings: currentModelResponse.warnings,
           logprobs: currentModelResponse.logprobs,
-        });
+          response: {
+            ...currentModelResponse.response,
+            headers: currentModelResponse.rawResponse?.headers,
+          },
+          experimental_providerMetadata: currentModelResponse.providerMetadata,
+          isContinued: nextStepType === 'continue',
+        };
+        steps.push(currentStep);
+        await onStepFinish?.(currentStep);
 
-        // append to messages for potential next roundtrip:
-        const newResponseMessages = toResponseMessages({
-          text: currentModelResponse.text,
-          toolCalls: currentToolCalls,
-          toolResults: currentToolResults,
-        });
-        responseMessages.push(...newResponseMessages);
-        promptMessages.push(
-          ...newResponseMessages.map(message =>
-            convertToLanguageModelMessage(message, null),
-          ),
-        );
-      } while (
-        // there are tool calls:
-        currentToolCalls.length > 0 &&
-        // all current tool calls have results:
-        currentToolResults.length === currentToolCalls.length &&
-        // the number of roundtrips is less than the maximum:
-        roundtripCount++ < maxToolRoundtrips
-      );
+        // append to messages for potential next step:
+        if (stepType === 'continue') {
+          // continue step: update the last assistant message
+          // continue is only possible when there are no tool calls,
+          // so we can assume that there is a single last assistant message:
+          const lastResponseMessage =
+            responseMessages.pop() as CoreAssistantMessage;
+          promptMessages.pop();
+          if (typeof lastResponseMessage.content === 'string') {
+            lastResponseMessage.content = text;
+          } else {
+            lastResponseMessage.content.push({
+              text: stepText,
+              type: 'text',
+            });
+          }
+          responseMessages.push(lastResponseMessage);
+          promptMessages.push(
+            convertToLanguageModelMessage(lastResponseMessage, null),
+          );
+        } else if (nextStepType === 'continue') {
+          const newResponseMessages = toResponseMessages({
+            text,
+            toolCalls: currentToolCalls,
+            toolResults: currentToolResults,
+          });
+
+          responseMessages.push(...newResponseMessages);
+          promptMessages.push(
+            ...newResponseMessages.map(message =>
+              convertToLanguageModelMessage(message, null),
+            ),
+          );
+        } else {
+          // next step is either done or tool-result:
+          const newResponseMessages = toResponseMessages({
+            text: currentModelResponse.text,
+            toolCalls: currentToolCalls,
+            toolResults: currentToolResults,
+          });
+
+          responseMessages.push(...newResponseMessages);
+          promptMessages.push(
+            ...newResponseMessages.map(message =>
+              convertToLanguageModelMessage(message, null),
+            ),
+          );
+        }
+
+        stepType = nextStepType;
+      } while (stepType !== 'done');
 
       // Add response information to the span:
       span.setAttributes(
@@ -353,19 +512,19 @@ By default, it's set to 0, which will disable the feature.
       );
 
       return new DefaultGenerateTextResult({
-        // Always return a string so that the caller doesn't have to check for undefined.
-        // If they need to check if the model did not return any text,
-        // they can check the length of the string:
-        text: currentModelResponse.text ?? '',
+        text,
         toolCalls: currentToolCalls,
         toolResults: currentToolResults,
         finishReason: currentModelResponse.finishReason,
         usage,
         warnings: currentModelResponse.warnings,
-        rawResponse: currentModelResponse.rawResponse,
+        response: {
+          ...currentModelResponse.response,
+          headers: currentModelResponse.rawResponse?.headers,
+        },
         logprobs: currentModelResponse.logprobs,
         responseMessages,
-        roundtrips,
+        steps,
         providerMetadata: currentModelResponse.providerMetadata,
       });
     },
@@ -458,9 +617,11 @@ class DefaultGenerateTextResult<TOOLS extends Record<string, CoreTool>>
   readonly warnings: GenerateTextResult<TOOLS>['warnings'];
   readonly responseMessages: GenerateTextResult<TOOLS>['responseMessages'];
   readonly roundtrips: GenerateTextResult<TOOLS>['roundtrips'];
+  readonly steps: GenerateTextResult<TOOLS>['steps'];
   readonly rawResponse: GenerateTextResult<TOOLS>['rawResponse'];
   readonly logprobs: GenerateTextResult<TOOLS>['logprobs'];
   readonly experimental_providerMetadata: GenerateTextResult<TOOLS>['experimental_providerMetadata'];
+  readonly response: GenerateTextResult<TOOLS>['response'];
 
   constructor(options: {
     text: GenerateTextResult<TOOLS>['text'];
@@ -469,11 +630,11 @@ class DefaultGenerateTextResult<TOOLS extends Record<string, CoreTool>>
     finishReason: GenerateTextResult<TOOLS>['finishReason'];
     usage: GenerateTextResult<TOOLS>['usage'];
     warnings: GenerateTextResult<TOOLS>['warnings'];
-    rawResponse?: GenerateTextResult<TOOLS>['rawResponse'];
     logprobs: GenerateTextResult<TOOLS>['logprobs'];
     responseMessages: GenerateTextResult<TOOLS>['responseMessages'];
-    roundtrips: GenerateTextResult<TOOLS>['roundtrips'];
+    steps: GenerateTextResult<TOOLS>['steps'];
     providerMetadata: GenerateTextResult<TOOLS>['experimental_providerMetadata'];
+    response: GenerateTextResult<TOOLS>['response'];
   }) {
     this.text = options.text;
     this.toolCalls = options.toolCalls;
@@ -481,11 +642,17 @@ class DefaultGenerateTextResult<TOOLS extends Record<string, CoreTool>>
     this.finishReason = options.finishReason;
     this.usage = options.usage;
     this.warnings = options.warnings;
-    this.rawResponse = options.rawResponse;
-    this.logprobs = options.logprobs;
+    this.response = options.response;
     this.responseMessages = options.responseMessages;
-    this.roundtrips = options.roundtrips;
+    this.roundtrips = options.steps;
+    this.steps = options.steps;
     this.experimental_providerMetadata = options.providerMetadata;
+
+    // deprecated:
+    this.rawResponse = {
+      headers: options.response.headers,
+    };
+    this.logprobs = options.logprobs;
   }
 }
 

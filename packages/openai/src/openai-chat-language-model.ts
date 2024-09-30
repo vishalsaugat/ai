@@ -26,6 +26,7 @@ import {
   openAIErrorDataSchema,
   openaiFailedResponseHandler,
 } from './openai-error';
+import { getResponseMetadata } from './get-response-metadata';
 
 type OpenAIChatConfig = {
   provider: string;
@@ -65,6 +66,11 @@ export class OpenAIChatLanguageModel implements LanguageModelV1 {
     return this.config.provider;
   }
 
+  get supportsImageUrls(): boolean {
+    // image urls can be sent if downloadImages is disabled (default):
+    return !this.settings.downloadImages;
+  }
+
   private getArgs({
     mode,
     prompt,
@@ -77,6 +83,7 @@ export class OpenAIChatLanguageModel implements LanguageModelV1 {
     stopSequences,
     responseFormat,
     seed,
+    providerMetadata,
   }: Parameters<LanguageModelV1['doGenerate']>[0]) {
     const type = mode.type;
 
@@ -146,6 +153,10 @@ export class OpenAIChatLanguageModel implements LanguageModelV1 {
       stop: stopSequences,
       seed,
 
+      // openai specific settings:
+      max_completion_tokens:
+        providerMetadata?.openai?.maxCompletionTokens ?? undefined,
+
       // response format:
       response_format:
         responseFormat?.type === 'json' ? { type: 'json_object' } : undefined,
@@ -156,6 +167,14 @@ export class OpenAIChatLanguageModel implements LanguageModelV1 {
         useLegacyFunctionCalling,
       }),
     };
+
+    // reasoning models have fixed params, remove them if they are set:
+    if (isReasoningModel(this.modelId)) {
+      baseArgs.temperature = undefined;
+      baseArgs.top_p = undefined;
+      baseArgs.frequency_penalty = undefined;
+      baseArgs.presence_penalty = undefined;
+    }
 
     switch (type) {
       case 'regular': {
@@ -264,6 +283,16 @@ export class OpenAIChatLanguageModel implements LanguageModelV1 {
     const { messages: rawPrompt, ...rawSettings } = args;
     const choice = response.choices[0];
 
+    const providerMetadata =
+      response.usage?.completion_tokens_details?.reasoning_tokens != null
+        ? {
+            openai: {
+              reasoningTokens:
+                response.usage?.completion_tokens_details?.reasoning_tokens,
+            },
+          }
+        : undefined;
+
     return {
       text: choice.message.content ?? undefined,
       toolCalls:
@@ -289,14 +318,60 @@ export class OpenAIChatLanguageModel implements LanguageModelV1 {
       },
       rawCall: { rawPrompt, rawSettings },
       rawResponse: { headers: responseHeaders },
+      response: getResponseMetadata(response),
       warnings,
       logprobs: mapOpenAIChatLogProbsOutput(choice.logprobs),
+      providerMetadata,
     };
   }
 
   async doStream(
     options: Parameters<LanguageModelV1['doStream']>[0],
   ): Promise<Awaited<ReturnType<LanguageModelV1['doStream']>>> {
+    // reasoning models don't support streaming, we simulate it:
+    if (isReasoningModel(this.modelId)) {
+      const result = await this.doGenerate(options);
+
+      const simulatedStream = new ReadableStream<LanguageModelV1StreamPart>({
+        start(controller) {
+          controller.enqueue({ type: 'response-metadata', ...result.response });
+
+          if (result.text) {
+            controller.enqueue({
+              type: 'text-delta',
+              textDelta: result.text,
+            });
+          }
+
+          if (result.toolCalls) {
+            for (const toolCall of result.toolCalls) {
+              controller.enqueue({
+                type: 'tool-call',
+                ...toolCall,
+              });
+            }
+          }
+
+          controller.enqueue({
+            type: 'finish',
+            finishReason: result.finishReason,
+            usage: result.usage,
+            logprobs: result.logprobs,
+            providerMetadata: result.providerMetadata,
+          });
+
+          controller.close();
+        },
+      });
+
+      return {
+        stream: simulatedStream,
+        rawCall: result.rawCall,
+        rawResponse: result.rawResponse,
+        warnings: result.warnings,
+      };
+    }
+
     const { args, warnings } = this.getArgs(options);
 
     const { responseHeaders, value: response } = await postJsonToApi({
@@ -343,6 +418,7 @@ export class OpenAIChatLanguageModel implements LanguageModelV1 {
       completionTokens: undefined,
     };
     let logprobs: LanguageModelV1LogProbs;
+    let isFirstChunk = true;
 
     const { useLegacyFunctionCalling } = this.settings;
 
@@ -367,6 +443,15 @@ export class OpenAIChatLanguageModel implements LanguageModelV1 {
               finishReason = 'error';
               controller.enqueue({ type: 'error', error: value.error });
               return;
+            }
+
+            if (isFirstChunk) {
+              isFirstChunk = false;
+
+              controller.enqueue({
+                type: 'response-metadata',
+                ...getResponseMetadata(value),
+              });
             }
 
             if (value.usage != null) {
@@ -453,29 +538,32 @@ export class OpenAIChatLanguageModel implements LanguageModelV1 {
 
                   const toolCall = toolCalls[index];
 
-                  // check if tool call is complete (some providers send the full tool call in one chunk)
                   if (
                     toolCall.function?.name != null &&
-                    toolCall.function?.arguments != null &&
-                    isParsableJson(toolCall.function.arguments)
+                    toolCall.function?.arguments != null
                   ) {
-                    // send delta
-                    controller.enqueue({
-                      type: 'tool-call-delta',
-                      toolCallType: 'function',
-                      toolCallId: toolCall.id,
-                      toolName: toolCall.function.name,
-                      argsTextDelta: toolCall.function.arguments,
-                    });
+                    // send delta if the argument text has already started:
+                    if (toolCall.function.arguments.length > 0) {
+                      controller.enqueue({
+                        type: 'tool-call-delta',
+                        toolCallType: 'function',
+                        toolCallId: toolCall.id,
+                        toolName: toolCall.function.name,
+                        argsTextDelta: toolCall.function.arguments,
+                      });
+                    }
 
-                    // send tool call
-                    controller.enqueue({
-                      type: 'tool-call',
-                      toolCallType: 'function',
-                      toolCallId: toolCall.id ?? generateId(),
-                      toolName: toolCall.function.name,
-                      args: toolCall.function.arguments,
-                    });
+                    // check if tool call is complete
+                    // (some providers send the full tool call in one chunk):
+                    if (isParsableJson(toolCall.function.arguments)) {
+                      controller.enqueue({
+                        type: 'tool-call',
+                        toolCallType: 'function',
+                        toolCallId: toolCall.id ?? generateId(),
+                        toolName: toolCall.function.name,
+                        args: toolCall.function.arguments,
+                      });
+                    }
                   }
 
                   continue;
@@ -540,12 +628,20 @@ const openAITokenUsageSchema = z
   .object({
     prompt_tokens: z.number().nullish(),
     completion_tokens: z.number().nullish(),
+    completion_tokens_details: z
+      .object({
+        reasoning_tokens: z.number().nullish(),
+      })
+      .nullish(),
   })
   .nullish();
 
 // limited version of the schema, focussed on what is needed for the implementation
 // this approach limits breakages when the API changes and increases efficiency
 const openAIChatResponseSchema = z.object({
+  id: z.string().nullish(),
+  created: z.number().nullish(),
+  model: z.string().nullish(),
   choices: z.array(
     z.object({
       message: z.object({
@@ -599,6 +695,9 @@ const openAIChatResponseSchema = z.object({
 // this approach limits breakages when the API changes and increases efficiency
 const openaiChatChunkSchema = z.union([
   z.object({
+    id: z.string().nullish(),
+    created: z.number().nullish(),
+    model: z.string().nullish(),
     choices: z.array(
       z.object({
         delta: z
@@ -742,4 +841,8 @@ function prepareToolsAndToolChoice({
       throw new Error(`Unsupported tool choice type: ${_exhaustiveCheck}`);
     }
   }
+}
+
+function isReasoningModel(modelId: string) {
+  return modelId.startsWith('o1-');
 }

@@ -44,8 +44,16 @@ export function convertToOpenAIChatMessages({
                         : `data:${
                             part.mimeType ?? 'image/jpeg'
                           };base64,${convertUint8ArrayToBase64(part.image)}`,
+
+                    // OpenAI specific extension: image detail
+                    detail: part.providerMetadata?.openai?.imageDetail,
                   },
                 };
+              }
+              case 'file': {
+                throw new UnsupportedFunctionalityError({
+                  functionality: 'File content parts in user messages',
+                });
               }
             }
           }),

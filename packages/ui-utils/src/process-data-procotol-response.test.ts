@@ -48,9 +48,10 @@ describe('scenario: simple text response', () => {
     const stream = createDataProtocolStream([
       formatStreamPart('text', 'Hello, '),
       formatStreamPart('text', 'world!'),
-      formatStreamPart('finish_roundtrip', {
+      formatStreamPart('finish_step', {
         finishReason: 'stop',
         usage: { completionTokens: 5, promptTokens: 10 },
+        isContinued: false,
       }),
       formatStreamPart('finish_message', {
         finishReason: 'stop',
@@ -139,14 +140,16 @@ describe('scenario: server-side tool roundtrip', () => {
         toolCallId: 'tool-call-id',
         result: { weather: 'sunny' },
       }),
-      formatStreamPart('finish_roundtrip', {
+      formatStreamPart('finish_step', {
         finishReason: 'tool-calls',
         usage: { completionTokens: 5, promptTokens: 10 },
+        isContinued: false,
       }),
       formatStreamPart('text', 'The weather in London is sunny.'),
-      formatStreamPart('finish_roundtrip', {
+      formatStreamPart('finish_step', {
         finishReason: 'stop',
         usage: { completionTokens: 2, promptTokens: 4 },
+        isContinued: false,
       }),
       formatStreamPart('finish_message', {
         finishReason: 'stop',
@@ -245,6 +248,96 @@ describe('scenario: server-side tool roundtrip', () => {
               },
             ],
           },
+          {
+            id: 'mock-id',
+            role: 'assistant',
+            content: 'The weather in London is sunny.',
+            createdAt: '2023-01-01T00:00:00.000Z',
+          },
+        ],
+        data: [],
+      },
+    ]);
+  });
+
+  it('should call the onFinish function with the correct arguments', async () => {
+    expect(finishCalls).toStrictEqual([
+      {
+        message: {
+          id: 'mock-id',
+          role: 'assistant',
+          content: 'The weather in London is sunny.',
+          createdAt: '2023-01-01T00:00:00.000Z',
+        },
+        finishReason: 'stop',
+        usage: {
+          completionTokens: 7,
+          promptTokens: 14,
+          totalTokens: 21,
+        },
+      },
+    ]);
+  });
+});
+
+describe('scenario: server-side continue roundtrip', () => {
+  let result: Awaited<ReturnType<typeof processDataProtocolResponse>>;
+
+  beforeEach(async () => {
+    const stream = createDataProtocolStream([
+      formatStreamPart('text', 'The weather in London '),
+      formatStreamPart('finish_step', {
+        finishReason: 'length',
+        usage: { completionTokens: 5, promptTokens: 10 },
+        isContinued: true,
+      }),
+      formatStreamPart('text', 'is sunny.'),
+      formatStreamPart('finish_step', {
+        finishReason: 'stop',
+        usage: { completionTokens: 2, promptTokens: 4 },
+        isContinued: false,
+      }),
+      formatStreamPart('finish_message', {
+        finishReason: 'stop',
+        usage: { completionTokens: 7, promptTokens: 14 },
+      }),
+    ]);
+
+    result = await processDataProtocolResponse({
+      reader: stream.getReader(),
+      update,
+      onFinish,
+      generateId: vi.fn().mockReturnValue('mock-id'),
+      getCurrentDate: vi.fn().mockReturnValue(new Date('2023-01-01')),
+    });
+  });
+
+  it('should return the correct messages', async () => {
+    expect(result.messages).toStrictEqual([
+      {
+        id: 'mock-id',
+        role: 'assistant',
+        content: 'The weather in London is sunny.',
+        createdAt: new Date('2023-01-01'),
+      },
+    ]);
+  });
+
+  it('should call the update function with the correct arguments', async () => {
+    expect(updateCalls).toStrictEqual([
+      {
+        newMessages: [
+          {
+            id: 'mock-id',
+            role: 'assistant',
+            content: 'The weather in London ',
+            createdAt: '2023-01-01T00:00:00.000Z',
+          },
+        ],
+        data: [],
+      },
+      {
+        newMessages: [
           {
             id: 'mock-id',
             role: 'assistant',

@@ -1,8 +1,6 @@
 import { openai } from '@ai-sdk/openai';
 import { generateText } from 'ai';
-import dotenv from 'dotenv';
-
-dotenv.config();
+import 'dotenv/config';
 
 import { NodeSDK } from '@opentelemetry/sdk-node';
 import { ConsoleSpanExporter } from '@opentelemetry/sdk-trace-node';
@@ -17,7 +15,7 @@ sdk.start();
 
 async function main() {
   const result = await generateText({
-    model: openai('gpt-3.5-turbo'),
+    model: openai('gpt-4o'),
     maxTokens: 50,
     prompt: 'Invent a new holiday and describe its traditions.',
     experimental_telemetry: {
