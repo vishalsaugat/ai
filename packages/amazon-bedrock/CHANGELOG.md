@@ -1,5 +1,17 @@
 # @ai-sdk/amazon-bedrock
 
+## 0.0.30
+
+### Patch Changes
+
+- 59d1abf: feat (provider/bedrock): support Bedrock amazon.titan-embed-text-v1 and amazon.titan-embed-text-v2:0 embeddings
+
+## 0.0.29
+
+### Patch Changes
+
+- 8c3847e: fix (provider/bedrock): update amazon bedrock package to use safe version of aws sdk
+
 ## 0.0.28
 
 ### Patch Changes

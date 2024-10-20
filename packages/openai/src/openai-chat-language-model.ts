@@ -4,6 +4,7 @@ import {
   LanguageModelV1CallWarning,
   LanguageModelV1FinishReason,
   LanguageModelV1LogProbs,
+  LanguageModelV1ProviderMetadata,
   LanguageModelV1StreamPart,
   UnsupportedFunctionalityError,
 } from '@ai-sdk/provider';
@@ -59,6 +60,11 @@ export class OpenAIChatLanguageModel implements LanguageModelV1 {
   }
 
   get defaultObjectGenerationMode() {
+    // audio models don't support structured outputs:
+    if (isAudioModel(this.modelId)) {
+      return 'tool';
+    }
+
     return this.supportsStructuredOutputs ? 'json' : 'tool';
   }
 
@@ -156,6 +162,8 @@ export class OpenAIChatLanguageModel implements LanguageModelV1 {
       // openai specific settings:
       max_completion_tokens:
         providerMetadata?.openai?.maxCompletionTokens ?? undefined,
+      store: providerMetadata?.openai?.store ?? undefined,
+      metadata: providerMetadata?.openai?.metadata ?? undefined,
 
       // response format:
       response_format:
@@ -283,15 +291,21 @@ export class OpenAIChatLanguageModel implements LanguageModelV1 {
     const { messages: rawPrompt, ...rawSettings } = args;
     const choice = response.choices[0];
 
-    const providerMetadata =
-      response.usage?.completion_tokens_details?.reasoning_tokens != null
-        ? {
-            openai: {
-              reasoningTokens:
-                response.usage?.completion_tokens_details?.reasoning_tokens,
-            },
-          }
-        : undefined;
+    let providerMetadata: LanguageModelV1ProviderMetadata | undefined;
+    if (
+      response.usage?.completion_tokens_details?.reasoning_tokens != null ||
+      response.usage?.prompt_tokens_details?.cached_tokens != null
+    ) {
+      providerMetadata = { openai: {} };
+      if (response.usage?.completion_tokens_details?.reasoning_tokens != null) {
+        providerMetadata.openai.reasoningTokens =
+          response.usage?.completion_tokens_details?.reasoning_tokens;
+      }
+      if (response.usage?.prompt_tokens_details?.cached_tokens != null) {
+        providerMetadata.openai.cachedPromptTokens =
+          response.usage?.prompt_tokens_details?.cached_tokens;
+      }
+    }
 
     return {
       text: choice.message.content ?? undefined,
@@ -422,6 +436,7 @@ export class OpenAIChatLanguageModel implements LanguageModelV1 {
 
     const { useLegacyFunctionCalling } = this.settings;
 
+    let providerMetadata: LanguageModelV1ProviderMetadata | undefined;
     return {
       stream: response.pipeThrough(
         new TransformStream<
@@ -459,6 +474,14 @@ export class OpenAIChatLanguageModel implements LanguageModelV1 {
                 promptTokens: value.usage.prompt_tokens ?? undefined,
                 completionTokens: value.usage.completion_tokens ?? undefined,
               };
+              if (value.usage.prompt_tokens_details?.cached_tokens != null) {
+                providerMetadata = {
+                  openai: {
+                    cachedPromptTokens:
+                      value.usage.prompt_tokens_details?.cached_tokens,
+                  },
+                };
+              }
             }
 
             const choice = value.choices[0];
@@ -613,6 +636,7 @@ export class OpenAIChatLanguageModel implements LanguageModelV1 {
                 promptTokens: usage.promptTokens ?? NaN,
                 completionTokens: usage.completionTokens ?? NaN,
               },
+              ...(providerMetadata != null ? { providerMetadata } : {}),
             });
           },
         }),
@@ -628,6 +652,11 @@ const openAITokenUsageSchema = z
   .object({
     prompt_tokens: z.number().nullish(),
     completion_tokens: z.number().nullish(),
+    prompt_tokens_details: z
+      .object({
+        cached_tokens: z.number().nullish(),
+      })
+      .nullish(),
     completion_tokens_details: z
       .object({
         reasoning_tokens: z.number().nullish(),
@@ -845,4 +874,8 @@ function prepareToolsAndToolChoice({
 
 function isReasoningModel(modelId: string) {
   return modelId.startsWith('o1-');
+}
+
+function isAudioModel(modelId: string) {
+  return modelId.startsWith('gpt-4o-audio-preview');
 }

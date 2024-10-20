@@ -1,5 +1,52 @@
 # @ai-sdk/azure
 
+## 0.0.48
+
+### Patch Changes
+
+- Updated dependencies [741ca51]
+  - @ai-sdk/openai@0.0.68
+
+## 0.0.47
+
+### Patch Changes
+
+- 861fb35: fix (provider/azure): support token usage information when streaming
+
+## 0.0.46
+
+### Patch Changes
+
+- Updated dependencies [39fccee]
+  - @ai-sdk/openai@0.0.67
+
+## 0.0.45
+
+### Patch Changes
+
+- Updated dependencies [3f29c10]
+  - @ai-sdk/openai@0.0.66
+
+## 0.0.44
+
+### Patch Changes
+
+- Updated dependencies [e8aed44]
+  - @ai-sdk/openai@0.0.65
+
+## 0.0.43
+
+### Patch Changes
+
+- Updated dependencies [5aa576d]
+  - @ai-sdk/openai@0.0.64
+
+## 0.0.42
+
+### Patch Changes
+
+- 9994f55: chore (provider/azure): update Azure OpenAI API version to 2024-08-01-preview
+
 ## 0.0.41
 
 ### Patch Changes

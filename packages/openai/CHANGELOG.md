@@ -1,5 +1,35 @@
 # @ai-sdk/openai
 
+## 0.0.68
+
+### Patch Changes
+
+- 741ca51: feat (provider/openai): support mp3 and wav audio inputs
+
+## 0.0.67
+
+### Patch Changes
+
+- 39fccee: feat (provider/openai): provider name can be changed for 3rd party openai compatible providers
+
+## 0.0.66
+
+### Patch Changes
+
+- 3f29c10: feat (provider/openai): support metadata field for distillation
+
+## 0.0.65
+
+### Patch Changes
+
+- e8aed44: Add OpenAI cached prompt tokens to experimental_providerMetadata for generateText and streamText
+
+## 0.0.64
+
+### Patch Changes
+
+- 5aa576d: feat (provider/openai): support store parameter for distillation
+
 ## 0.0.63
 
 ### Patch Changes

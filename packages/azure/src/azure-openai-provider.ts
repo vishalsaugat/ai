@@ -120,8 +120,8 @@ export function createAzure(
 
   const url = ({ path, modelId }: { path: string; modelId: string }) =>
     options.baseURL
-      ? `${options.baseURL}/${modelId}${path}?api-version=2024-06-01`
-      : `https://${getResourceName()}.openai.azure.com/openai/deployments/${modelId}${path}?api-version=2024-06-01`;
+      ? `${options.baseURL}/${modelId}${path}?api-version=2024-08-01-preview`
+      : `https://${getResourceName()}.openai.azure.com/openai/deployments/${modelId}${path}?api-version=2024-08-01-preview`;
 
   const createChatModel = (
     deploymentName: string,
@@ -131,7 +131,7 @@ export function createAzure(
       provider: 'azure-openai.chat',
       url,
       headers: getHeaders,
-      compatibility: 'compatible',
+      compatibility: 'strict',
       fetch: options.fetch,
     });
 
@@ -142,7 +142,7 @@ export function createAzure(
     new OpenAICompletionLanguageModel(modelId, settings, {
       provider: 'azure-openai.completion',
       url,
-      compatibility: 'compatible',
+      compatibility: 'strict',
       headers: getHeaders,
       fetch: options.fetch,
     });
