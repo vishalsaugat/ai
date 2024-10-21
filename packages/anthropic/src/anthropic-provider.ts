@@ -78,6 +78,8 @@ or to provide a custom fetch implementation for e.g. testing.
     */
   fetch?: FetchFunction;
 
+  googleAuthOptions?: GoogleAuthOptions;
+
   generateId?: () => string;
 }
 
