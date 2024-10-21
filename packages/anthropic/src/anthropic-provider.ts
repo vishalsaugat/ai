@@ -94,7 +94,6 @@ export function createAnthropic(
     'https://api.anthropic.com/v1';
 
   const getHeaders = () => ({
-    googleAuthOptions: options.googleAuthOptions,
     ...options.headers,
   });
 
@@ -107,6 +106,7 @@ export function createAnthropic(
       baseURL,
       headers: getHeaders,
       fetch: options.fetch,
+      googleAuthOptions: options.googleAuthOptions
     });
 
   const provider = function (
