@@ -60,12 +60,18 @@ export function convertToGoogleVertexContentRequest(
               parts.push(
                 part.data instanceof URL
                   ? {
+                    fileData: {
+                      mimeType: part.mimeType,
+                      fileUri: part.data.toString(),
+                    },
+                  }
+                  : part.data.startsWith('gs://') ?
+                    {
                       fileData: {
                         mimeType: part.mimeType,
-                        fileUri: part.data.toString(),
+                        fileUri: part.data,
                       },
-                    }
-                  : {
+                    } : {
                       inlineData: {
                         mimeType: part.mimeType,
                         data: part.data,

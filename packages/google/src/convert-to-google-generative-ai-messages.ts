@@ -46,17 +46,17 @@ export function convertToGoogleGenerativeAIMessages(
               parts.push(
                 part.image instanceof URL
                   ? {
-                      fileData: {
-                        mimeType: part.mimeType ?? 'image/jpeg',
-                        fileUri: part.image.toString(),
-                      },
-                    }
-                  : {
-                      inlineData: {
-                        mimeType: part.mimeType ?? 'image/jpeg',
-                        data: convertUint8ArrayToBase64(part.image),
-                      },
+                    fileData: {
+                      mimeType: part.mimeType ?? 'image/jpeg',
+                      fileUri: part.image.toString(),
                     },
+                  }
+                  : {
+                    inlineData: {
+                      mimeType: part.mimeType ?? 'image/jpeg',
+                      data: convertUint8ArrayToBase64(part.image),
+                    },
+                  },
               );
 
               break;
@@ -64,14 +64,20 @@ export function convertToGoogleGenerativeAIMessages(
 
             case 'file': {
               parts.push(
-                part.data instanceof URL || part.data.startsWith('gs://')
+                part.data instanceof URL
                   ? {
+                    fileData: {
+                      mimeType: part.mimeType,
+                      fileUri: part.data.toString(),
+                    },
+                  }
+                  : part.data.startsWith('gs://') ?
+                    {
                       fileData: {
                         mimeType: part.mimeType,
-                        fileUri: part.data.toString(),
+                        fileUri: part.data,
                       },
-                    }
-                  : {
+                    } : {
                       inlineData: {
                         mimeType: part.mimeType,
                         data: part.data,
