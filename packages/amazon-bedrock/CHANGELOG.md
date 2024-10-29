@@ -1,5 +1,32 @@
 # @ai-sdk/amazon-bedrock
 
+## 0.0.33
+
+### Patch Changes
+
+- bc0ffc5: feat (provider/bedrock): add file content part support
+
+## 0.0.32
+
+### Patch Changes
+
+- 3b1b69a: feat: provider-defined tools
+- Updated dependencies [aa98cdb]
+- Updated dependencies [1486128]
+- Updated dependencies [7b937c5]
+- Updated dependencies [3b1b69a]
+- Updated dependencies [811a317]
+  - @ai-sdk/provider-utils@1.0.22
+  - @ai-sdk/provider@0.0.26
+
+## 0.0.31
+
+### Patch Changes
+
+- Updated dependencies [b9b0d7b]
+  - @ai-sdk/provider@0.0.25
+  - @ai-sdk/provider-utils@1.0.21
+
 ## 0.0.30
 
 ### Patch Changes

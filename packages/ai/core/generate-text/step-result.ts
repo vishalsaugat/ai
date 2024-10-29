@@ -1,8 +1,10 @@
+import { CoreAssistantMessage, CoreToolMessage } from '../prompt/message';
 import { CoreTool } from '../tool';
 import {
   CallWarning,
   FinishReason,
-  LanguageModelResponseMetadataWithHeaders,
+  LanguageModelRequestMetadata,
+  LanguageModelResponseMetadata,
   LogProbs,
   ProviderMetadata,
 } from '../types';
@@ -63,9 +65,20 @@ Response headers.
   };
 
   /**
+Additional request information.
+   */
+  readonly request: LanguageModelRequestMetadata;
+
+  /**
 Additional response information.
 */
-  readonly response: LanguageModelResponseMetadataWithHeaders;
+  readonly response: LanguageModelResponseMetadata & {
+    /**
+The response messages that were generated during the call. It consists of an assistant message,
+potentially containing tool calls.
+*/
+    readonly messages: Array<CoreAssistantMessage | CoreToolMessage>;
+  };
 
   /**
 Additional provider-specific metadata. They are passed through

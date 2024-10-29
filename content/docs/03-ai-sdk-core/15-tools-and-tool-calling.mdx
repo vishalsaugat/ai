@@ -276,6 +276,10 @@ async function generateSomething(prompt: string): Promise<{
 
 ## Active Tools
 
+<Note type="warning">
+  The `activeTools` property is experimental and may change in the future.
+</Note>
+
 Language models can only handle a limited number of tools at a time, depending on the model.
 To allow for static typing using a large number of tools and limiting the available tools to the model at the same time,
 the AI SDK provides the `experimental_activeTools` property.
@@ -294,21 +298,79 @@ const { text } = await generateText({
 });
 ```
 
-## Prompt Engineering with Tools
+## Multi-modal Tool Results
 
-When you create prompts that include tools, getting good results can be tricky as the number and complexity of your tools increases.
+<Note type="warning">
+  Multi-modal tool results are experimental and only supported by Anthropic.
+</Note>
 
-Here are a few tips to help you get the best results:
+In order to send multi-modal tool results, e.g. screenshots, back to the model,
+they need to be converted into a specific format.
 
-1. Use a model that is strong at tool calling, such as `gpt-4` or `gpt-4-turbo`. Weaker models will often struggle to call tools effectively and flawlessly.
-1. Keep the number of tools low, e.g. to 5 or less.
-1. Keep the complexity of the tool parameters low. Complex Zod schemas with many nested and optional elements, unions, etc. can be challenging for the model to work with.
-1. Use semantically meaningful names for your tools, parameters, parameter properties, etc. The more information you pass to the model, the better it can understand what you want.
-1. Add `.describe("...")` to your Zod schema properties to give the model hints about what a particular property is for.
-1. When the output of a tool might be unclear to the model and there are dependencies between tools, use the `description` field of a tool to provide information about the output of the tool execution.
-1. You can include example input/outputs of tool calls in your prompt to help the model understand how to use the tools. Keep in mind that the tools work with JSON objects, so the examples should use JSON.
+AI SDK Core tools have an optional `experimental_toToolResultContent` function
+that converts the tool result into a content part.
 
-In general, the goal should be to give the model all information it needs in a clear way.
+Here is an example for converting a screenshot into a content part:
+
+```ts highlight="22-27"
+const result = await generateText({
+  model: anthropic('claude-3-5-sonnet-20241022'),
+  tools: {
+    computer: anthropic.tools.computer_20241022({
+      // ...
+      async execute({ action, coordinate, text }) {
+        switch (action) {
+          case 'screenshot': {
+            return {
+              type: 'image',
+              data: fs
+                .readFileSync('./data/screenshot-editor.png')
+                .toString('base64'),
+            };
+          }
+          default: {
+            return `executed ${action}`;
+          }
+        }
+      },
+
+      // map to tool result content for LLM consumption:
+      experimental_toToolResultContent(result) {
+        return typeof result === 'string'
+          ? [{ type: 'text', text: result }]
+          : [{ type: 'image', data: result.data, mimeType: 'image/png' }];
+      },
+    }),
+  },
+  // ...
+});
+```
+
+When working with multi-modal tool results in a chat context, you'll need to provide the tools to `convertToCoreMessages` to properly convert the tool results back into content. This is particularly important when passing messages between the UI and core functions:
+
+```ts
+import { convertToCoreMessages, generateText } from 'ai';
+
+// Define your tools with multi-modal capabilities
+const tools = {
+  screenshot: tool({
+    // ... tool definition
+    experimental_toToolResultContent: result => [
+      { type: 'image', data: result.data },
+    ],
+  }),
+};
+
+// When converting UI messages to core messages, pass the tools
+const coreMessages = convertToCoreMessages(uiMessages, { tools });
+
+const result = await generateText({
+  model: anthropic('claude-3-5-sonnet-20241022'),
+  messages: coreMessages,
+  tools,
+  // ... other options
+});
+```
 
 ## Examples
 

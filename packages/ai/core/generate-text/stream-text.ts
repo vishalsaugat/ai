@@ -1,7 +1,3 @@
-import {
-  LanguageModelV1Message,
-  LanguageModelV1Prompt,
-} from '@ai-sdk/provider';
 import { createIdGenerator } from '@ai-sdk/provider-utils';
 import { Span } from '@opentelemetry/api';
 import { ServerResponse } from 'node:http';
@@ -17,14 +13,11 @@ import {
 import { createResolvablePromise } from '../../util/create-resolvable-promise';
 import { retryWithExponentialBackoff } from '../../util/retry-with-exponential-backoff';
 import { CallSettings } from '../prompt/call-settings';
-import {
-  convertToLanguageModelMessage,
-  convertToLanguageModelPrompt,
-} from '../prompt/convert-to-language-model-prompt';
+import { convertToLanguageModelPrompt } from '../prompt/convert-to-language-model-prompt';
 import { prepareCallSettings } from '../prompt/prepare-call-settings';
 import { prepareToolsAndToolChoice } from '../prompt/prepare-tools-and-tool-choice';
 import { Prompt } from '../prompt/prompt';
-import { validatePrompt } from '../prompt/validate-prompt';
+import { standardizePrompt } from '../prompt/standardize-prompt';
 import { assembleOperationName } from '../telemetry/assemble-operation-name';
 import { getBaseTelemetryAttributes } from '../telemetry/get-base-telemetry-attributes';
 import { getTracer } from '../telemetry/get-tracer';
@@ -37,6 +30,7 @@ import {
   CoreToolChoice,
   FinishReason,
   LanguageModel,
+  LanguageModelRequestMetadata,
   LogProbs,
   ProviderMetadata,
 } from '../types';
@@ -62,7 +56,7 @@ import { toResponseMessages } from './to-response-messages';
 import { ToolCallUnion } from './tool-call';
 import { ToolResultUnion } from './tool-result';
 
-const originalGenerateId = createIdGenerator({ prefix: 'aitxt-', size: 24 });
+const originalGenerateId = createIdGenerator({ prefix: 'aitxt', size: 24 });
 
 /**
 Generate a text and call tools for a given prompt using a language model.
@@ -284,6 +278,8 @@ need to be added separately.
 
   const tracer = getTracer(telemetry);
 
+  const initialPrompt = standardizePrompt({ system, prompt, messages });
+
   return recordSpan({
     name: 'ai.streamText',
     attributes: selectTelemetryAttributes({
@@ -304,14 +300,26 @@ need to be added separately.
       const retry = retryWithExponentialBackoff({ maxRetries });
 
       const startStep: StartStepFunction<TOOLS> = async ({
-        promptMessages,
-        promptType,
+        responseMessages,
       }: {
-        promptMessages: LanguageModelV1Prompt;
-        promptType: 'prompt' | 'messages';
+        responseMessages: Array<CoreAssistantMessage | CoreToolMessage>;
       }) => {
+        // after the 1st step, we need to switch to messages format:
+        const promptFormat =
+          responseMessages.length === 0 ? initialPrompt.type : 'messages';
+
+        const promptMessages = await convertToLanguageModelPrompt({
+          prompt: {
+            type: promptFormat,
+            system: initialPrompt.system,
+            messages: [...initialPrompt.messages, ...responseMessages],
+          },
+          modelSupportsImageUrls: model.supportsImageUrls,
+          modelSupportsUrl: model.supportsUrl,
+        });
+
         const {
-          result: { stream, warnings, rawResponse },
+          result: { stream, warnings, rawResponse, request },
           doStreamSpan,
           startTimestampMs,
         } = await retry(() =>
@@ -326,7 +334,7 @@ need to be added separately.
                 }),
                 ...baseTelemetryAttributes,
                 'ai.prompt.format': {
-                  input: () => promptType,
+                  input: () => promptFormat,
                 },
                 'ai.prompt.messages': {
                   input: () => JSON.stringify(promptMessages),
@@ -359,7 +367,7 @@ need to be added separately.
                   }),
                 },
                 ...prepareCallSettings(settings),
-                inputFormat: promptType,
+                inputFormat: promptFormat,
                 prompt: promptMessages,
                 providerMetadata,
                 abortSignal,
@@ -380,6 +388,7 @@ need to be added separately.
               abortSignal,
             }),
             warnings,
+            request: request ?? {},
             rawResponse,
           },
           doStreamSpan,
@@ -387,24 +396,17 @@ need to be added separately.
         };
       };
 
-      const promptMessages = await convertToLanguageModelPrompt({
-        prompt: validatePrompt({ system, prompt, messages }),
-        modelSupportsImageUrls: model.supportsImageUrls,
-      });
-
       const {
-        result: { stream, warnings, rawResponse },
+        result: { stream, warnings, rawResponse, request },
         doStreamSpan,
         startTimestampMs,
-      } = await startStep({
-        promptType: validatePrompt({ system, prompt, messages }).type,
-        promptMessages,
-      });
+      } = await startStep({ responseMessages: [] });
 
       return new DefaultStreamTextResult({
         stream,
         warnings,
         rawResponse,
+        request,
         onChunk,
         onFinish,
         onStepFinish,
@@ -415,26 +417,24 @@ need to be added separately.
         maxSteps,
         continueSteps,
         startStep,
-        promptMessages,
         modelId: model.modelId,
         now,
         currentDate,
         generateId,
+        tools,
       });
     },
   });
 }
 
 type StartStepFunction<TOOLS extends Record<string, CoreTool>> = (options: {
-  promptMessages: LanguageModelV1Prompt;
-  promptType: 'prompt' | 'messages';
+  responseMessages: Array<CoreAssistantMessage | CoreToolMessage>;
 }) => Promise<{
   result: {
     stream: ReadableStream<SingleRequestTextStreamPart<TOOLS>>;
-    warnings?: CallWarning[] | undefined;
-    rawResponse?: {
-      headers?: Record<string, string>;
-    };
+    warnings: CallWarning[] | undefined;
+    rawResponse: { headers?: Record<string, string> } | undefined;
+    request: LanguageModelRequestMetadata;
   };
   doStreamSpan: Span;
   startTimestampMs: number;
@@ -456,6 +456,7 @@ class DefaultStreamTextResult<TOOLS extends Record<string, CoreTool>>
   readonly text: StreamTextResult<TOOLS>['text'];
   readonly toolCalls: StreamTextResult<TOOLS>['toolCalls'];
   readonly toolResults: StreamTextResult<TOOLS>['toolResults'];
+  readonly request: StreamTextResult<TOOLS>['request'];
   readonly response: StreamTextResult<TOOLS>['response'];
   readonly steps: StreamTextResult<TOOLS>['steps'];
   readonly responseMessages: StreamTextResult<TOOLS>['responseMessages'];
@@ -464,6 +465,7 @@ class DefaultStreamTextResult<TOOLS extends Record<string, CoreTool>>
     stream,
     warnings,
     rawResponse,
+    request,
     onChunk,
     onFinish,
     onStepFinish,
@@ -474,15 +476,16 @@ class DefaultStreamTextResult<TOOLS extends Record<string, CoreTool>>
     maxSteps,
     continueSteps,
     startStep,
-    promptMessages,
     modelId,
     now,
     currentDate,
     generateId,
+    tools,
   }: {
     stream: ReadableStream<SingleRequestTextStreamPart<TOOLS>>;
     warnings: StreamTextResult<TOOLS>['warnings'];
     rawResponse: StreamTextResult<TOOLS>['rawResponse'];
+    request: Awaited<StreamTextResult<TOOLS>['request']>;
     onChunk: Parameters<typeof streamText>[0]['onChunk'];
     onFinish:
       | ((
@@ -502,11 +505,11 @@ class DefaultStreamTextResult<TOOLS extends Record<string, CoreTool>>
     maxSteps: number;
     continueSteps: boolean;
     startStep: StartStepFunction<TOOLS>;
-    promptMessages: LanguageModelV1Prompt;
     modelId: string;
     now: () => number;
     currentDate: () => Date;
     generateId: () => string;
+    tools: TOOLS | undefined;
   }) {
     this.warnings = warnings;
     this.rawResponse = rawResponse;
@@ -548,6 +551,11 @@ class DefaultStreamTextResult<TOOLS extends Record<string, CoreTool>>
     } = createResolvablePromise<ProviderMetadata | undefined>();
     this.experimental_providerMetadata = providerMetadataPromise;
 
+    // initialize request promise
+    const { resolve: resolveRequest, promise: requestPromise } =
+      createResolvablePromise<LanguageModelRequestMetadata>();
+    this.request = requestPromise;
+
     // initialize response promise
     const { resolve: resolveResponse, promise: responsePromise } =
       createResolvablePromise<Awaited<StreamTextResult<TOOLS>['response']>>();
@@ -581,7 +589,7 @@ class DefaultStreamTextResult<TOOLS extends Record<string, CoreTool>>
       startTimestamp,
       doStreamSpan,
       currentStep,
-      promptMessages,
+      responseMessages,
       usage = {
         promptTokens: 0,
         completionTokens: 0,
@@ -589,15 +597,17 @@ class DefaultStreamTextResult<TOOLS extends Record<string, CoreTool>>
       },
       stepType,
       previousStepText = '',
+      stepRequest,
     }: {
       stream: ReadableStream<SingleRequestTextStreamPart<TOOLS>>;
       startTimestamp: number;
       doStreamSpan: Span;
       currentStep: number;
-      promptMessages: LanguageModelV1Prompt;
+      responseMessages: Array<CoreAssistantMessage | CoreToolMessage>;
       usage: LanguageModelUsage | undefined;
       stepType: 'initial' | 'continue' | 'tool-result';
       previousStepText?: string;
+      stepRequest: LanguageModelRequestMetadata;
     }) {
       const stepToolCalls: ToolCallUnion<TOOLS>[] = [];
       const stepToolResults: ToolResultUnion<TOOLS>[] = [];
@@ -858,11 +868,42 @@ class DefaultStreamTextResult<TOOLS extends Record<string, CoreTool>>
                 usage: stepUsage,
                 experimental_providerMetadata: stepProviderMetadata,
                 logprobs: stepLogProbs,
-                response: stepResponse,
+                response: {
+                  ...stepResponse,
+                },
                 isContinued: nextStepType === 'continue',
               });
 
-              const stepResult: StepResult<TOOLS> = {
+              // append to messages for the next step:
+              if (stepType === 'continue') {
+                // continue step: update the last assistant message
+                // continue is only possible when there are no tool calls,
+                // so we can assume that there is a single last assistant message:
+                const lastMessage = responseMessages[
+                  responseMessages.length - 1
+                ] as CoreAssistantMessage;
+
+                if (typeof lastMessage.content === 'string') {
+                  lastMessage.content = stepText;
+                } else {
+                  lastMessage.content.push({
+                    text: stepText,
+                    type: 'text',
+                  });
+                }
+              } else {
+                responseMessages.push(
+                  ...toResponseMessages({
+                    text: stepText,
+                    tools: tools ?? ({} as TOOLS),
+                    toolCalls: stepToolCalls,
+                    toolResults: stepToolResults,
+                  }),
+                );
+              }
+
+              // Add step information (after response messages are updated):
+              const currentStepResult: StepResult<TOOLS> = {
                 stepType,
                 text: stepText,
                 toolCalls: stepToolCalls,
@@ -871,15 +912,22 @@ class DefaultStreamTextResult<TOOLS extends Record<string, CoreTool>>
                 usage: stepUsage,
                 warnings: self.warnings,
                 logprobs: stepLogProbs,
-                response: stepResponse,
+                request: stepRequest,
                 rawResponse: self.rawResponse,
+                response: {
+                  ...stepResponse,
+                  headers: self.rawResponse?.headers,
+
+                  // deep clone msgs to avoid mutating past messages in multi-step:
+                  messages: JSON.parse(JSON.stringify(responseMessages)),
+                },
                 experimental_providerMetadata: stepProviderMetadata,
                 isContinued: nextStepType === 'continue',
               };
 
-              stepResults.push(stepResult);
+              stepResults.push(currentStepResult);
 
-              await onStepFinish?.(stepResult);
+              await onStepFinish?.(currentStepResult);
 
               const combinedUsage = {
                 promptTokens: usage.promptTokens + stepUsage.promptTokens,
@@ -889,45 +937,12 @@ class DefaultStreamTextResult<TOOLS extends Record<string, CoreTool>>
               };
 
               if (nextStepType !== 'done') {
-                // append to messages for the next step:
-                if (stepType === 'continue') {
-                  // continue step: update the last assistant message
-                  // continue is only possible when there are no tool calls,
-                  // so we can assume that there is a single last assistant message:
-                  const lastPromptMessage = promptMessages[
-                    promptMessages.length - 1
-                  ] as LanguageModelV1Message & {
-                    role: 'assistant';
-                  };
-
-                  lastPromptMessage.content.push({
-                    text: stepText,
-                    type: 'text',
-                  });
-                } else {
-                  // tool result step
-                  // add the assistant message with the tool calls
-                  // and the tool result messages:
-                  promptMessages.push(
-                    ...toResponseMessages({
-                      text: stepText,
-                      toolCalls: stepToolCalls,
-                      toolResults: stepToolResults,
-                    }).map(message =>
-                      convertToLanguageModelMessage(message, null),
-                    ),
-                  );
-                }
-
                 // create call and doStream span:
                 const {
                   result,
                   doStreamSpan,
                   startTimestampMs: startTimestamp,
-                } = await startStep({
-                  promptType: 'messages',
-                  promptMessages,
-                });
+                } = await startStep({ responseMessages });
 
                 // update warnings and rawResponse:
                 self.warnings = result.warnings;
@@ -939,10 +954,11 @@ class DefaultStreamTextResult<TOOLS extends Record<string, CoreTool>>
                   startTimestamp,
                   doStreamSpan,
                   currentStep: currentStep + 1,
-                  promptMessages,
+                  responseMessages,
                   usage: combinedUsage,
                   stepType: nextStepType,
                   previousStepText: fullStepText,
+                  stepRequest: result.request,
                 });
 
                 return;
@@ -956,7 +972,9 @@ class DefaultStreamTextResult<TOOLS extends Record<string, CoreTool>>
                   usage: combinedUsage,
                   experimental_providerMetadata: stepProviderMetadata,
                   logprobs: stepLogProbs,
-                  response: stepResponse,
+                  response: {
+                    ...stepResponse,
+                  },
                 });
 
                 // close the stitchable stream
@@ -987,39 +1005,6 @@ class DefaultStreamTextResult<TOOLS extends Record<string, CoreTool>>
                   }),
                 );
 
-                // Collect responseMessages from all steps:
-                const responseMessages = stepResults.reduce<
-                  Array<CoreAssistantMessage | CoreToolMessage>
-                >((responseMessages, step) => {
-                  if (step.stepType === 'continue') {
-                    // continue step: update the last assistant message
-                    // continue is only possible when there are no tool calls,
-                    // so we can assume that there is a single last assistant message:
-                    const lastResponseMessage =
-                      responseMessages.pop() as CoreAssistantMessage;
-
-                    if (typeof lastResponseMessage.content === 'string') {
-                      lastResponseMessage.content += step.text;
-                    } else {
-                      lastResponseMessage.content.push({
-                        text: step.text,
-                        type: 'text',
-                      });
-                    }
-
-                    return [...responseMessages, lastResponseMessage];
-                  }
-
-                  return [
-                    ...responseMessages,
-                    ...toResponseMessages({
-                      text: step.text,
-                      toolCalls: step.toolCalls,
-                      toolResults: step.toolResults,
-                    }),
-                  ];
-                }, []);
-
                 // resolve promises:
                 resolveUsage(combinedUsage);
                 resolveFinishReason(stepFinishReason!);
@@ -1027,6 +1012,7 @@ class DefaultStreamTextResult<TOOLS extends Record<string, CoreTool>>
                 resolveToolCalls(stepToolCalls);
                 resolveProviderMetadata(stepProviderMetadata);
                 resolveToolResults(stepToolResults);
+                resolveRequest(stepRequest);
                 resolveResponse({
                   ...stepResponse,
                   headers: rawResponse?.headers,
@@ -1046,10 +1032,12 @@ class DefaultStreamTextResult<TOOLS extends Record<string, CoreTool>>
                   // optional as well. Therefore we need to cast the toolResults to any.
                   // The type exposed to the users will be correctly inferred.
                   toolResults: stepToolResults as any,
+                  request: stepRequest,
                   rawResponse,
                   response: {
                     ...stepResponse,
                     headers: rawResponse?.headers,
+                    messages: responseMessages,
                   },
                   warnings,
                   experimental_providerMetadata: stepProviderMetadata,
@@ -1073,9 +1061,10 @@ class DefaultStreamTextResult<TOOLS extends Record<string, CoreTool>>
       startTimestamp: startTimestampMs,
       doStreamSpan,
       currentStep: 0,
-      promptMessages,
+      responseMessages: [],
       usage: undefined,
       stepType: 'initial',
+      stepRequest: request,
     });
   }
 

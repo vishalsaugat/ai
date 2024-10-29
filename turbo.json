@@ -12,6 +12,7 @@
         "DEEPSEEK_API_KEY",
         "FIREWORKS_API_KEY",
         "GOOGLE_API_KEY",
+        "GOOGLE_GENERATIVE_AI_API_KEY",
         "GROQ_API_KEY",
         "HUGGINGFACE_API_KEY",
         "MISTRAL_API_KEY",
@@ -27,7 +28,8 @@
         "SENTRY_AUTH_TOKEN",
         "SENTRY_ORG",
         "SENTRY_PROJECT",
-        "NEXT_RUNTIME"
+        "NEXT_RUNTIME",
+        "XAI_API_KEY"
       ],
       "outputs": ["dist/**", ".next/**", "!.next/cache/**"]
     },

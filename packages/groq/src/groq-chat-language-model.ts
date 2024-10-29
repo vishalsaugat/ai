@@ -21,6 +21,7 @@ import { convertToGroqChatMessages } from './convert-to-groq-chat-messages';
 import { getResponseMetadata } from './get-response-metadata';
 import { GroqChatModelId, GroqChatSettings } from './groq-chat-settings';
 import { groqErrorDataSchema, groqFailedResponseHandler } from './groq-error';
+import { prepareTools } from './groq-prepare-tools';
 import { mapGroqFinishReason } from './map-groq-finish-reason';
 
 type GroqChatConfig = {
@@ -129,12 +130,14 @@ export class GroqChatLanguageModel implements LanguageModelV1 {
 
     switch (type) {
       case 'regular': {
+        const { tools, tool_choice, toolWarnings } = prepareTools({ mode });
         return {
           args: {
             ...baseArgs,
-            ...prepareToolsAndToolChoice({ mode }),
+            tools,
+            tool_choice,
           },
-          warnings,
+          warnings: [...warnings, ...toolWarnings],
         };
       }
 
@@ -185,6 +188,8 @@ export class GroqChatLanguageModel implements LanguageModelV1 {
   ): Promise<Awaited<ReturnType<LanguageModelV1['doGenerate']>>> {
     const { args, warnings } = this.getArgs({ ...options, stream: false });
 
+    const body = JSON.stringify(args);
+
     const { responseHeaders, value: response } = await postJsonToApi({
       url: this.config.url({
         path: '/chat/completions',
@@ -220,6 +225,7 @@ export class GroqChatLanguageModel implements LanguageModelV1 {
       rawResponse: { headers: responseHeaders },
       response: getResponseMetadata(response),
       warnings,
+      request: { body },
     };
   }
 
@@ -227,6 +233,8 @@ export class GroqChatLanguageModel implements LanguageModelV1 {
     options: Parameters<LanguageModelV1['doStream']>[0],
   ): Promise<Awaited<ReturnType<LanguageModelV1['doStream']>>> {
     const { args, warnings } = this.getArgs({ ...options, stream: true });
+
+    const body = JSON.stringify({ ...args, stream: true });
 
     const { responseHeaders, value: response } = await postJsonToApi({
       url: this.config.url({
@@ -445,6 +453,7 @@ export class GroqChatLanguageModel implements LanguageModelV1 {
       rawCall: { rawPrompt, rawSettings },
       rawResponse: { headers: responseHeaders },
       warnings,
+      request: { body },
     };
   }
 }
@@ -530,56 +539,3 @@ const groqChatChunkSchema = z.union([
   }),
   groqErrorDataSchema,
 ]);
-
-function prepareToolsAndToolChoice({
-  mode,
-}: {
-  mode: Parameters<LanguageModelV1['doGenerate']>[0]['mode'] & {
-    type: 'regular';
-  };
-}) {
-  // when the tools array is empty, change it to undefined to prevent errors:
-  const tools = mode.tools?.length ? mode.tools : undefined;
-
-  if (tools == null) {
-    return { tools: undefined, tool_choice: undefined };
-  }
-
-  const toolChoice = mode.toolChoice;
-
-  const mappedTools = tools.map(tool => ({
-    type: 'function',
-    function: {
-      name: tool.name,
-      description: tool.description,
-      parameters: tool.parameters,
-    },
-  }));
-
-  if (toolChoice == null) {
-    return { tools: mappedTools, tool_choice: undefined };
-  }
-
-  const type = toolChoice.type;
-
-  switch (type) {
-    case 'auto':
-    case 'none':
-    case 'required':
-      return { tools: mappedTools, tool_choice: type };
-    case 'tool':
-      return {
-        tools: mappedTools,
-        tool_choice: {
-          type: 'function',
-          function: {
-            name: toolChoice.toolName,
-          },
-        },
-      };
-    default: {
-      const _exhaustiveCheck: never = type;
-      throw new Error(`Unsupported tool choice type: ${_exhaustiveCheck}`);
-    }
-  }
-}

@@ -1,5 +1,36 @@
 # @ai-sdk/react
 
+## 0.0.68
+
+### Patch Changes
+
+- 8301e41: fix (ai/react): update React peer dependency version to allow rc releases.
+
+## 0.0.67
+
+### Patch Changes
+
+- Updated dependencies [3bf8da0]
+  - @ai-sdk/ui-utils@0.0.49
+
+## 0.0.66
+
+### Patch Changes
+
+- aa98cdb: chore: more flexible dependency versioning
+- Updated dependencies [aa98cdb]
+- Updated dependencies [7b937c5]
+- Updated dependencies [811a317]
+  - @ai-sdk/provider-utils@1.0.22
+  - @ai-sdk/ui-utils@0.0.48
+
+## 0.0.65
+
+### Patch Changes
+
+- @ai-sdk/provider-utils@1.0.21
+- @ai-sdk/ui-utils@0.0.47
+
 ## 0.0.64
 
 ### Patch Changes

@@ -23,8 +23,13 @@ describe('result.text', () => {
             tools: undefined,
             toolChoice: undefined,
           });
-          assert.deepStrictEqual(prompt, [
-            { role: 'user', content: [{ type: 'text', text: 'prompt' }] },
+
+          expect(prompt).toStrictEqual([
+            {
+              role: 'user',
+              content: [{ type: 'text', text: 'prompt' }],
+              providerMetadata: undefined,
+            },
           ]);
 
           return {
@@ -75,8 +80,13 @@ describe('result.toolCalls', () => {
               },
             ],
           });
-          assert.deepStrictEqual(prompt, [
-            { role: 'user', content: [{ type: 'text', text: 'test-input' }] },
+
+          expect(prompt).toStrictEqual([
+            {
+              role: 'user',
+              content: [{ type: 'text', text: 'test-input' }],
+              providerMetadata: undefined,
+            },
           ]);
 
           return {
@@ -144,8 +154,13 @@ describe('result.toolResults', () => {
               },
             ],
           });
-          assert.deepStrictEqual(prompt, [
-            { role: 'user', content: [{ type: 'text', text: 'test-input' }] },
+
+          expect(prompt).toStrictEqual([
+            {
+              role: 'user',
+              content: [{ type: 'text', text: 'test-input' }],
+              providerMetadata: undefined,
+            },
           ]);
 
           return {
@@ -270,6 +285,53 @@ describe('result.responseMessages', () => {
   });
 });
 
+describe('result.request', () => {
+  it('should contain request information', async () => {
+    const result = await generateText({
+      model: new MockLanguageModelV1({
+        doGenerate: async ({}) => ({
+          ...dummyResponseValues,
+          text: `Hello, world!`,
+          request: {
+            body: 'test body',
+          },
+        }),
+      }),
+      prompt: 'prompt',
+    });
+
+    expect(result.request).toStrictEqual({
+      body: 'test body',
+    });
+  });
+});
+
+describe('result.response', () => {
+  it('should contain response information', async () => {
+    const result = await generateText({
+      model: new MockLanguageModelV1({
+        doGenerate: async ({}) => ({
+          ...dummyResponseValues,
+          text: `Hello, world!`,
+          response: {
+            id: 'test-id-from-model',
+            timestamp: new Date(10000),
+            modelId: 'test-response-model-id',
+          },
+          rawResponse: {
+            headers: {
+              'custom-response-header': 'response-header-value',
+            },
+          },
+        }),
+      }),
+      prompt: 'prompt',
+    });
+
+    expect(result.response).toMatchSnapshot();
+  });
+});
+
 describe('options.maxSteps', () => {
   describe('2 steps: initial, tool-result', () => {
     let result: GenerateTextResult<any>;
@@ -307,6 +369,7 @@ describe('options.maxSteps', () => {
                   {
                     role: 'user',
                     content: [{ type: 'text', text: 'test-input' }],
+                    providerMetadata: undefined,
                   },
                 ]);
 
@@ -359,12 +422,8 @@ describe('options.maxSteps', () => {
                 expect(prompt).toStrictEqual([
                   {
                     role: 'user',
-                    content: [
-                      {
-                        type: 'text',
-                        text: 'test-input',
-                      },
-                    ],
+                    content: [{ type: 'text', text: 'test-input' }],
+                    providerMetadata: undefined,
                   },
                   {
                     role: 'assistant',
@@ -387,6 +446,8 @@ describe('options.maxSteps', () => {
                         toolCallId: 'call-1',
                         toolName: 'tool1',
                         result: 'result1',
+                        content: undefined,
+                        isError: undefined,
                         providerMetadata: undefined,
                       },
                     ],
@@ -474,16 +535,18 @@ describe('options.maxSteps', () => {
         model: new MockLanguageModelV1({
           doGenerate: async ({ prompt, mode }) => {
             switch (responseCount++) {
-              case 0:
+              case 0: {
                 expect(mode).toStrictEqual({
                   type: 'regular',
                   toolChoice: undefined,
                   tools: undefined,
                 });
+
                 expect(prompt).toStrictEqual([
                   {
                     role: 'user',
                     content: [{ type: 'text', text: 'test-input' }],
+                    providerMetadata: undefined,
                   },
                 ]);
 
@@ -498,16 +561,19 @@ describe('options.maxSteps', () => {
                     modelId: 'test-response-model-id',
                   },
                 };
-              case 1:
+              }
+              case 1: {
                 expect(mode).toStrictEqual({
                   type: 'regular',
                   toolChoice: undefined,
                   tools: undefined,
                 });
+
                 expect(prompt).toStrictEqual([
                   {
                     role: 'user',
                     content: [{ type: 'text', text: 'test-input' }],
+                    providerMetadata: undefined,
                   },
                   {
                     role: 'assistant',
@@ -539,7 +605,8 @@ describe('options.maxSteps', () => {
                     },
                   },
                 };
-              case 2:
+              }
+              case 2: {
                 expect(mode).toStrictEqual({
                   type: 'regular',
                   toolChoice: undefined,
@@ -549,6 +616,7 @@ describe('options.maxSteps', () => {
                   {
                     role: 'user',
                     content: [{ type: 'text', text: 'test-input' }],
+                    providerMetadata: undefined,
                   },
                   {
                     role: 'assistant',
@@ -579,6 +647,7 @@ describe('options.maxSteps', () => {
                   },
                   usage: { completionTokens: 2, promptTokens: 3 },
                 };
+              }
               default:
                 throw new Error(`Unexpected response count: ${responseCount}`);
             }
@@ -635,50 +704,6 @@ describe('options.maxSteps', () => {
 
     it('onStepFinish should be called for each step', () => {
       expect(onStepFinishResults).toMatchSnapshot();
-    });
-  });
-});
-
-describe('result.response', () => {
-  it('should contain response information', async () => {
-    const result = await generateText({
-      model: new MockLanguageModelV1({
-        doGenerate: async ({ prompt, mode }) => {
-          assert.deepStrictEqual(mode, {
-            type: 'regular',
-            tools: undefined,
-            toolChoice: undefined,
-          });
-          assert.deepStrictEqual(prompt, [
-            { role: 'user', content: [{ type: 'text', text: 'prompt' }] },
-          ]);
-
-          return {
-            ...dummyResponseValues,
-            text: `Hello, world!`,
-            response: {
-              id: 'test-id-from-model',
-              timestamp: new Date(10000),
-              modelId: 'test-response-model-id',
-            },
-            rawResponse: {
-              headers: {
-                'custom-response-header': 'response-header-value',
-              },
-            },
-          };
-        },
-      }),
-      prompt: 'prompt',
-    });
-
-    expect(result.response).toStrictEqual({
-      id: 'test-id-from-model',
-      timestamp: new Date(10000),
-      modelId: 'test-response-model-id',
-      headers: {
-        'custom-response-header': 'response-header-value',
-      },
     });
   });
 });
@@ -935,8 +960,13 @@ describe('tools with custom schema', () => {
               },
             ],
           });
-          assert.deepStrictEqual(prompt, [
-            { role: 'user', content: [{ type: 'text', text: 'test-input' }] },
+
+          expect(prompt).toStrictEqual([
+            {
+              role: 'user',
+              content: [{ type: 'text', text: 'test-input' }],
+              providerMetadata: undefined,
+            },
           ]);
 
           return {
