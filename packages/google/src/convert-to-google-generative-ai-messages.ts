@@ -64,7 +64,7 @@ export function convertToGoogleGenerativeAIMessages(
 
             case 'file': {
               parts.push(
-                part.data instanceof URL
+                part.data instanceof URL || part.data.startsWith('gs://')
                   ? {
                       fileData: {
                         mimeType: part.mimeType,
