@@ -257,7 +257,7 @@ export class AnthropicMessagesLanguageModel implements LanguageModelV1 {
               },
             }
           : undefined,
-      request: { body: JSON.stringify(args) },
+      // request: { body: JSON.stringify(args) },
     };
   }
 
@@ -468,7 +468,7 @@ export class AnthropicMessagesLanguageModel implements LanguageModelV1 {
       rawCall: { rawPrompt, rawSettings },
       rawResponse: { headers: responseHeaders },
       warnings,
-      request: { body: JSON.stringify(body) },
+      // request: { body: JSON.stringify(body) },
     };
   }
 }
