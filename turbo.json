@@ -6,6 +6,7 @@
       "dependsOn": ["^build"],
       "env": [
         "ANTHROPIC_API_KEY",
+        "FLUX_SECRET",
         "ASSISTANT_ID",
         "AWS_REGION",
         "AWS_ACCESS_KEY_ID",

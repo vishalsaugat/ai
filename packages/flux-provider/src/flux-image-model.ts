@@ -89,7 +89,7 @@ export class FluxImageModel implements ImageModelV1 {
 
     const currentDate = this.config._internal?.currentDate?.() ?? new Date();
     const fullHeaders = combineHeaders(this.config.headers(), headers);
-  const token = jwt.sign({ project: '' }, 'a', { expiresIn: '1h' });
+  const token = jwt.sign({ project: '' }, process.env.FLUX_SECRET!, { expiresIn: '1h' });
 
   const [height, width] = size ? size.split("x") : ['1024', '1024'];
   const data = {
