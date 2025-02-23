@@ -1,15 +1,9 @@
-import { createOpenAI } from '@ai-sdk/openai';
+import { fireworks } from '@ai-sdk/fireworks';
 import { streamText } from 'ai';
 import 'dotenv/config';
 
-const fireworks = createOpenAI({
-  name: 'fireworks',
-  apiKey: process.env.FIREWORKS_API_KEY ?? '',
-  baseURL: 'https://api.fireworks.ai/inference/v1',
-});
-
 async function main() {
-  const result = await streamText({
+  const result = streamText({
     model: fireworks('accounts/fireworks/models/firefunction-v1'),
     prompt: 'Invent a new holiday and describe its traditions.',
   });

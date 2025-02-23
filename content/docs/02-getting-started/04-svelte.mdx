@@ -22,9 +22,11 @@ If you haven't obtained your OpenAI API key, you can do so by [signing up](https
 
 ## Setup Your Application
 
+<Note>This guide applies to SvelteKit versions 4 and below.</Note>
+
 Start by creating a new SvelteKit application. This command will create a new directory named `my-ai-app` and set up a basic SvelteKit application inside it.
 
-<Snippet text="pnpm create svelte@latest my-ai-app" />
+<Snippet text="pnpm create svelte@6.3.2 my-ai-app" />
 
 Navigate to the newly created directory:
 
@@ -84,7 +86,7 @@ Create a SvelteKit Endpoint, `src/routes/api/chat/+server.ts` and add the follow
 
 ```tsx filename="src/routes/api/chat/+server.ts"
 import { createOpenAI } from '@ai-sdk/openai';
-import { streamText, convertToCoreMessages } from 'ai';
+import { streamText } from 'ai';
 import type { RequestHandler } from './$types';
 
 import { env } from '$env/dynamic/private';
@@ -96,9 +98,9 @@ const openai = createOpenAI({
 export const POST = (async ({ request }) => {
   const { messages } = await request.json();
 
-  const result = await streamText({
-    model: openai('gpt-4-turbo'),
-    messages: convertToCoreMessages(messages),
+  const result = streamText({
+    model: openai('gpt-4o'),
+    messages,
   });
 
   return result.toDataStreamResponse();
@@ -174,7 +176,7 @@ Modify your `src/routes/api/chat/+server.ts` file to include the new weather too
 
 ```tsx filename="src/routes/api/chat/+server.ts" highlight="2,4,18-32"
 import { createOpenAI } from '@ai-sdk/openai';
-import { streamText, convertToCoreMessages, tool } from 'ai';
+import { streamText, tool } from 'ai';
 import type { RequestHandler } from './$types';
 import { z } from 'zod';
 
@@ -187,12 +189,12 @@ const openai = createOpenAI({
 export const POST = (async ({ request }) => {
   const { messages } = await request.json();
 
-  const result = await streamText({
-    model: openai('gpt-4-turbo'),
-    messages: convertToCoreMessages(messages),
+  const result = streamText({
+    model: openai('gpt-4o'),
+    messages,
     tools: {
       weather: tool({
-        description: 'Get the weather in a location (farenheit)',
+        description: 'Get the weather in a location (fahrenheit)',
         parameters: z.object({
           location: z.string().describe('The location to get the weather for'),
         }),
@@ -291,7 +293,7 @@ Update your `src/routes/api/chat/+server.ts` file to add a new tool to convert t
 
 ```tsx filename="src/routes/api/chat/+server.ts" highlight="32-45"
 import { createOpenAI } from '@ai-sdk/openai';
-import { streamText, convertToCoreMessages, tool } from 'ai';
+import { streamText, tool } from 'ai';
 import type { RequestHandler } from './$types';
 import { z } from 'zod';
 
@@ -304,12 +306,12 @@ const openai = createOpenAI({
 export const POST = (async ({ request }) => {
   const { messages } = await request.json();
 
-  const result = await streamText({
-    model: openai('gpt-4-turbo'),
-    messages: convertToCoreMessages(messages),
+  const result = streamText({
+    model: openai('gpt-4o'),
+    messages,
     tools: {
       weather: tool({
-        description: 'Get the weather in a location (farenheit)',
+        description: 'Get the weather in a location (fahrenheit)',
         parameters: z.object({
           location: z.string().describe('The location to get the weather for'),
         }),
@@ -321,12 +323,12 @@ export const POST = (async ({ request }) => {
           };
         },
       }),
-      convertFarenheitToCelsius: tool({
-        description: 'Convert a temperature in farenheit to celsius',
+      convertFahrenheitToCelsius: tool({
+        description: 'Convert a temperature in fahrenheit to celsius',
         parameters: z.object({
           temperature: z
             .number()
-            .describe('The temperature in farenheit to convert'),
+            .describe('The temperature in fahrenheit to convert'),
         }),
         execute: async ({ temperature }) => {
           const celsius = Math.round((temperature - 32) * (5 / 9));

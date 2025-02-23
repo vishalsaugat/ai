@@ -2,6 +2,7 @@ export type OpenAIChatPrompt = Array<ChatCompletionMessage>;
 
 export type ChatCompletionMessage =
   | ChatCompletionSystemMessage
+  | ChatCompletionDeveloperMessage
   | ChatCompletionUserMessage
   | ChatCompletionAssistantMessage
   | ChatCompletionToolMessage
@@ -9,6 +10,11 @@ export type ChatCompletionMessage =
 
 export interface ChatCompletionSystemMessage {
   role: 'system';
+  content: string;
+}
+
+export interface ChatCompletionDeveloperMessage {
+  role: 'developer';
   content: string;
 }
 
@@ -43,7 +49,7 @@ export interface ChatCompletionAssistantMessage {
   tool_calls?: Array<ChatCompletionMessageToolCall>;
   /**
    * Legacy function calling interface.
-   * @deprecated
+   * @deprecated this API is supported but deprecated by OpenAI.
    */
   function_call?: {
     arguments: string;
@@ -68,9 +74,7 @@ export interface ChatCompletionToolMessage {
 
 /**
  * Legacy function calling interface.
- *
- * @internal
- * @deprecated
+ * @deprecated this API is supported but deprecated by OpenAI.
  */
 export interface ChatCompletionFunctionMessage {
   role: 'function';

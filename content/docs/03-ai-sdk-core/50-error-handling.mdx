@@ -22,6 +22,8 @@ try {
 }
 ```
 
+See [Error Types](/docs/reference/ai-sdk-errors) for more information on the different types of errors that may be thrown.
+
 ## Handling streaming errors (simple streams)
 
 When errors occur during streams that do not support error chunks,
@@ -32,7 +34,7 @@ You can handle these errors using the `try/catch` block.
 import { generateText } from 'ai';
 
 try {
-  const { textStream } = await streamText({
+  const { textStream } = streamText({
     model: yourModel,
     prompt: 'Write a vegetarian lasagna recipe for 4 people.',
   });
@@ -56,7 +58,7 @@ happen outside of the streaming.
 import { generateText } from 'ai';
 
 try {
-  const { fullStream } = await streamText({
+  const { fullStream } = streamText({
     model: yourModel,
     prompt: 'Write a vegetarian lasagna recipe for 4 people.',
   });

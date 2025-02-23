@@ -52,7 +52,7 @@ You can use the following optional settings to customize the OpenAI provider ins
 
 - **apiKey** _string_
 
-  API key that is being send using the `Authorization` header.
+  API key that is being sent using the `Authorization` header.
   It defaults to the `OPENAI_API_KEY` environment variable.
 
 - **name** _string_
@@ -123,24 +123,6 @@ const { text } = await generateText({
 OpenAI language models can also be used in the `streamText`, `generateObject`, `streamObject`, and `streamUI` functions
 (see [AI SDK Core](/docs/ai-sdk-core) and [AI SDK RSC](/docs/ai-sdk-rsc)).
 
-### Model Capabilities
-
-| Model                  | Image Input         | Audio Input         | Object Generation   | Tool Usage          |
-| ---------------------- | ------------------- | ------------------- | ------------------- | ------------------- |
-| `gpt-4o`               | <Check size={18} /> | <Cross size={18} /> | <Check size={18} /> | <Check size={18} /> |
-| `gpt-4o-mini`          | <Check size={18} /> | <Cross size={18} /> | <Check size={18} /> | <Check size={18} /> |
-| `gpt-4o-audio-preview` | <Cross size={18} /> | <Check size={18} /> | <Check size={18} /> | <Check size={18} /> |
-| `gpt-4-turbo`          | <Check size={18} /> | <Cross size={18} /> | <Check size={18} /> | <Check size={18} /> |
-| `gpt-4`                | <Cross size={18} /> | <Cross size={18} /> | <Check size={18} /> | <Check size={18} /> |
-| `gpt-3.5-turbo`        | <Cross size={18} /> | <Cross size={18} /> | <Check size={18} /> | <Check size={18} /> |
-| `o1-preview`           | <Cross size={18} /> | <Cross size={18} /> | <Cross size={18} /> | <Cross size={18} /> |
-| `o1-mini`              | <Cross size={18} /> | <Cross size={18} /> | <Cross size={18} /> | <Cross size={18} /> |
-
-<Note>
-  The table above lists popular models. You can also pass any available provider
-  model ID as a string if needed.
-</Note>
-
 ### Chat Models
 
 You can create models that call the [OpenAI chat API](https://platform.openai.com/docs/api-reference/chat) using the `.chat()` factory method.
@@ -180,7 +162,7 @@ The following optional settings are available for OpenAI chat models:
 
   As an example, you can pass `{"50256": -100}` to prevent the token from being generated.
 
-- **logProbs** _boolean | number_
+- **logprobs** _boolean | number_
 
   Return the log probabilities of the tokens. Including logprobs will increase
   the response size and can slow down response times. However, it can
@@ -208,7 +190,8 @@ The following optional settings are available for OpenAI chat models:
 
 - **structuredOutputs** _boolean_
 
-  Whether to use [structured outputs](#structured-outputs). Defaults to `false`.
+  Whether to use [structured outputs](#structured-outputs).
+  Defaults to `false` for normal models, and `true` for reasoning models.
 
   When enabled, tool calls and object generation will be strict and follow the provided schema.
 
@@ -223,6 +206,18 @@ The following optional settings are available for OpenAI chat models:
   OpenAI supports image URLs for public models, so this is only needed for
   private models or when the images are not publicly accessible.
   Defaults to `false`.
+
+- **simulateStreaming** _boolean_
+
+  Simulates streaming by using a normal generate call and returning it as a stream.
+  Enable this if the model that you are using does not support streaming.
+  Defaults to `false`.
+
+- **reasoningEffort** _'low' | 'medium' | 'high'_
+
+  Reasoning effort for reasoning models. Defaults to `medium`. If you use
+  `providerOptions` to set the `reasoningEffort` option, this
+  model setting will be ignored.
 
 #### Structured Outputs
 
@@ -268,9 +263,55 @@ You need to change Zod `.nullish()` and `.optional()` to `.nullable()`.
 
 </Note>
 
+#### Predicted Outputs
+
+OpenAI supports [predicted outputs](https://platform.openai.com/docs/guides/latency-optimization#use-predicted-outputs) for `gpt-4o` and `gpt-4o-mini`.
+Predicted outputs help you reduce latency by allowing you to specify a base text that the model should modify.
+You can enable predicted outputs by adding the `prediction` option to the `providerOptions.openai` object:
+
+```ts highlight="15-18"
+const result = streamText({
+  model: openai('gpt-4o'),
+  messages: [
+    {
+      role: 'user',
+      content: 'Replace the Username property with an Email property.',
+    },
+    {
+      role: 'user',
+      content: existingCode,
+    },
+  ],
+  providerOptions: {
+    openai: {
+      prediction: {
+        type: 'content',
+        content: existingCode,
+      },
+    },
+  },
+});
+```
+
+OpenAI provides usage information for predicted outputs (`acceptedPredictionTokens` and `rejectedPredictionTokens`).
+You can access it in the `providerMetadata` object.
+
+```ts highlight="11"
+const openaiMetadata = (await result.providerMetadata)?.openai;
+
+const acceptedPredictionTokens = openaiMetadata?.acceptedPredictionTokens;
+const rejectedPredictionTokens = openaiMetadata?.rejectedPredictionTokens;
+```
+
+<Note type="warning">
+  OpenAI Predicted Outputs have several
+  [limitations](https://platform.openai.com/docs/guides/predicted-outputs#limitations),
+  e.g. unsupported API parameters and no tool calling support.
+</Note>
+
 #### Image Detail
 
-You can use the `openai` provider metadata to set the [image generation detail](https://platform.openai.com/docs/guides/vision/low-or-high-fidelity-image-understanding) to `high`, `low`, or `auto`:
+You can use the `openai` provider option to set the [image generation detail](https://platform.openai.com/docs/guides/vision/low-or-high-fidelity-image-understanding) to `high`, `low`, or `auto`:
 
 ```ts highlight="13-16"
 const result = await generateText({
@@ -285,8 +326,8 @@ const result = await generateText({
           image:
             'https://github.com/vercel/ai/blob/main/examples/ai-core/data/comic-cat.png?raw=true',
 
-          // OpenAI specific extension - image detail:
-          experimental_providerMetadata: {
+          // OpenAI specific options - image detail:
+          providerOptions: {
             openai: { imageDetail: 'low' },
           },
         },
@@ -298,9 +339,11 @@ const result = await generateText({
 
 #### Distillation
 
-OpenAI supports model distillation for some models. If you want to store a generation for use in the distillation process, you can add the `store` option to the `experimental_providerMetadata.openai` object. This will save the generation to the OpenAI platform for later use in distillation.
+OpenAI supports model distillation for some models.
+If you want to store a generation for use in the distillation process, you can add the `store` option to the `providerOptions.openai` object.
+This will save the generation to the OpenAI platform for later use in distillation.
 
-```typescript highlight="9-13"
+```typescript highlight="9-16"
 import { openai } from '@ai-sdk/openai';
 import { generateText } from 'ai';
 import 'dotenv/config';
@@ -309,7 +352,7 @@ async function main() {
   const { text, usage } = await generateText({
     model: openai('gpt-4o-mini'),
     prompt: 'Who worked on the original macintosh?',
-    experimental_providerMetadata: {
+    providerOptions: {
       openai: {
         store: true,
         metadata: {
@@ -329,39 +372,58 @@ main().catch(console.error);
 
 #### Reasoning Models
 
-OpenAI has introduced the `o1` series of [reasoning models](https://platform.openai.com/docs/guides/reasoning).
-Currently, `o1-mini` and `o1-preview` are available.
+OpenAI has introduced the `o1` and `o3` series of [reasoning models](https://platform.openai.com/docs/guides/reasoning).
+Currently, `o3-mini`, `o1`, `o1-mini`, and `o1-preview` are available.
 
 Reasoning models currently only generate text, have several limitations, and are only supported using `generateText` and `streamText`.
 
-<Note>
-  Streaming is simulated and all stream chunks will returned at the same time.
-</Note>
+Reasoning models support additional settings and response metadata:
 
-Reasoning models support two additional options:
+- You can use `providerOptions` to set
 
-- You can use request `experimental_providerMetadata` to set the `maxCompletionTokens` option, which determines the maximum number
-  of both reasoning and output tokens that the model generates.
-- You can use response `experimental_providerMetadata` to access the number of reasoning tokens that the model generated.
+  - the `reasoningEffort` option (or alternatively the `reasoningEffort` model setting), which determines the amount of reasoning the model performs.
 
-```ts highlight="4,7-9,15"
+- You can use response `providerMetadata` to access the number of reasoning tokens that the model generated.
+
+```ts highlight="4,7-11,17"
 import { openai } from '@ai-sdk/openai';
 import { generateText } from 'ai';
 
-const { text, usage, experimental_providerMetadata } = await generateText({
-  model: openai('o1-mini'),
+const { text, usage, providerMetadata } = await generateText({
+  model: openai('o3-mini'),
   prompt: 'Invent a new holiday and describe its traditions.',
-  experimental_providerMetadata: {
-    openai: { maxCompletionTokens: 1000 },
+  providerOptions: {
+    openai: {
+      reasoningEffort: 'low',
+    },
   },
 });
 
 console.log(text);
 console.log('Usage:', {
   ...usage,
-  reasoningTokens: experimental_providerMetadata?.openai?.reasoningTokens,
+  reasoningTokens: providerMetadata?.openai?.reasoningTokens,
 });
 ```
+
+<Note>
+  System messages are automatically converted to OpenAI developer messages for
+  reasoning models when supported. For models that do not support developer
+  messages, such as `o1-preview`, system messages are removed and a warning is
+  added.
+</Note>
+
+<Note>
+  Reasoning models like `o1-mini` and `o1-preview` require additional runtime
+  inference to complete their reasoning phase before generating a response. This
+  introduces longer latency compared to other models, with `o1-preview`
+  exhibiting significantly more inference time than `o1-mini`.
+</Note>
+
+<Note>
+  `maxTokens` is automatically mapped to `max_completion_tokens` for reasoning
+  models.
+</Note>
 
 #### Prompt Caching
 
@@ -370,7 +432,7 @@ including `gpt-4o`, `gpt-4o-mini`, `o1-preview`, and `o1-mini`.
 
 - Prompt caching is automatically enabled for these models, when the prompt is 1024 tokens or longer. It does
   not need to be explicitly enabled.
-- You can use response `experimental_providerMetadata` to access the number of prompt tokens that were a cache hit.
+- You can use response `providerMetadata` to access the number of prompt tokens that were a cache hit.
 - Note that caching behavior is dependent on load on OpenAI's infrastructure. Prompt prefixes generally remain in the
   cache following 5-10 minutes of inactivity before they are evicted, but during off-peak periods they may persist for up
   to an hour.
@@ -379,14 +441,14 @@ including `gpt-4o`, `gpt-4o-mini`, `o1-preview`, and `o1-mini`.
 import { openai } from '@ai-sdk/openai';
 import { generateText } from 'ai';
 
-const { text, usage, experimental_providerMetadata } = await generateText({
+const { text, usage, providerMetadata } = await generateText({
   model: openai('gpt-4o-mini'),
   prompt: `A 1024-token or longer prompt...`,
 });
 
 console.log(`usage:`, {
   ...usage,
-  cachedPromptTokens: experimental_providerMetadata?.openai?.cachedPromptTokens,
+  cachedPromptTokens: providerMetadata?.openai?.cachedPromptTokens,
 });
 ```
 
@@ -467,7 +529,7 @@ The following optional settings are available for OpenAI completion models:
   As an example, you can pass `{"50256": -100}` to prevent the &lt;|endoftext|&gt;
   token from being generated.
 
-- **logProbs** _boolean | number_
+- **logprobs** _boolean | number_
 
   Return the log probabilities of the tokens. Including logprobs will increase
   the response size and can slow down response times. However, it can
@@ -488,6 +550,28 @@ The following optional settings are available for OpenAI completion models:
   A unique identifier representing your end-user, which can help OpenAI to
   monitor and detect abuse. [Learn more](https://platform.openai.com/docs/guides/safety-best-practices/end-user-ids).
 
+### Model Capabilities
+
+| Model                  | Image Input         | Audio Input         | Object Generation   | Tool Usage          |
+| ---------------------- | ------------------- | ------------------- | ------------------- | ------------------- |
+| `gpt-4o`               | <Check size={18} /> | <Cross size={18} /> | <Check size={18} /> | <Check size={18} /> |
+| `gpt-4o-mini`          | <Check size={18} /> | <Cross size={18} /> | <Check size={18} /> | <Check size={18} /> |
+| `gpt-4o-audio-preview` | <Cross size={18} /> | <Check size={18} /> | <Check size={18} /> | <Check size={18} /> |
+| `gpt-4-turbo`          | <Check size={18} /> | <Cross size={18} /> | <Check size={18} /> | <Check size={18} /> |
+| `gpt-4`                | <Cross size={18} /> | <Cross size={18} /> | <Check size={18} /> | <Check size={18} /> |
+| `gpt-3.5-turbo`        | <Cross size={18} /> | <Cross size={18} /> | <Check size={18} /> | <Check size={18} /> |
+| `o1`                   | <Check size={18} /> | <Cross size={18} /> | <Check size={18} /> | <Check size={18} /> |
+| `o1-mini`              | <Check size={18} /> | <Cross size={18} /> | <Cross size={18} /> | <Cross size={18} /> |
+| `o1-preview`           | <Cross size={18} /> | <Cross size={18} /> | <Cross size={18} /> | <Cross size={18} /> |
+| `o3-mini`              | <Cross size={18} /> | <Cross size={18} /> | <Check size={18} /> | <Check size={18} /> |
+
+<Note>
+  The table above lists popular models. Please see the [OpenAI
+  docs](https://platform.openai.com/docs/models) for a full list of available
+  models. The table above lists popular models. You can also pass any available
+  provider model ID as a string if needed.
+</Note>
+
 ## Embedding Models
 
 You can create models that call the [OpenAI embeddings API](https://platform.openai.com/docs/api-reference/embeddings)
@@ -497,7 +581,7 @@ using the `.embedding()` factory method.
 const model = openai.embedding('text-embedding-3-large');
 ```
 
-OpenAI embedding models support several aditional settings.
+OpenAI embedding models support several additional settings.
 You can pass them as an options argument:
 
 ```ts
@@ -526,3 +610,24 @@ The following optional settings are available for OpenAI embedding models:
 | `text-embedding-3-large` | 3072               | <Check size={18} /> |
 | `text-embedding-3-small` | 1536               | <Check size={18} /> |
 | `text-embedding-ada-002` | 1536               | <Cross size={18} /> |
+
+## Image Models
+
+You can create models that call the [OpenAI image generation API](https://platform.openai.com/docs/api-reference/images)
+using the `.image()` factory method.
+
+```ts
+const model = openai.image('dall-e-3');
+```
+
+<Note>
+  Dall-E models do not support the `aspectRatio` parameter. Use the `size`
+  parameter instead.
+</Note>
+
+### Model Capabilities
+
+| Model      | Sizes                           |
+| ---------- | ------------------------------- |
+| `dall-e-3` | 1024x1024, 1792x1024, 1024x1792 |
+| `dall-e-2` | 256x256, 512x512, 1024x1024     |

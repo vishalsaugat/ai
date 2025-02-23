@@ -1,5 +1,68 @@
 # @ai-sdk/provider
 
+## 1.0.8
+
+### Patch Changes
+
+- 2761f06: fix (ai/provider): publish with LanguageModelV1Source
+
+## 1.0.7
+
+### Patch Changes
+
+- d89c3b9: feat (provider): add image model support to provider specification
+
+## 1.0.6
+
+### Patch Changes
+
+- 3a58a2e: feat (ai/core): throw NoImageGeneratedError from generateImage when no predictions are returned.
+
+## 1.0.5
+
+### Patch Changes
+
+- 0a699f1: feat: add reasoning token support
+
+## 1.0.4
+
+### Patch Changes
+
+- 19a2ce7: feat (provider): add message option to UnsupportedFunctionalityError
+- 6337688: feat: change image generation errors to warnings
+
+## 1.0.3
+
+### Patch Changes
+
+- 5ed5e45: chore (config): Use ts-library.json tsconfig for no-UI libs.
+
+## 1.0.2
+
+### Patch Changes
+
+- 09a9cab: feat (ai/core): add experimental generateImage function
+
+## 1.0.1
+
+### Patch Changes
+
+- b446ae5: feat (provider): Define type for ObjectGenerationMode.
+
+## 1.0.0
+
+### Major Changes
+
+- b469a7e: chore: remove isXXXError methods
+- c0ddc24: chore (ai): remove toJSON method from AI SDK errors
+
+## 1.0.0-canary.0
+
+### Major Changes
+
+- b469a7e: chore: remove isXXXError methods
+- c0ddc24: chore (ai): remove toJSON method from AI SDK errors
+
 ## 0.0.26
 
 ### Patch Changes

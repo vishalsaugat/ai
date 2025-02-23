@@ -1,12 +1,235 @@
 /** @jsxImportSource solid-js */
 import { withTestServer } from '@ai-sdk/provider-utils/test';
-import { formatStreamPart, Message } from '@ai-sdk/ui-utils';
+import { formatDataStreamPart, Message } from '@ai-sdk/ui-utils';
 import { mockFetchDataStream } from '@ai-sdk/ui-utils/test';
-import { cleanup, findByText, render, screen } from '@solidjs/testing-library';
+import {
+  cleanup,
+  findByText,
+  render,
+  screen,
+  fireEvent,
+  waitFor,
+} from '@solidjs/testing-library';
 import '@testing-library/jest-dom';
 import userEvent from '@testing-library/user-event';
 import { createSignal, For } from 'solid-js';
 import { useChat } from './use-chat';
+
+describe('prepareRequestBody', () => {
+  let bodyOptions: any;
+
+  const TestComponent = () => {
+    const { messages, append, status } = useChat({
+      experimental_prepareRequestBody: options => {
+        bodyOptions = options;
+        return 'test-request-body';
+      },
+    });
+
+    return (
+      <div>
+        <div data-testid="status">{status()}</div>
+        <For each={messages()}>
+          {(m, idx) => (
+            <div data-testid={`message-${idx()}`}>
+              {m.role === 'user' ? 'User: ' : 'AI: '}
+              {m.content}
+            </div>
+          )}
+        </For>
+
+        <button
+          data-testid="do-append"
+          onClick={() => {
+            append(
+              { role: 'user', content: 'hi' },
+              {
+                data: { 'test-data-key': 'test-data-value' },
+                body: { 'request-body-key': 'request-body-value' },
+              },
+            );
+          }}
+        />
+      </div>
+    );
+  };
+
+  beforeEach(async () => {
+    await render(() => <TestComponent />);
+  });
+
+  afterEach(() => {
+    bodyOptions = undefined;
+    vi.restoreAllMocks();
+  });
+
+  it('should use prepared request body', () =>
+    withTestServer(
+      {
+        url: '/api/chat',
+        type: 'stream-values',
+        content: ['0:"Hello"\n', '0:","\n', '0:" world"\n', '0:"."\n'],
+      },
+      async ({ call }) => {
+        fireEvent.click(screen.getByTestId('do-append'));
+
+        await screen.findByTestId('message-0');
+        expect(screen.getByTestId('message-0')).toHaveTextContent('User: hi');
+
+        expect(bodyOptions).toStrictEqual({
+          id: expect.any(String),
+          messages: [
+            {
+              role: 'user',
+              content: 'hi',
+              id: expect.any(String),
+              experimental_attachments: undefined,
+              createdAt: expect.any(Date),
+            },
+          ],
+          requestData: { 'test-data-key': 'test-data-value' },
+          requestBody: { 'request-body-key': 'request-body-value' },
+        });
+
+        expect(await call(0).getRequestBodyJson()).toBe('test-request-body');
+
+        await screen.findByTestId('message-1');
+        expect(screen.getByTestId('message-1')).toHaveTextContent(
+          'AI: Hello, world.',
+        );
+      },
+    ));
+});
+
+describe('file attachments with data url', () => {
+  const TestComponent = () => {
+    const { messages, handleSubmit, handleInputChange, isLoading, input } =
+      useChat();
+
+    const [attachments, setAttachments] = createSignal<FileList | undefined>();
+    let fileInputRef: HTMLInputElement | undefined;
+
+    return (
+      <div>
+        <For each={messages()}>
+          {(m, idx) => (
+            <div data-testid={`message-${idx()}`}>
+              {m.role === 'user' ? 'User: ' : 'AI: '}
+              {m.content}
+              <For each={m.experimental_attachments ?? []}>
+                {attachment =>
+                  attachment.contentType?.startsWith('text/') ? (
+                    <div data-testid={`attachment-${idx()}`}>
+                      {atob(attachment.url.split(',')[1])}
+                    </div>
+                  ) : null
+                }
+              </For>
+            </div>
+          )}
+        </For>
+
+        <form
+          onSubmit={e => {
+            handleSubmit(e, {
+              experimental_attachments: attachments(),
+            });
+            setAttachments(undefined);
+            if (fileInputRef) fileInputRef.value = '';
+          }}
+          data-testid="chat-form"
+        >
+          <input
+            type="file"
+            onChange={e => setAttachments(e.currentTarget.files || undefined)}
+            multiple
+            ref={fileInputRef}
+            data-testid="file-input"
+          />
+          <input
+            value={input()}
+            onInput={handleInputChange}
+            disabled={isLoading()}
+            data-testid="message-input"
+          />
+          <button type="submit" data-testid="submit-button">
+            Send
+          </button>
+        </form>
+      </div>
+    );
+  };
+
+  beforeEach(() => {
+    render(() => <TestComponent />);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    cleanup();
+  });
+
+  it(
+    'should handle text file attachment and submission',
+    withTestServer(
+      {
+        url: '/api/chat',
+        type: 'stream-values',
+        content: ['0:"Response to message with text attachment"\n'],
+      },
+      async ({ call }) => {
+        const file = new File(['test file content'], 'test.txt', {
+          type: 'text/plain',
+        });
+
+        const fileInput = screen.getByTestId('file-input');
+        await userEvent.upload(fileInput, file);
+
+        const messageInput = screen.getByTestId('message-input');
+        await userEvent.type(messageInput, 'Message with text attachment');
+
+        const submitButton = screen.getByTestId('submit-button');
+        await userEvent.click(submitButton);
+
+        await waitFor(() => {
+          expect(screen.getByTestId('message-0')).toHaveTextContent(
+            'User: Message with text attachment',
+          );
+        });
+
+        await waitFor(() => {
+          expect(screen.getByTestId('attachment-0')).toHaveTextContent(
+            'test file content',
+          );
+        });
+
+        await waitFor(() => {
+          expect(screen.getByTestId('message-1')).toHaveTextContent(
+            'AI: Response to message with text attachment',
+          );
+        });
+
+        expect(await call(0).getRequestBodyJson()).toStrictEqual({
+          id: expect.any(String),
+          messages: [
+            {
+              role: 'user',
+              content: 'Message with text attachment',
+              experimental_attachments: [
+                {
+                  name: 'test.txt',
+                  contentType: 'text/plain',
+                  url: 'data:text/plain;base64,dGVzdCBmaWxlIGNvbnRlbnQ=',
+                },
+              ],
+              parts: [{ text: 'Message with text attachment', type: 'text' }],
+            },
+          ],
+        });
+      },
+    ),
+  );
+});
 
 describe('data protocol stream', () => {
   let onFinishCalls: Array<{
@@ -23,18 +246,16 @@ describe('data protocol stream', () => {
 
   const TestComponent = () => {
     const [id, setId] = createSignal('first-id');
-    const { messages, append, error, data, isLoading, setData } = useChat(
-      () => ({
-        id: id(),
-        onFinish: (message, options) => {
-          onFinishCalls.push({ message, options });
-        },
-      }),
-    );
+    const { messages, append, error, data, status, setData } = useChat(() => ({
+      id: id(),
+      onFinish: (message, options) => {
+        onFinishCalls.push({ message, options });
+      },
+    }));
 
     return (
       <div>
-        <div data-testid="loading">{isLoading().toString()}</div>
+        <div data-testid="status">{status()}</div>
         <div data-testid="error">{error()?.toString()}</div>
         <div data-testid="data">
           {data() != null ? JSON.stringify(data()) : ''}
@@ -174,36 +395,43 @@ describe('data protocol stream', () => {
     ),
   );
 
-  describe('loading state', () => {
+  describe('status', () => {
     it(
-      'should show loading state',
+      'should show status',
       withTestServer(
         { url: '/api/chat', type: 'controlled-stream' },
         async ({ streamController }) => {
-          streamController.enqueue('0:"Hello"\n');
-
           await userEvent.click(screen.getByTestId('do-append'));
 
-          await screen.findByTestId('loading');
-          expect(screen.getByTestId('loading')).toHaveTextContent('true');
+          await waitFor(() => {
+            expect(screen.getByTestId('status')).toHaveTextContent('submitted');
+          });
+
+          streamController.enqueue('0:"Hello"\n');
+
+          await waitFor(() => {
+            expect(screen.getByTestId('status')).toHaveTextContent('streaming');
+          });
 
           streamController.close();
 
-          await findByText(await screen.findByTestId('loading'), 'false');
-          expect(screen.getByTestId('loading')).toHaveTextContent('false');
+          await waitFor(() => {
+            expect(screen.getByTestId('status')).toHaveTextContent('ready');
+          });
         },
       ),
     );
 
     it(
-      'should reset loading state on error',
+      'should set status to error when there is a server error',
       withTestServer(
         { type: 'error', url: '/api/chat', status: 404, content: 'Not found' },
         async () => {
           await userEvent.click(screen.getByTestId('do-append'));
 
-          await screen.findByTestId('loading');
-          expect(screen.getByTestId('loading')).toHaveTextContent('false');
+          await waitFor(() => {
+            expect(screen.getByTestId('status')).toHaveTextContent('error');
+          });
         },
       ),
     );
@@ -216,11 +444,11 @@ describe('data protocol stream', () => {
         url: '/api/chat',
         type: 'stream-values',
         content: [
-          formatStreamPart('text', 'Hello'),
-          formatStreamPart('text', ','),
-          formatStreamPart('text', ' world'),
-          formatStreamPart('text', '.'),
-          formatStreamPart('finish_message', {
+          formatDataStreamPart('text', 'Hello'),
+          formatDataStreamPart('text', ','),
+          formatDataStreamPart('text', ' world'),
+          formatDataStreamPart('text', '.'),
+          formatDataStreamPart('finish_message', {
             finishReason: 'stop',
             usage: { completionTokens: 1, promptTokens: 3 },
           }),
@@ -238,6 +466,7 @@ describe('data protocol stream', () => {
               createdAt: expect.any(Date),
               role: 'assistant',
               content: 'Hello, world.',
+              parts: [{ text: 'Hello, world.', type: 'text' }],
             },
             options: {
               finishReason: 'stop',
@@ -376,6 +605,7 @@ describe('text stream', () => {
               createdAt: expect.any(Date),
               role: 'assistant',
               content: 'Hello, world.',
+              parts: [{ text: 'Hello, world.', type: 'text' }],
             },
             options: {
               finishReason: 'unknown',
@@ -393,9 +623,13 @@ describe('text stream', () => {
 });
 
 describe('onToolCall', () => {
+  let resolve: () => void;
+  let toolCallPromise: Promise<void>;
+
   const TestComponent = () => {
     const { messages, append } = useChat(() => ({
       async onToolCall({ toolCall }) {
+        await toolCallPromise;
         return `test-tool-response: ${toolCall.toolName} ${
           toolCall.toolCallId
         } ${JSON.stringify(toolCall.args)}`;
@@ -408,13 +642,95 @@ describe('onToolCall', () => {
           {(m, idx) => (
             <div data-testid={`message-${idx()}`}>
               <For each={m.toolInvocations ?? []}>
-                {(toolInvocation, toolIdx) =>
-                  'result' in toolInvocation ? (
+                {(toolInvocation, toolIdx) => (
+                  <div data-testid={`tool-invocation-${toolIdx()}`}>
+                    {JSON.stringify(toolInvocation)}
+                  </div>
+                )}
+              </For>
+            </div>
+          )}
+        </For>
+
+        <button
+          data-testid="do-append"
+          onClick={() => {
+            append({ role: 'user', content: 'hi' });
+          }}
+        />
+      </div>
+    );
+  };
+
+  beforeEach(() => {
+    toolCallPromise = new Promise(resolveArg => {
+      resolve = resolveArg;
+    });
+
+    render(() => <TestComponent />);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    cleanup();
+  });
+
+  it("should invoke onToolCall when a tool call is received from the server's response", async () => {
+    mockFetchDataStream({
+      url: 'https://example.com/api/chat',
+      chunks: [
+        formatDataStreamPart('tool_call', {
+          toolCallId: 'tool-call-0',
+          toolName: 'test-tool',
+          args: { testArg: 'test-value' },
+        }),
+      ],
+    });
+
+    await userEvent.click(screen.getByTestId('do-append'));
+
+    await screen.findByTestId('message-1');
+    expect(screen.getByTestId('message-1')).toHaveTextContent(
+      `{"state":"call","step":0,"toolCallId":"tool-call-0","toolName":"test-tool","args":{"testArg":"test-value"}}`,
+    );
+
+    resolve();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('message-1')).toHaveTextContent(
+        `{"state":"result","step":0,"toolCallId":"tool-call-0","toolName":"test-tool","args":{"testArg":"test-value"},"result":"test-tool-response: test-tool tool-call-0 {\\"testArg\\":\\"test-value\\"}"}`,
+      );
+    });
+  });
+});
+
+describe('tool invocations', () => {
+  const TestComponent = () => {
+    const { messages, append, addToolResult } = useChat();
+    return (
+      <div>
+        <For each={messages()}>
+          {(m, idx) => (
+            <div data-testid={`message-${idx()}`}>
+              <For each={m.toolInvocations ?? []}>
+                {(toolInvocation, toolIdx) => (
+                  <>
                     <div data-testid={`tool-invocation-${toolIdx()}`}>
-                      {toolInvocation.result}
+                      {JSON.stringify(toolInvocation)}
                     </div>
-                  ) : null
-                }
+                    {toolInvocation.state === 'call' && (
+                      <button
+                        data-testid={`add-result-${toolIdx()}`}
+                        onClick={() => {
+                          addToolResult({
+                            toolCallId: toolInvocation.toolCallId,
+                            result: 'test-result',
+                          });
+                        }}
+                      />
+                    )}
+                  </>
+                )}
               </For>
             </div>
           )}
@@ -439,42 +755,173 @@ describe('onToolCall', () => {
     cleanup();
   });
 
-  it("should invoke onToolCall when a tool call is received from the server's response", async () => {
-    mockFetchDataStream({
-      url: 'https://example.com/api/chat',
-      chunks: [
-        formatStreamPart('tool_call', {
-          toolCallId: 'tool-call-0',
-          toolName: 'test-tool',
-          args: { testArg: 'test-value' },
-        }),
+  it(
+    'should display partial tool call, tool call, and tool result',
+    withTestServer(
+      { url: '/api/chat', type: 'controlled-stream' },
+      async ({ streamController }) => {
+        await userEvent.click(screen.getByTestId('do-append'));
+
+        streamController.enqueue(
+          formatDataStreamPart('tool_call_streaming_start', {
+            toolCallId: 'tool-call-0',
+            toolName: 'test-tool',
+          }),
+        );
+
+        await waitFor(() => {
+          expect(screen.getByTestId('message-1')).toHaveTextContent(
+            '{"state":"partial-call","step":0,"toolCallId":"tool-call-0","toolName":"test-tool"}',
+          );
+        });
+
+        streamController.enqueue(
+          formatDataStreamPart('tool_call_delta', {
+            toolCallId: 'tool-call-0',
+            argsTextDelta: '{"testArg":"t',
+          }),
+        );
+
+        await waitFor(() => {
+          expect(screen.getByTestId('message-1')).toHaveTextContent(
+            '{"state":"partial-call","step":0,"toolCallId":"tool-call-0","toolName":"test-tool","args":{"testArg":"t"}}',
+          );
+        });
+
+        streamController.enqueue(
+          formatDataStreamPart('tool_call_delta', {
+            toolCallId: 'tool-call-0',
+            argsTextDelta: 'est-value"}}',
+          }),
+        );
+
+        await waitFor(() => {
+          expect(screen.getByTestId('message-1')).toHaveTextContent(
+            '{"state":"partial-call","step":0,"toolCallId":"tool-call-0","toolName":"test-tool","args":{"testArg":"test-value"}}',
+          );
+        });
+
+        streamController.enqueue(
+          formatDataStreamPart('tool_call', {
+            toolCallId: 'tool-call-0',
+            toolName: 'test-tool',
+            args: { testArg: 'test-value' },
+          }),
+        );
+
+        await waitFor(() => {
+          expect(screen.getByTestId('message-1')).toHaveTextContent(
+            '{"state":"call","step":0,"toolCallId":"tool-call-0","toolName":"test-tool","args":{"testArg":"test-value"}}',
+          );
+        });
+
+        streamController.enqueue(
+          formatDataStreamPart('tool_result', {
+            toolCallId: 'tool-call-0',
+            result: 'test-result',
+          }),
+        );
+        streamController.close();
+
+        await waitFor(() => {
+          expect(screen.getByTestId('message-1')).toHaveTextContent(
+            '{"state":"result","step":0,"toolCallId":"tool-call-0","toolName":"test-tool","args":{"testArg":"test-value"},"result":"test-result"}',
+          );
+        });
+      },
+    ),
+  );
+
+  it(
+    'should display partial tool call and tool result (when there is no tool call streaming)',
+    withTestServer(
+      { url: '/api/chat', type: 'controlled-stream' },
+      async ({ streamController }) => {
+        await userEvent.click(screen.getByTestId('do-append'));
+
+        streamController.enqueue(
+          formatDataStreamPart('tool_call', {
+            toolCallId: 'tool-call-0',
+            toolName: 'test-tool',
+            args: { testArg: 'test-value' },
+          }),
+        );
+
+        await waitFor(() => {
+          expect(screen.getByTestId('message-1')).toHaveTextContent(
+            '{"state":"call","step":0,"toolCallId":"tool-call-0","toolName":"test-tool","args":{"testArg":"test-value"}}',
+          );
+        });
+
+        streamController.enqueue(
+          formatDataStreamPart('tool_result', {
+            toolCallId: 'tool-call-0',
+            result: 'test-result',
+          }),
+        );
+        streamController.close();
+
+        await waitFor(() => {
+          expect(screen.getByTestId('message-1')).toHaveTextContent(
+            '{"state":"result","step":0,"toolCallId":"tool-call-0","toolName":"test-tool","args":{"testArg":"test-value"},"result":"test-result"}',
+          );
+        });
+      },
+    ),
+  );
+
+  it(
+    'should update tool call to result when addToolResult is called',
+    withTestServer(
+      [
+        {
+          url: '/api/chat',
+          type: 'stream-values',
+          content: [
+            formatDataStreamPart('tool_call', {
+              toolCallId: 'tool-call-0',
+              toolName: 'test-tool',
+              args: { testArg: 'test-value' },
+            }),
+          ],
+        },
       ],
-    });
+      async () => {
+        await userEvent.click(screen.getByTestId('do-append'));
 
-    await userEvent.click(screen.getByTestId('do-append'));
+        await waitFor(() => {
+          expect(screen.getByTestId('message-1')).toHaveTextContent(
+            '{"state":"call","step":0,"toolCallId":"tool-call-0","toolName":"test-tool","args":{"testArg":"test-value"}}',
+          );
+        });
 
-    await screen.findByTestId('message-1');
-    expect(screen.getByTestId('message-1')).toHaveTextContent(
-      'test-tool-response: test-tool tool-call-0 {"testArg":"test-value"}',
-    );
-  });
+        await userEvent.click(screen.getByTestId('add-result-0'));
+
+        await waitFor(() => {
+          expect(screen.getByTestId('message-1')).toHaveTextContent(
+            '{"state":"result","step":0,"toolCallId":"tool-call-0","toolName":"test-tool","args":{"testArg":"test-value"},"result":"test-result"}',
+          );
+        });
+      },
+    ),
+  );
 });
 
-describe('maxToolRoundtrips', () => {
-  describe('single automatic tool roundtrip', () => {
+describe('maxSteps', () => {
+  describe('two steps with automatic tool call', () => {
     const TestComponent = () => {
       const { messages, append } = useChat(() => ({
         async onToolCall({ toolCall }) {
           mockFetchDataStream({
             url: 'https://example.com/api/chat',
-            chunks: [formatStreamPart('text', 'final result')],
+            chunks: [formatDataStreamPart('text', 'final result')],
           });
 
           return `test-tool-response: ${toolCall.toolName} ${
             toolCall.toolCallId
           } ${JSON.stringify(toolCall.args)}`;
         },
-        maxToolRoundtrips: 5,
+        maxSteps: 5,
       }));
 
       return (
@@ -508,7 +955,7 @@ describe('maxToolRoundtrips', () => {
       mockFetchDataStream({
         url: 'https://example.com/api/chat',
         chunks: [
-          formatStreamPart('tool_call', {
+          formatDataStreamPart('tool_call', {
             toolCallId: 'tool-call-0',
             toolName: 'test-tool',
             args: { testArg: 'test-value' },
@@ -518,18 +965,18 @@ describe('maxToolRoundtrips', () => {
 
       await userEvent.click(screen.getByTestId('do-append'));
 
-      await screen.findByTestId('message-2');
-      expect(screen.getByTestId('message-2')).toHaveTextContent('final result');
+      await screen.findByTestId('message-1');
+      expect(screen.getByTestId('message-1')).toHaveTextContent('final result');
     });
   });
 
-  describe('single roundtrip with error response', () => {
+  describe('two steps with error response', () => {
     const TestComponent = () => {
       const { messages, append, error } = useChat(() => ({
         async onToolCall({ toolCall }) {
           mockFetchDataStream({
             url: 'https://example.com/api/chat',
-            chunks: [formatStreamPart('error', 'some failure')],
+            chunks: [formatDataStreamPart('error', 'some failure')],
             maxCalls: 1,
           });
 
@@ -537,7 +984,7 @@ describe('maxToolRoundtrips', () => {
             toolCall.toolCallId
           } ${JSON.stringify(toolCall.args)}`;
         },
-        maxToolRoundtrips: 5,
+        maxSteps: 5,
       }));
 
       return (
@@ -583,7 +1030,7 @@ describe('maxToolRoundtrips', () => {
       mockFetchDataStream({
         url: 'https://example.com/api/chat',
         chunks: [
-          formatStreamPart('tool_call', {
+          formatDataStreamPart('tool_call', {
             toolCallId: 'tool-call-0',
             toolName: 'test-tool',
             args: { testArg: 'test-value' },
@@ -603,7 +1050,7 @@ describe('maxToolRoundtrips', () => {
 
 describe('form actions', () => {
   const TestComponent = () => {
-    const { messages, handleSubmit, handleInputChange, isLoading, input } =
+    const { messages, handleSubmit, handleInputChange, status, input } =
       useChat();
 
     return (
@@ -622,7 +1069,7 @@ describe('form actions', () => {
             value={input()}
             placeholder="Send message..."
             onInput={handleInputChange}
-            disabled={isLoading()}
+            disabled={status() !== 'ready'}
             data-testid="do-input"
           />
         </form>
@@ -643,7 +1090,7 @@ describe('form actions', () => {
     mockFetchDataStream({
       url: 'https://example.com/api/chat',
       chunks: ['Hello', ',', ' world', '.'].map(token =>
-        formatStreamPart('text', token),
+        formatDataStreamPart('text', token),
       ),
     });
 
@@ -665,7 +1112,7 @@ describe('form actions', () => {
     mockFetchDataStream({
       url: 'https://example.com/api/chat',
       chunks: ['How', ' can', ' I', ' help', ' you', '?'].map(token =>
-        formatStreamPart('text', token),
+        formatDataStreamPart('text', token),
       ),
     });
 
@@ -678,7 +1125,7 @@ describe('form actions', () => {
 
 describe('form actions (with options)', () => {
   const TestComponent = () => {
-    const { messages, handleSubmit, handleInputChange, isLoading, input } =
+    const { messages, handleSubmit, handleInputChange, status, input } =
       useChat();
 
     return (
@@ -703,7 +1150,7 @@ describe('form actions (with options)', () => {
             value={input()}
             placeholder="Send message..."
             onInput={handleInputChange}
-            disabled={isLoading()}
+            disabled={status() !== 'ready'}
             data-testid="do-input"
           />
         </form>
@@ -724,7 +1171,7 @@ describe('form actions (with options)', () => {
     mockFetchDataStream({
       url: 'https://example.com/api/chat',
       chunks: ['Hello', ',', ' world', '.'].map(token =>
-        formatStreamPart('text', token),
+        formatDataStreamPart('text', token),
       ),
     });
 
@@ -746,7 +1193,7 @@ describe('form actions (with options)', () => {
     mockFetchDataStream({
       url: 'https://example.com/api/chat',
       chunks: ['How', ' can', ' I', ' help', ' you', '?'].map(token =>
-        formatStreamPart('text', token),
+        formatDataStreamPart('text', token),
       ),
     });
 
@@ -754,27 +1201,30 @@ describe('form actions (with options)', () => {
     await userEvent.keyboard('{Enter}');
 
     await screen.findByTestId('message-2');
-    expect(screen.getByTestId('message-2')).toHaveTextContent(
+    expect(screen.getByTestId('message-2')).toHaveTextContent('User:');
+
+    await screen.findByTestId('message-3');
+    expect(screen.getByTestId('message-3')).toHaveTextContent(
       'AI: How can I help you?',
     );
 
     mockFetchDataStream({
       url: 'https://example.com/api/chat',
       chunks: ['The', ' sky', ' is', ' blue.'].map(token =>
-        formatStreamPart('text', token),
+        formatDataStreamPart('text', token),
       ),
     });
 
     await userEvent.type(input, 'what color is the sky?');
     await userEvent.keyboard('{Enter}');
 
-    await screen.findByTestId('message-3');
-    expect(screen.getByTestId('message-3')).toHaveTextContent(
+    await screen.findByTestId('message-4');
+    expect(screen.getByTestId('message-4')).toHaveTextContent(
       'User: what color is the sky?',
     );
 
-    await screen.findByTestId('message-4');
-    expect(screen.getByTestId('message-4')).toHaveTextContent(
+    await screen.findByTestId('message-5');
+    expect(screen.getByTestId('message-5')).toHaveTextContent(
       'AI: The sky is blue.',
     );
   });
@@ -852,7 +1302,14 @@ describe('reload', () => {
         await userEvent.click(screen.getByTestId('do-reload'));
 
         expect(await call(1).getRequestBodyJson()).toStrictEqual({
-          messages: [{ content: 'hi', role: 'user' }],
+          id: expect.any(String),
+          messages: [
+            {
+              content: 'hi',
+              role: 'user',
+              parts: [{ text: 'hi', type: 'text' }],
+            },
+          ],
           data: { 'test-data-key': 'test-data-value' },
           'request-body-key': 'request-body-value',
         });

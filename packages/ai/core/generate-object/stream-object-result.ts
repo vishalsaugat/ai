@@ -17,7 +17,7 @@ export interface StreamObjectResult<PARTIAL, RESULT, ELEMENT_STREAM> {
   /**
   Warnings from the model provider (e.g. unsupported settings)
      */
-  readonly warnings: CallWarning[] | undefined;
+  readonly warnings: Promise<CallWarning[] | undefined>;
 
   /**
   The token usage of the generated response. Resolved when the response is finished.
@@ -29,20 +29,12 @@ Additional provider-specific metadata. They are passed through
 from the provider to the AI SDK and enable provider-specific
 results that can be fully encapsulated in the provider.
    */
-  readonly experimental_providerMetadata: Promise<ProviderMetadata | undefined>;
+  readonly providerMetadata: Promise<ProviderMetadata | undefined>;
 
   /**
-Optional raw response data.
-
-@deprecated Use `response` instead.
-     */
-  // TODO removed in v4
-  readonly rawResponse?: {
-    /**
-  Response headers.
+@deprecated Use `providerMetadata` instead.
    */
-    headers?: Record<string, string>;
-  };
+  readonly experimental_providerMetadata: Promise<ProviderMetadata | undefined>;
 
   /**
 Additional request information from the last step.

@@ -12,7 +12,7 @@ Allows you to create text completion based capabilities for your application. It
 <Tabs items={['React', 'Svelte', 'Vue', 'Solid']}>
   <Tab>
     <Snippet
-      text="import { useCompletion } from 'ai/react'"
+      text="import { useCompletion } from '@ai-sdk/react'"
       dark
       prompt={false}
     />
@@ -49,7 +49,8 @@ Allows you to create text completion based capabilities for your application. It
     {
       name: 'api',
       type: "string = '/api/completion'",
-      description: 'The text completion API endpoint offered by the provider.',
+      description:
+        'The API endpoint that is called to generate text. It can be a relative path (starting with `/`) or an absolute URL.',
     },
     {
       name: 'id',
@@ -122,6 +123,13 @@ Allows you to create text completion based capabilities for your application. It
       isOptional: true,
       description:
         'Optional. A custom fetch function to be used for the API call. Defaults to the global fetch function.',
+    },
+    {
+      name: 'experimental_throttle',
+      type: 'number',
+      isOptional: true,
+      description:
+        'React only. Custom throttle wait time in milliseconds for the completion and data updates. When specified, throttles how often the UI updates during streaming. Default is undefined, which disables throttling.',
     },
   ]}
 />

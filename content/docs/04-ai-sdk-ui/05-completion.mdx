@@ -14,7 +14,7 @@ In this guide, you will learn how to use the `useCompletion` hook in your applic
 ```tsx filename='app/page.tsx'
 'use client';
 
-import { useCompletion } from 'ai/react';
+import { useCompletion } from '@ai-sdk/react';
 
 export default function Page() {
   const { completion, input, handleInputChange, handleSubmit } = useCompletion({
@@ -46,7 +46,7 @@ export const maxDuration = 30;
 export async function POST(req: Request) {
   const { prompt }: { prompt: string } = await req.json();
 
-  const result = await streamText({
+  const result = streamText({
     model: openai('gpt-3.5-turbo'),
     prompt,
   });
@@ -127,6 +127,20 @@ return (
 ```
 
 When the user clicks the "Stop" button, the fetch request will be aborted. This avoids consuming unnecessary resources and improves the UX of your application.
+
+### Throttling UI Updates
+
+<Note>This feature is currently only available for React.</Note>
+
+By default, the `useCompletion` hook will trigger a render every time a new chunk is received.
+You can throttle the UI updates with the `experimental_throttle` option.
+
+```tsx filename="page.tsx" highlight="2-3"
+const { completion, ... } = useCompletion({
+  // Throttle the completion and data updates to 50ms:
+  experimental_throttle: 50
+})
+```
 
 ## Event Callbacks
 

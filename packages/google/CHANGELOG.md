@@ -1,5 +1,331 @@
 # @ai-sdk/google
 
+## 1.1.16
+
+### Patch Changes
+
+- 1b2e2a0: fix (provider/google): add resilience against undefined parts
+
+## 1.1.15
+
+### Patch Changes
+
+- Updated dependencies [2761f06]
+  - @ai-sdk/provider@1.0.8
+  - @ai-sdk/provider-utils@2.1.9
+
+## 1.1.14
+
+### Patch Changes
+
+- 08a3641: fix (provider/google): support nullable enums in schema
+
+## 1.1.13
+
+### Patch Changes
+
+- Updated dependencies [2e898b4]
+  - @ai-sdk/provider-utils@2.1.8
+
+## 1.1.12
+
+### Patch Changes
+
+- Updated dependencies [3ff4ef8]
+  - @ai-sdk/provider-utils@2.1.7
+
+## 1.1.11
+
+### Patch Changes
+
+- 6eb7fc4: feat (ai/core): url source support
+
+## 1.1.10
+
+### Patch Changes
+
+- e5567f7: feat (provider/google): update model ids
+
+## 1.1.9
+
+### Patch Changes
+
+- b2573de: fix (provider/google): remove reasoning text following removal from Gemini API
+
+## 1.1.8
+
+### Patch Changes
+
+- Updated dependencies [d89c3b9]
+  - @ai-sdk/provider@1.0.7
+  - @ai-sdk/provider-utils@2.1.6
+
+## 1.1.7
+
+### Patch Changes
+
+- d399f25: feat (provider/google-vertex): support public file urls in messages
+
+## 1.1.6
+
+### Patch Changes
+
+- e012cd8: feat (provider/google): add reasoning support
+
+## 1.1.5
+
+### Patch Changes
+
+- Updated dependencies [3a602ca]
+  - @ai-sdk/provider-utils@2.1.5
+
+## 1.1.4
+
+### Patch Changes
+
+- Updated dependencies [066206e]
+  - @ai-sdk/provider-utils@2.1.4
+
+## 1.1.3
+
+### Patch Changes
+
+- Updated dependencies [39e5c1f]
+  - @ai-sdk/provider-utils@2.1.3
+
+## 1.1.2
+
+### Patch Changes
+
+- Updated dependencies [ed012d2]
+- Updated dependencies [3a58a2e]
+  - @ai-sdk/provider-utils@2.1.2
+  - @ai-sdk/provider@1.0.6
+
+## 1.1.1
+
+### Patch Changes
+
+- Updated dependencies [e7a9ec9]
+- Updated dependencies [0a699f1]
+  - @ai-sdk/provider-utils@2.1.1
+  - @ai-sdk/provider@1.0.5
+
+## 1.1.0
+
+### Minor Changes
+
+- 62ba5ad: release: AI SDK 4.1
+
+### Patch Changes
+
+- Updated dependencies [62ba5ad]
+  - @ai-sdk/provider-utils@2.1.0
+
+## 1.0.17
+
+### Patch Changes
+
+- Updated dependencies [00114c5]
+  - @ai-sdk/provider-utils@2.0.8
+
+## 1.0.16
+
+### Patch Changes
+
+- 4eb9b41: fix (provider/google): support conversion of string enums to openapi spec
+
+## 1.0.15
+
+### Patch Changes
+
+- 7611964: feat (provider/xai): Support structured output for latest models.
+
+## 1.0.14
+
+### Patch Changes
+
+- Updated dependencies [90fb95a]
+- Updated dependencies [e6dfef4]
+- Updated dependencies [6636db6]
+  - @ai-sdk/provider-utils@2.0.7
+
+## 1.0.13
+
+### Patch Changes
+
+- Updated dependencies [19a2ce7]
+- Updated dependencies [19a2ce7]
+- Updated dependencies [6337688]
+  - @ai-sdk/provider@1.0.4
+  - @ai-sdk/provider-utils@2.0.6
+
+## 1.0.12
+
+### Patch Changes
+
+- 5ed5e45: chore (config): Use ts-library.json tsconfig for no-UI libs.
+- Updated dependencies [5ed5e45]
+  - @ai-sdk/provider-utils@2.0.5
+  - @ai-sdk/provider@1.0.3
+
+## 1.0.11
+
+### Patch Changes
+
+- db31e74: feat: adding audioTimestamp support to GoogleGenerativeAISettings
+
+## 1.0.10
+
+### Patch Changes
+
+- e07439a: feat (provider/google): Include safety ratings response detail.
+- 4017b0f: feat (provider/google-vertex): Enhance grounding metadata response detail.
+- a9df182: feat (provider/google): Add support for search grounding.
+
+## 1.0.9
+
+### Patch Changes
+
+- c0b1c7e: feat (provider/google): Add Gemini 2.0 model.
+
+## 1.0.8
+
+### Patch Changes
+
+- b7372dc: feat (provider/google): Include optional response grounding metadata.
+
+## 1.0.7
+
+### Patch Changes
+
+- Updated dependencies [09a9cab]
+  - @ai-sdk/provider@1.0.2
+  - @ai-sdk/provider-utils@2.0.4
+
+## 1.0.6
+
+### Patch Changes
+
+- 9e54403: fix (provider/google-vertex): support empty object as usage metadata
+
+## 1.0.5
+
+### Patch Changes
+
+- 0984f0b: feat (provider/google-vertex): Rewrite for Edge runtime support.
+- Updated dependencies [0984f0b]
+  - @ai-sdk/provider-utils@2.0.3
+
+## 1.0.4
+
+### Patch Changes
+
+- 6373c60: fix (provider/google): send json schema into provider
+
+## 1.0.3
+
+### Patch Changes
+
+- Updated dependencies [b446ae5]
+  - @ai-sdk/provider@1.0.1
+  - @ai-sdk/provider-utils@2.0.2
+
+## 1.0.2
+
+### Patch Changes
+
+- b748dfb: feat (providers): update model lists
+
+## 1.0.1
+
+### Patch Changes
+
+- Updated dependencies [c3ab5de]
+  - @ai-sdk/provider-utils@2.0.1
+
+## 1.0.0
+
+### Major Changes
+
+- 66060f7: chore (release): bump major version to 4.0
+- 0d3d3f5: chore (providers): remove baseUrl option
+- 36b03b0: chore (provider/google): remove topK model setting
+- 277fc6b: chore (provider/google): remove facade
+
+### Patch Changes
+
+- c38a0db: fix (provider/google): allow empty candidates array when streaming
+- 0509c34: fix (provider/google): add name/content details to tool responses
+- Updated dependencies [b469a7e]
+- Updated dependencies [dce4158]
+- Updated dependencies [c0ddc24]
+- Updated dependencies [b1da952]
+- Updated dependencies [dce4158]
+- Updated dependencies [8426f55]
+- Updated dependencies [db46ce5]
+  - @ai-sdk/provider-utils@2.0.0
+  - @ai-sdk/provider@1.0.0
+
+## 1.0.0-canary.6
+
+### Patch Changes
+
+- c38a0db: fix (provider/google): allow empty candidates array when streaming
+
+## 1.0.0-canary.5
+
+### Patch Changes
+
+- 0509c34: fix (provider/google): add name/content details to tool responses
+
+## 1.0.0-canary.4
+
+### Major Changes
+
+- 36b03b0: chore (provider/google): remove topK model setting
+- 277fc6b: chore (provider/google): remove facade
+
+## 1.0.0-canary.3
+
+### Patch Changes
+
+- Updated dependencies [8426f55]
+  - @ai-sdk/provider-utils@2.0.0-canary.3
+
+## 1.0.0-canary.2
+
+### Patch Changes
+
+- Updated dependencies [dce4158]
+- Updated dependencies [dce4158]
+  - @ai-sdk/provider-utils@2.0.0-canary.2
+
+## 1.0.0-canary.1
+
+### Major Changes
+
+- 0d3d3f5: chore (providers): remove baseUrl option
+
+### Patch Changes
+
+- Updated dependencies [b1da952]
+  - @ai-sdk/provider-utils@2.0.0-canary.1
+
+## 1.0.0-canary.0
+
+### Major Changes
+
+- 66060f7: chore (release): bump major version to 4.0
+
+### Patch Changes
+
+- Updated dependencies [b469a7e]
+- Updated dependencies [c0ddc24]
+- Updated dependencies [db46ce5]
+  - @ai-sdk/provider-utils@2.0.0-canary.0
+  - @ai-sdk/provider@1.0.0-canary.0
+
 ## 0.0.55
 
 ### Patch Changes

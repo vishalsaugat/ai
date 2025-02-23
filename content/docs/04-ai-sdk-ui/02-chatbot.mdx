@@ -10,22 +10,22 @@ The `useChat` hook makes it effortless to create a conversational user interface
 To summarize, the `useChat` hook provides the following features:
 
 - **Message Streaming**: All the messages from the AI provider are streamed to the chat UI in real-time.
-- **Managed States**: The hook manages the states for input, messages, loading, error and more for you.
+- **Managed States**: The hook manages the states for input, messages, status, error and more for you.
 - **Seamless Integration**: Easily integrate your chat AI into any design or layout with minimal effort.
 
-In this guide, you will learn how to use the `useChat` hook to create a chatbot application with real-time message streaming. Let's start with the following example first.
+In this guide, you will learn how to use the `useChat` hook to create a chatbot application with real-time message streaming.
+Check out our [chatbot with tools guide](/docs/ai-sdk-ui/chatbot-with-tool-calling) to learn how to use tools in your chatbot.
+Let's start with the following example first.
 
 ## Example
 
 ```tsx filename='app/page.tsx'
 'use client';
 
-import { useChat } from 'ai/react';
+import { useChat } from '@ai-sdk/react';
 
 export default function Page() {
-  const { messages, input, handleInputChange, handleSubmit } = useChat({
-    keepLastMessageOnError: true,
-  });
+  const { messages, input, handleInputChange, handleSubmit } = useChat({});
 
   return (
     <>
@@ -47,7 +47,7 @@ export default function Page() {
 
 ```ts filename='app/api/chat/route.ts'
 import { openai } from '@ai-sdk/openai';
-import { convertToCoreMessages, streamText } from 'ai';
+import { streamText } from 'ai';
 
 // Allow streaming responses up to 30 seconds
 export const maxDuration = 30;
@@ -55,15 +55,23 @@ export const maxDuration = 30;
 export async function POST(req: Request) {
   const { messages } = await req.json();
 
-  const result = await streamText({
+  const result = streamText({
     model: openai('gpt-4-turbo'),
     system: 'You are a helpful assistant.',
-    messages: convertToCoreMessages(messages),
+    messages,
   });
 
   return result.toDataStreamResponse();
 }
 ```
+
+<Note>
+  The UI messages have a new `parts` property that contains the message parts.
+  We recommend rendering the messages using the `parts` property instead of the
+  `content` property. The parts property supports different message types,
+  including text, tool invocation, and tool result, and allows for more flexible
+  and complex chat UIs.
+</Note>
 
 In the `Page` component, the `useChat` hook will request to your AI provider endpoint whenever the user submits a message.
 The messages are then streamed back in real-time and displayed in the chat UI.
@@ -71,21 +79,20 @@ The messages are then streamed back in real-time and displayed in the chat UI.
 This enables a seamless chat experience where the user can see the AI response as soon as it is available,
 without having to wait for the entire response to be received.
 
-<Note>
-  `useChat` has a `keepLastMessageOnError` option that defaults to `false`. This
-  option can be enabled to keep the last message on error. We will make this the
-  default behavior in the next major release. Please enable it and update your
-  error handling/resubmit behavior.
-</Note>
-
 ## Customized UI
 
-`useChat` also provides ways to manage the chat message and input states via code, show loading and error states, and update messages without being triggered by user interactions.
+`useChat` also provides ways to manage the chat message and input states via code, show status, and update messages without being triggered by user interactions.
 
-### Loading State
+### Status
 
-The `isLoading` state returned by the `useChat` hook can be used for several
-purposes
+The `useChat` hook returns a `status`. It has the following possible values:
+
+- `submitted`: The message has been sent to the API and we're awaiting the start of the response stream.
+- `streaming`: The response is actively streaming in from the API, receiving chunks of data.
+- `ready`: The full response has been received and processed; a new user message can be submitted.
+- `error`: An error occurred during the API request, preventing successful completion.
+
+You can use `status` for e.g. the following purposes:
 
 - To show a loading spinner while the chatbot is processing the user's message.
 - To show a "Stop" button to abort the current message.
@@ -94,13 +101,11 @@ purposes
 ```tsx filename='app/page.tsx' highlight="6,20-27,34"
 'use client';
 
-import { useChat } from 'ai/react';
+import { useChat } from '@ai-sdk/react';
 
 export default function Page() {
-  const { messages, input, handleInputChange, handleSubmit, isLoading, stop } =
-    useChat({
-      keepLastMessageOnError: true,
-    });
+  const { messages, input, handleInputChange, handleSubmit, status, stop } =
+    useChat({});
 
   return (
     <>
@@ -111,9 +116,9 @@ export default function Page() {
         </div>
       ))}
 
-      {isLoading && (
+      {(status === 'submitted' || status === 'streaming') && (
         <div>
-          <Spinner />
+          {status === 'submitted' && <Spinner />}
           <button type="button" onClick={() => stop()}>
             Stop
           </button>
@@ -125,7 +130,7 @@ export default function Page() {
           name="prompt"
           value={input}
           onChange={handleInputChange}
-          disabled={isLoading}
+          disabled={status !== 'ready'}
         />
         <button type="submit">Submit</button>
       </form>
@@ -148,13 +153,11 @@ It can be used to display an error message, disable the submit button, or show a
 ```tsx file="app/page.tsx" highlight="6,18-25,31"
 'use client';
 
-import { useChat } from 'ai/react';
+import { useChat } from '@ai-sdk/react';
 
 export default function Chat() {
   const { messages, input, handleInputChange, handleSubmit, error, reload } =
-    useChat({
-      keepLastMessageOnError: true,
-    });
+    useChat({});
 
   return (
     <div>
@@ -234,15 +237,15 @@ return <>
   ...
 ```
 
-### Cancelation and regeneration
+### Cancellation and regeneration
 
 It's also a common use case to abort the response message while it's still streaming back from the AI provider. You can do this by calling the `stop` function returned by the `useChat` hook.
 
 ```tsx
-const { stop, isLoading, ... } = useChat()
+const { stop, status, ... } = useChat()
 
 return <>
-  <button onClick={stop} disabled={!isLoading}>Stop</button>
+  <button onClick={stop} disabled={!(status === 'streaming' || status === 'submitted')}>Stop</button>
   ...
 ```
 
@@ -251,15 +254,29 @@ When the user clicks the "Stop" button, the fetch request will be aborted. This 
 Similarly, you can also request the AI provider to reprocess the last message by calling the `reload` function returned by the `useChat` hook:
 
 ```tsx
-const { reload, isLoading, ... } = useChat()
+const { reload, status, ... } = useChat()
 
 return <>
-  <button onClick={reload} disabled={isLoading}>Regenerate</button>
+  <button onClick={reload} disabled={!(status === 'ready' || status === 'error')}>Regenerate</button>
   ...
 </>
 ```
 
 When the user clicks the "Regenerate" button, the AI provider will regenerate the last message and replace the current one correspondingly.
+
+### Throttling UI Updates
+
+<Note>This feature is currently only available for React.</Note>
+
+By default, the `useChat` hook will trigger a render every time a new chunk is received.
+You can throttle the UI updates with the `experimental_throttle` option.
+
+```tsx filename="page.tsx" highlight="2-3"
+const { messages, ... } = useChat({
+  // Throttle the messages and data updates to 50ms:
+  experimental_throttle: 50
+})
+```
 
 ## Event Callbacks
 
@@ -272,7 +289,7 @@ When the user clicks the "Regenerate" button, the AI provider will regenerate th
 These callbacks can be used to trigger additional actions, such as logging, analytics, or custom UI updates.
 
 ```tsx
-import { Message } from 'ai/react';
+import { Message } from '@ai-sdk/react';
 
 const {
   /* ... */
@@ -322,7 +339,7 @@ This is useful if you want to pass in additional information to your backend tha
 ```tsx filename="app/page.tsx" highlight="18-20"
 'use client';
 
-import { useChat } from 'ai/react';
+import { useChat } from '@ai-sdk/react';
 
 export default function Chat() {
   const { messages, input, handleInputChange, handleSubmit } = useChat();
@@ -366,18 +383,20 @@ With `streamText`, you can control how error messages and usage information are 
 
 ### Error Messages
 
-By default, the error message is suppressed for security reasons. You can forward it or send your own error message by providing a `getErrorMessage` function:
+By default, the error message is masked for security reasons.
+The default error message is "An error occurred."
+You can forward error messages or send your own error message by providing a `getErrorMessage` function:
 
 ```ts filename="app/api/chat/route.ts" highlight="13-27"
 import { openai } from '@ai-sdk/openai';
-import { convertToCoreMessages, streamText } from 'ai';
+import { streamText } from 'ai';
 
 export async function POST(req: Request) {
   const { messages } = await req.json();
 
-  const result = await streamText({
+  const result = streamText({
     model: openai('gpt-4o'),
-    messages: convertToCoreMessages(messages),
+    messages,
   });
 
   return result.toDataStreamResponse({
@@ -406,14 +425,14 @@ By default, the usage information is sent back to the client. You can disable it
 
 ```ts filename="app/api/chat/route.ts" highlight="13"
 import { openai } from '@ai-sdk/openai';
-import { convertToCoreMessages, streamText } from 'ai';
+import { streamText } from 'ai';
 
 export async function POST(req: Request) {
   const { messages } = await req.json();
 
-  const result = await streamText({
+  const result = streamText({
     model: openai('gpt-4o'),
-    messages: convertToCoreMessages(messages),
+    messages,
   });
 
   return result.toDataStreamResponse({
@@ -429,7 +448,7 @@ export async function POST(req: Request) {
 ```tsx filename="app/page.tsx" highlight="7"
 'use client';
 
-import { useChat } from 'ai/react';
+import { useChat } from '@ai-sdk/react';
 
 export default function Chat() {
   const { messages } = useChat({
@@ -455,7 +474,7 @@ You can configure the `useChat` hook to allow empty submissions by setting the `
 ```tsx filename="app/page.tsx" highlight="18"
 'use client';
 
-import { useChat } from 'ai/react';
+import { useChat } from '@ai-sdk/react';
 
 export default function Chat() {
   const { messages, input, handleInputChange, handleSubmit } = useChat();
@@ -481,11 +500,109 @@ export default function Chat() {
 }
 ```
 
+## Reasoning
+
+Some models such as as DeepSeek `deepseek-reasoner` support reasoning tokens.
+These tokens are typically sent before the message content.
+You can forward them to the client with the `sendReasoning` option:
+
+```ts filename="app/api/chat/route.ts" highlight="13"
+import { deepseek } from '@ai-sdk/deepseek';
+import { streamText } from 'ai';
+
+export async function POST(req: Request) {
+  const { messages } = await req.json();
+
+  const result = streamText({
+    model: deepseek('deepseek-reasoner'),
+    messages,
+  });
+
+  return result.toDataStreamResponse({
+    sendReasoning: true,
+  });
+}
+```
+
+On the client side, you can access the reasoning parts of the message object:
+
+```tsx filename="app/page.tsx"
+messages.map(message => (
+  <div key={message.id}>
+    {message.role === 'user' ? 'User: ' : 'AI: '}
+    {message.parts.map((part, index) => {
+      // text parts:
+      if (part.type === 'text') {
+        return <div key={index}>{part.text}</div>;
+      }
+
+      // reasoning parts:
+      if (part.type === 'reasoning') {
+        return <pre key={index}>{part.reasoning}</pre>;
+      }
+    })}
+  </div>
+));
+```
+
+## Sources
+
+Some providers such as [Perplexity](/providers/ai-sdk-providers/perplexity#sources) and
+[Google Generative AI](/providers/ai-sdk-providers/google-generative-ai#sources) include sources in the response.
+
+Currently sources are limited to web pages that ground the response.
+You can forward them to the client with the `sendSources` option:
+
+```ts filename="app/api/chat/route.ts" highlight="13"
+import { perplexity } from '@ai-sdk/perplexity';
+import { streamText } from 'ai';
+
+export async function POST(req: Request) {
+  const { messages } = await req.json();
+
+  const result = streamText({
+    model: perplexity('sonar-pro'),
+    messages,
+  });
+
+  return result.toDataStreamResponse({
+    sendSources: true,
+  });
+}
+```
+
+On the client side, you can access source parts of the message object.
+Here is an example that renders the sources as links at the bottom of the message:
+
+```tsx filename="app/page.tsx"
+messages.map(message => (
+  <div key={message.id}>
+    {message.role === 'user' ? 'User: ' : 'AI: '}
+    {message.parts
+      .filter(part => part.type !== 'source')
+      .map((part, index) => {
+        if (part.type === 'text') {
+          return <div key={index}>{part.text}</div>;
+        }
+      })}
+    {message.parts
+      .filter(part => part.type === 'source')
+      .map(part => (
+        <span key={`source-${part.source.id}`}>
+          [
+          <a href={part.source.url} target="_blank">
+            {part.source.title ?? new URL(part.source.url).hostname}
+          </a>
+          ]
+        </span>
+      ))}
+  </div>
+));
+```
+
 ## Attachments (Experimental)
 
 The `useChat` hook supports sending attachments along with a message as well as rendering them on the client. This can be useful for building applications that involve sending images, files, or other media content to the AI provider.
-
-> **Note:** Attachments is currently only available for React frameworks.
 
 There are two ways to send attachments with a message, either by providing a `FileList` object or a list of URLs to the `handleSubmit` function:
 
@@ -493,16 +610,21 @@ There are two ways to send attachments with a message, either by providing a `Fi
 
 By using `FileList`, you can send multiple files as attachments along with a message using the file input element. The `useChat` hook will automatically convert them into data URLs and send them to the AI provider.
 
-> **Note:** Currently, only `image/*` and `text/*` content types get automatically converted into [multi-modal content parts](https://sdk.vercel.ai/docs/foundations/prompts#multi-modal-messages). You will need to handle other content types manually.
+<Note>
+  Currently, only `image/*` and `text/*` content types get automatically
+  converted into [multi-modal content
+  parts](https://sdk.vercel.ai/docs/foundations/prompts#multi-modal-messages).
+  You will need to handle other content types manually.
+</Note>
 
 ```tsx filename="app/page.tsx"
 'use client';
 
-import { useChat } from 'ai/react';
+import { useChat } from '@ai-sdk/react';
 import { useRef, useState } from 'react';
 
 export default function Page() {
-  const { messages, input, handleSubmit, handleInputChange, isLoading } =
+  const { messages, input, handleSubmit, handleInputChange, status } =
     useChat();
 
   const [files, setFiles] = useState<FileList | undefined>(undefined);
@@ -563,7 +685,7 @@ export default function Page() {
           value={input}
           placeholder="Send message..."
           onChange={handleInputChange}
-          disabled={isLoading}
+          disabled={status !== 'ready'}
         />
       </form>
     </div>
@@ -580,12 +702,12 @@ You can also send URLs as attachments along with a message. This can be useful f
 ```tsx filename="app/page.tsx"
 'use client';
 
-import { useChat } from 'ai/react';
+import { useChat } from '@ai-sdk/react';
 import { useState } from 'react';
 import { Attachment } from '@ai-sdk/ui-utils';
 
 export default function Page() {
-  const { messages, input, handleSubmit, handleInputChange, isLoading } =
+  const { messages, input, handleSubmit, handleInputChange, status } =
     useChat();
 
   const [attachments] = useState<Attachment[]>([
@@ -640,7 +762,7 @@ export default function Page() {
           value={input}
           placeholder="Send message..."
           onChange={handleInputChange}
-          disabled={isLoading}
+          disabled={status !== 'ready'}
         />
       </form>
     </div>

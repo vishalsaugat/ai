@@ -1,13 +1,21 @@
+import { createResolvablePromise } from '../../util/create-resolvable-promise';
+
 /**
  * Creates a stitchable stream that can pipe one stream at a time.
  *
  * @template T - The type of values emitted by the streams.
  * @returns {Object} An object containing the stitchable stream and control methods.
  */
-export function createStitchableStream<T>() {
+export function createStitchableStream<T>(): {
+  stream: ReadableStream<T>;
+  addStream: (innerStream: ReadableStream<T>) => void;
+  close: () => void;
+  terminate: () => void;
+} {
   let innerStreamReaders: ReadableStreamDefaultReader<T>[] = [];
   let controller: ReadableStreamDefaultController<T> | null = null;
   let isClosed = false;
+  let waitForNewStream = createResolvablePromise<void>();
 
   const processPull = async () => {
     // Case 1: Outer stream is closed and no more inner streams
@@ -17,8 +25,11 @@ export function createStitchableStream<T>() {
     }
 
     // Case 2: No inner streams available, but outer stream is open
+    // wait for a new inner stream to be added or the outer stream to close
     if (innerStreamReaders.length === 0) {
-      return;
+      waitForNewStream = createResolvablePromise<void>();
+      await waitForNewStream.promise;
+      return processPull();
     }
 
     try {
@@ -69,13 +80,33 @@ export function createStitchableStream<T>() {
       }
 
       innerStreamReaders.push(innerStream.getReader());
+      waitForNewStream.resolve();
     },
+
+    /**
+     * Gracefully close the outer stream. This will let the inner streams
+     * finish processing and then close the outer stream.
+     */
     close: () => {
       isClosed = true;
+      waitForNewStream.resolve();
 
       if (innerStreamReaders.length === 0) {
         controller?.close();
       }
+    },
+
+    /**
+     * Immediately close the outer stream. This will cancel all inner streams
+     * and close the outer stream.
+     */
+    terminate: () => {
+      isClosed = true;
+      waitForNewStream.resolve();
+
+      innerStreamReaders.forEach(reader => reader.cancel());
+      innerStreamReaders = [];
+      controller?.close();
     },
   };
 }

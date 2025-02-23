@@ -1,15 +1,28 @@
+import { LanguageModelV1, ProviderV1, ImageModelV1 } from '@ai-sdk/provider';
 import {
-  LanguageModelV1,
-  NoSuchModelError,
-  ProviderV1,
-} from '@ai-sdk/provider';
-import { generateId, loadSetting } from '@ai-sdk/provider-utils';
-import { VertexAI, VertexInit } from '@google-cloud/vertexai';
-import { GoogleVertexLanguageModel } from './google-vertex-language-model';
+  FetchFunction,
+  generateId,
+  loadSetting,
+  Resolvable,
+  withoutTrailingSlash,
+} from '@ai-sdk/provider-utils';
 import {
   GoogleVertexModelId,
   GoogleVertexSettings,
 } from './google-vertex-settings';
+import {
+  GoogleVertexEmbeddingModelId,
+  GoogleVertexEmbeddingSettings,
+} from './google-vertex-embedding-settings';
+import { GoogleVertexEmbeddingModel } from './google-vertex-embedding-model';
+import { GoogleGenerativeAILanguageModel } from '@ai-sdk/google/internal';
+import { GoogleVertexImageModel } from './google-vertex-image-model';
+import {
+  GoogleVertexImageModelId,
+  GoogleVertexImageSettings,
+} from './google-vertex-image-settings';
+import { GoogleVertexConfig } from './google-vertex-config';
+import { isSupportedFileUrl } from './google-vertex-supported-file-url';
 
 export interface GoogleVertexProvider extends ProviderV1 {
   /**
@@ -24,6 +37,22 @@ Creates a model for text generation.
     modelId: GoogleVertexModelId,
     settings?: GoogleVertexSettings,
   ) => LanguageModelV1;
+
+  /**
+   * Creates a model for image generation.
+   */
+  image(
+    modelId: GoogleVertexImageModelId,
+    settings?: GoogleVertexImageSettings,
+  ): ImageModelV1;
+
+  /**
+Creates a model for image generation.
+   */
+  imageModel(
+    modelId: GoogleVertexImageModelId,
+    settings?: GoogleVertexImageSettings,
+  ): ImageModelV1;
 }
 
 export interface GoogleVertexProviderSettings {
@@ -38,24 +67,27 @@ Your Google Vertex project. Defaults to the environment variable `GOOGLE_VERTEX_
   project?: string;
 
   /**
- Optional. The Authentication options provided by google-auth-library.
-Complete list of authentication options is documented in the
-GoogleAuthOptions interface:
-https://github.com/googleapis/google-auth-library-nodejs/blob/main/src/auth/googleauth.ts.
+   * Headers to use for requests. Can be:
+   * - A headers object
+   * - A Promise that resolves to a headers object
+   * - A function that returns a headers object
+   * - A function that returns a Promise of a headers object
    */
-  googleAuthOptions?: VertexInit['googleAuthOptions'];
+  headers?: Resolvable<Record<string, string | undefined>>;
+
+  /**
+Custom fetch implementation. You can use it as a middleware to intercept requests,
+or to provide a custom fetch implementation for e.g. testing.
+    */
+  fetch?: FetchFunction;
 
   // for testing
   generateId?: () => string;
 
-  // for testing
-  createVertexAI?: ({
-    project,
-    location,
-  }: {
-    project: string;
-    location: string;
-  }) => VertexAI;
+  /**
+Base URL for the Google Vertex API calls.
+     */
+  baseURL?: string;
 }
 
 /**
@@ -64,34 +96,65 @@ Create a Google Vertex AI provider instance.
 export function createVertex(
   options: GoogleVertexProviderSettings = {},
 ): GoogleVertexProvider {
-  const createVertexAI = () => {
-    const config = {
-      project: loadSetting({
-        settingValue: options.project,
-        settingName: 'project',
-        environmentVariableName: 'GOOGLE_VERTEX_PROJECT',
-        description: 'Google Vertex project',
-      }),
-      location: loadSetting({
-        settingValue: options.location,
-        settingName: 'location',
-        environmentVariableName: 'GOOGLE_VERTEX_LOCATION',
-        description: 'Google Vertex location',
-      }),
-      googleAuthOptions: options.googleAuthOptions,
-    };
+  const loadVertexProject = () =>
+    loadSetting({
+      settingValue: options.project,
+      settingName: 'project',
+      environmentVariableName: 'GOOGLE_VERTEX_PROJECT',
+      description: 'Google Vertex project',
+    });
 
-    return options.createVertexAI?.(config) ?? new VertexAI(config);
+  const loadVertexLocation = () =>
+    loadSetting({
+      settingValue: options.location,
+      settingName: 'location',
+      environmentVariableName: 'GOOGLE_VERTEX_LOCATION',
+      description: 'Google Vertex location',
+    });
+
+  const loadBaseURL = () => {
+    const region = loadVertexLocation();
+    const project = loadVertexProject();
+    return (
+      withoutTrailingSlash(options.baseURL) ??
+      `https://${region}-aiplatform.googleapis.com/v1/projects/${project}/locations/${region}/publishers/google`
+    );
+  };
+
+  const createConfig = (name: string): GoogleVertexConfig => {
+    return {
+      provider: `google.vertex.${name}`,
+      headers: options.headers ?? {},
+      fetch: options.fetch,
+      baseURL: loadBaseURL(),
+    };
   };
 
   const createChatModel = (
     modelId: GoogleVertexModelId,
     settings: GoogleVertexSettings = {},
-  ) =>
-    new GoogleVertexLanguageModel(modelId, settings, {
-      vertexAI: createVertexAI(),
+  ) => {
+    return new GoogleGenerativeAILanguageModel(modelId, settings, {
+      ...createConfig('chat'),
       generateId: options.generateId ?? generateId,
+      isSupportedUrl: isSupportedFileUrl,
     });
+  };
+
+  const createEmbeddingModel = (
+    modelId: GoogleVertexEmbeddingModelId,
+    settings: GoogleVertexEmbeddingSettings = {},
+  ) =>
+    new GoogleVertexEmbeddingModel(
+      modelId,
+      settings,
+      createConfig('embedding'),
+    );
+
+  const createImageModel = (
+    modelId: GoogleVertexImageModelId,
+    settings: GoogleVertexImageSettings = {},
+  ) => new GoogleVertexImageModel(modelId, settings, createConfig('image'));
 
   const provider = function (
     modelId: GoogleVertexModelId,
@@ -107,14 +170,9 @@ export function createVertex(
   };
 
   provider.languageModel = createChatModel;
-  provider.textEmbeddingModel = (modelId: string) => {
-    throw new NoSuchModelError({ modelId, modelType: 'textEmbeddingModel' });
-  };
+  provider.textEmbeddingModel = createEmbeddingModel;
+  provider.image = createImageModel;
+  provider.imageModel = createImageModel;
 
-  return provider as GoogleVertexProvider;
+  return provider;
 }
-
-/**
-Default Google Vertex AI provider instance.
- */
-export const vertex = createVertex();

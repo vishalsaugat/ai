@@ -1,19 +1,16 @@
-import { createOpenAI } from '@ai-sdk/openai';
+import { perplexity } from '@ai-sdk/perplexity';
 import { streamText } from 'ai';
 import 'dotenv/config';
 
-const perplexity = createOpenAI({
-  name: 'perplexity',
-  apiKey: process.env.PERPLEXITY_API_KEY ?? '',
-  baseURL: 'https://api.perplexity.ai/',
-});
-
 async function main() {
-  const result = await streamText({
-    model: perplexity('llama-3-sonar-large-32k-online'),
-    prompt:
-      'List the top 5 San Francisco news from the past week.' +
-      'You must include the date of each article.',
+  const result = streamText({
+    model: perplexity('sonar-pro'),
+    prompt: 'What has happened in San Francisco recently?',
+    providerOptions: {
+      perplexity: {
+        search_recency_filter: 'week',
+      },
+    },
   });
 
   for await (const textPart of result.textStream) {
@@ -21,8 +18,13 @@ async function main() {
   }
 
   console.log();
+  console.log('Sources:', await result.sources);
   console.log('Token usage:', await result.usage);
   console.log('Finish reason:', await result.finishReason);
+  console.log(
+    'Metadata:',
+    JSON.stringify(await result.providerMetadata, null, 2),
+  );
 }
 
 main().catch(console.error);

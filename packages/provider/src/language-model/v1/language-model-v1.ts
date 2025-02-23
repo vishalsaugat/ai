@@ -4,6 +4,7 @@ import { LanguageModelV1FinishReason } from './language-model-v1-finish-reason';
 import { LanguageModelV1FunctionToolCall } from './language-model-v1-function-tool-call';
 import { LanguageModelV1LogProbs } from './language-model-v1-logprobs';
 import { LanguageModelV1ProviderMetadata } from './language-model-v1-provider-metadata';
+import { LanguageModelV1Source } from './language-model-v1-source';
 
 /**
 Specification for a language model that implements the language model interface version 1.
@@ -36,7 +37,7 @@ model. `undefined` can be returned if object generation is not supported.
 This is needed to generate the best objects possible w/o requiring the
 user to explicitly specify the object generation mode.
    */
-  readonly defaultObjectGenerationMode: 'json' | 'tool' | undefined;
+  readonly defaultObjectGenerationMode: LanguageModelV1ObjectGenerationMode;
 
   /**
 Flag whether this model supports image URLs. Default is `true`.
@@ -87,6 +88,12 @@ Text that the model has generated. Can be undefined if the model
 has only generated tool calls.
      */
     text?: string;
+
+    /**
+Reasoning text that the model has generated. Can be undefined if the model
+has only generated text.
+     */
+    reasoning?: string;
 
     /**
 Tool calls that the model has generated. Can be undefined if the
@@ -177,11 +184,17 @@ results that can be fully encapsulated in the provider.
     providerMetadata?: LanguageModelV1ProviderMetadata;
 
     /**
+Sources that have been used as input to generate the response.
+     */
+    sources?: LanguageModelV1Source[];
+
+    /**
 Logprobs for the completion.
 `undefined` if the mode does not support logprobs or if was not enabled
 
 @deprecated will be changed into a provider-specific extension in v2
      */
+    // TODO change in language model v2
     logprobs?: LanguageModelV1LogProbs;
   }>;
 
@@ -236,13 +249,22 @@ Non-HTTP(s) providers should not set this.
       body?: string;
     };
 
-    warnings?: LanguageModelV1CallWarning[];
+    /**
+Warnings for the call, e.g. unsupported settings.
+     */
+    warnings?: Array<LanguageModelV1CallWarning>;
   }>;
 };
 
 export type LanguageModelV1StreamPart =
   // Basic text deltas:
   | { type: 'text-delta'; textDelta: string }
+
+  // Reasoning text deltas:
+  | { type: 'reasoning'; textDelta: string }
+
+  // Sources:
+  | { type: 'source'; source: LanguageModelV1Source }
 
   // Complete tool calls:
   | ({ type: 'tool-call' } & LanguageModelV1FunctionToolCall)
@@ -280,3 +302,9 @@ export type LanguageModelV1StreamPart =
 
   // error parts are streamed, allowing for multiple errors
   | { type: 'error'; error: unknown };
+
+/**
+The object generation modes available for use with a model. `undefined`
+represents no support for object generation.
+   */
+export type LanguageModelV1ObjectGenerationMode = 'json' | 'tool' | undefined;

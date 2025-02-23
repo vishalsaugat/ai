@@ -40,7 +40,7 @@ Here is a Next.js example that uses the text stream protocol:
 ```tsx filename='app/page.tsx' highlight="7"
 'use client';
 
-import { useCompletion } from 'ai/react';
+import { useCompletion } from '@ai-sdk/react';
 
 export default function Page() {
   const { completion, input, handleInputChange, handleSubmit } = useCompletion({
@@ -67,7 +67,7 @@ export const maxDuration = 30;
 export async function POST(req: Request) {
   const { prompt }: { prompt: string } = await req.json();
 
-  const result = await streamText({
+  const result = streamText({
     model: openai('gpt-4o'),
     prompt,
   });
@@ -111,6 +111,22 @@ Example: `0:"example"\n`
   height={1148}
 />
 
+### Reasoning Part
+
+The reasoning parts are appended to the message as they are received. The reasoning part is available through `reasoning`.
+
+Format: `g:string\n`
+
+Example: `g:"I will open the conversation with witty banter."\n`
+
+### Source Part
+
+The source parts are appended to the message as they are received. The source part is available through `source`.
+
+Format: `h:Source\n`
+
+Example: `h:{"sourceType":"url","id":"source-id","url":"https://example.com","title":"Example"}\n`
+
 ### Data Part
 
 The data parts are parsed as JSON and appended to the message as they are received. The data part is available through `data`.
@@ -128,11 +144,11 @@ Example: `2:[{"key":"object1"},{"anotherKey":"object2"}]\n`
 
 ### Message Annotation Part
 
-The message annotation parts are appended to the message as they are received.
+The message annotation parts are appended to the message as they are received. The annotation part is available through `annotations`.
 
-Format: `8:JSONValue\n`
+Format: `8:Array<JSONValue>\n`
 
-Example: `8:{"id":"message-123","other":"annotation"}\n`
+Example: `8:[{"id":"message-123","other":"annotation"}]\n`
 
 ### Error Part
 
@@ -209,6 +225,18 @@ Example: `a:{"toolCallId":"call-123","result":"tool output"}\n`
   height={1148}
 />
 
+### Start Step Part
+
+A part indicating the start of a step.
+
+It includes the following metadata:
+
+- `messageId` to indicate the id of the message that this step belongs to.
+
+Format: `f:{messageId:string}\n`
+
+Example: `f:{"messageId":"step_123"}\n`
+
 ### Finish Step Part
 
 A part indicating that a step (i.e., one LLM API call in the backend) has been completed.
@@ -255,7 +283,7 @@ Here is a Next.js example that uses the data stream protocol:
 ```tsx filename='app/page.tsx' highlight="7"
 'use client';
 
-import { useCompletion } from 'ai/react';
+import { useCompletion } from '@ai-sdk/react';
 
 export default function Page() {
   const { completion, input, handleInputChange, handleSubmit } = useCompletion({
@@ -282,7 +310,7 @@ export const maxDuration = 30;
 export async function POST(req: Request) {
   const { prompt }: { prompt: string } = await req.json();
 
-  const result = await streamText({
+  const result = streamText({
     model: openai('gpt-4o'),
     prompt,
   });

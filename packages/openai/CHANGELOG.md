@@ -1,5 +1,330 @@
 # @ai-sdk/openai
 
+## 1.1.13
+
+### Patch Changes
+
+- Updated dependencies [2761f06]
+  - @ai-sdk/provider@1.0.8
+  - @ai-sdk/provider-utils@2.1.9
+
+## 1.1.12
+
+### Patch Changes
+
+- ea159cb: chore (provider/openai): remove default streaming simulation for o1
+
+## 1.1.11
+
+### Patch Changes
+
+- Updated dependencies [2e898b4]
+  - @ai-sdk/provider-utils@2.1.8
+
+## 1.1.10
+
+### Patch Changes
+
+- Updated dependencies [3ff4ef8]
+  - @ai-sdk/provider-utils@2.1.7
+
+## 1.1.9
+
+### Patch Changes
+
+- c55b81a: fix (provider/openai): fix o3-mini streaming
+
+## 1.1.8
+
+### Patch Changes
+
+- 161be90: fix (provider/openai): fix model id typo
+
+## 1.1.7
+
+### Patch Changes
+
+- 0a2f026: feat (provider/openai): add o3-mini
+
+## 1.1.6
+
+### Patch Changes
+
+- d89c3b9: feat (provider): add image model support to provider specification
+- Updated dependencies [d89c3b9]
+  - @ai-sdk/provider@1.0.7
+  - @ai-sdk/provider-utils@2.1.6
+
+## 1.1.5
+
+### Patch Changes
+
+- Updated dependencies [3a602ca]
+  - @ai-sdk/provider-utils@2.1.5
+
+## 1.1.4
+
+### Patch Changes
+
+- Updated dependencies [066206e]
+  - @ai-sdk/provider-utils@2.1.4
+
+## 1.1.3
+
+### Patch Changes
+
+- Updated dependencies [39e5c1f]
+  - @ai-sdk/provider-utils@2.1.3
+
+## 1.1.2
+
+### Patch Changes
+
+- 3a58a2e: feat (ai/core): throw NoImageGeneratedError from generateImage when no predictions are returned.
+- Updated dependencies [ed012d2]
+- Updated dependencies [3a58a2e]
+  - @ai-sdk/provider-utils@2.1.2
+  - @ai-sdk/provider@1.0.6
+
+## 1.1.1
+
+### Patch Changes
+
+- e7a9ec9: feat (provider-utils): include raw value in json parse results
+- Updated dependencies [e7a9ec9]
+- Updated dependencies [0a699f1]
+  - @ai-sdk/provider-utils@2.1.1
+  - @ai-sdk/provider@1.0.5
+
+## 1.1.0
+
+### Minor Changes
+
+- 62ba5ad: release: AI SDK 4.1
+
+### Patch Changes
+
+- Updated dependencies [62ba5ad]
+  - @ai-sdk/provider-utils@2.1.0
+
+## 1.0.20
+
+### Patch Changes
+
+- Updated dependencies [00114c5]
+  - @ai-sdk/provider-utils@2.0.8
+
+## 1.0.19
+
+### Patch Changes
+
+- 218d001: feat (provider): Add maxImagesPerCall setting to all image providers.
+
+## 1.0.18
+
+### Patch Changes
+
+- fe816e4: fix (provider/openai): streamObject with o1
+
+## 1.0.17
+
+### Patch Changes
+
+- ba62cf2: feat (provider/openai): automatically map maxTokens to max_completion_tokens for reasoning models
+- 3c3fae8: fix (provider/openai): add o1-mini-2024-09-12 and o1-preview-2024-09-12 configurations
+
+## 1.0.16
+
+### Patch Changes
+
+- Updated dependencies [90fb95a]
+- Updated dependencies [e6dfef4]
+- Updated dependencies [6636db6]
+  - @ai-sdk/provider-utils@2.0.7
+
+## 1.0.15
+
+### Patch Changes
+
+- f8c6acb: feat (provider/openai): automatically simulate streaming for reasoning models
+- d0041f7: feat (provider/openai): improved system message support for reasoning models
+- 4d2f97b: feat (provider/openai): improve automatic setting removal for reasoning models
+
+## 1.0.14
+
+### Patch Changes
+
+- 19a2ce7: feat (ai/core): add aspectRatio and seed options to generateImage
+- 6337688: feat: change image generation errors to warnings
+- Updated dependencies [19a2ce7]
+- Updated dependencies [19a2ce7]
+- Updated dependencies [6337688]
+  - @ai-sdk/provider@1.0.4
+  - @ai-sdk/provider-utils@2.0.6
+
+## 1.0.13
+
+### Patch Changes
+
+- b19aa82: feat (provider/openai): add predicted outputs token usage
+
+## 1.0.12
+
+### Patch Changes
+
+- a4241ff: feat (provider/openai): add o3 reasoning model support
+
+## 1.0.11
+
+### Patch Changes
+
+- 5ed5e45: chore (config): Use ts-library.json tsconfig for no-UI libs.
+- Updated dependencies [5ed5e45]
+  - @ai-sdk/provider-utils@2.0.5
+  - @ai-sdk/provider@1.0.3
+
+## 1.0.10
+
+### Patch Changes
+
+- d4fad4e: fix (provider/openai): fix reasoning model detection
+
+## 1.0.9
+
+### Patch Changes
+
+- 3fab0fb: feat (provider/openai): support reasoning_effort setting
+- e956eed: feat (provider/openai): update model list and add o1
+- 6faab13: feat (provider/openai): simulated streaming setting
+
+## 1.0.8
+
+### Patch Changes
+
+- 09a9cab: feat (ai/core): add experimental generateImage function
+- Updated dependencies [09a9cab]
+  - @ai-sdk/provider@1.0.2
+  - @ai-sdk/provider-utils@2.0.4
+
+## 1.0.7
+
+### Patch Changes
+
+- Updated dependencies [0984f0b]
+  - @ai-sdk/provider-utils@2.0.3
+
+## 1.0.6
+
+### Patch Changes
+
+- a9a19cb: fix (provider/openai,groq): prevent sending duplicate tool calls
+
+## 1.0.5
+
+### Patch Changes
+
+- fc18132: feat (ai/core): experimental output for generateText
+
+## 1.0.4
+
+### Patch Changes
+
+- Updated dependencies [b446ae5]
+  - @ai-sdk/provider@1.0.1
+  - @ai-sdk/provider-utils@2.0.2
+
+## 1.0.3
+
+### Patch Changes
+
+- b748dfb: feat (providers): update model lists
+
+## 1.0.2
+
+### Patch Changes
+
+- Updated dependencies [c3ab5de]
+  - @ai-sdk/provider-utils@2.0.1
+
+## 1.0.1
+
+### Patch Changes
+
+- 5e6419a: feat (provider/openai): support streaming for reasoning models
+
+## 1.0.0
+
+### Major Changes
+
+- 66060f7: chore (release): bump major version to 4.0
+- 79644e9: chore (provider/openai): remove OpenAI facade
+- 0d3d3f5: chore (providers): remove baseUrl option
+
+### Patch Changes
+
+- Updated dependencies [b469a7e]
+- Updated dependencies [dce4158]
+- Updated dependencies [c0ddc24]
+- Updated dependencies [b1da952]
+- Updated dependencies [dce4158]
+- Updated dependencies [8426f55]
+- Updated dependencies [db46ce5]
+  - @ai-sdk/provider-utils@2.0.0
+  - @ai-sdk/provider@1.0.0
+
+## 1.0.0-canary.3
+
+### Patch Changes
+
+- Updated dependencies [8426f55]
+  - @ai-sdk/provider-utils@2.0.0-canary.3
+
+## 1.0.0-canary.2
+
+### Patch Changes
+
+- Updated dependencies [dce4158]
+- Updated dependencies [dce4158]
+  - @ai-sdk/provider-utils@2.0.0-canary.2
+
+## 1.0.0-canary.1
+
+### Major Changes
+
+- 79644e9: chore (provider/openai): remove OpenAI facade
+- 0d3d3f5: chore (providers): remove baseUrl option
+
+### Patch Changes
+
+- Updated dependencies [b1da952]
+  - @ai-sdk/provider-utils@2.0.0-canary.1
+
+## 1.0.0-canary.0
+
+### Major Changes
+
+- 66060f7: chore (release): bump major version to 4.0
+
+### Patch Changes
+
+- Updated dependencies [b469a7e]
+- Updated dependencies [c0ddc24]
+- Updated dependencies [db46ce5]
+  - @ai-sdk/provider-utils@2.0.0-canary.0
+  - @ai-sdk/provider@1.0.0-canary.0
+
+## 0.0.72
+
+### Patch Changes
+
+- 0bc4115: feat (provider/openai): support predicted outputs
+
+## 0.0.71
+
+### Patch Changes
+
+- 54a3a59: fix (provider/openai): support object-json mode without schema
+
 ## 0.0.70
 
 ### Patch Changes

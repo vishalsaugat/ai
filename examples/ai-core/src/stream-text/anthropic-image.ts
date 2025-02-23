@@ -4,9 +4,8 @@ import 'dotenv/config';
 import fs from 'node:fs';
 
 async function main() {
-  const result = await streamText({
+  const result = streamText({
     model: anthropic('claude-3-5-sonnet-20240620'),
-    maxTokens: 512,
     messages: [
       {
         role: 'user',

@@ -43,7 +43,7 @@ Please note the code for handling `undefined` values in the JSX.
 ```tsx filename='app/page.tsx'
 'use client';
 
-import { experimental_useObject as useObject } from 'ai/react';
+import { experimental_useObject as useObject } from '@ai-sdk/react';
 import { notificationSchema } from './api/notifications/schema';
 
 export default function Page() {
@@ -84,7 +84,7 @@ export const maxDuration = 30;
 export async function POST(req: Request) {
   const context = await req.json();
 
-  const result = await streamObject({
+  const result = streamObject({
     model: openai('gpt-4-turbo'),
     schema: notificationSchema,
     prompt:
@@ -102,16 +102,52 @@ export async function POST(req: Request) {
 ### Loading State
 
 The `isLoading` state returned by the `useObject` hook can be used for several
-purposes
+purposes:
 
 - To show a loading spinner while the object is generated.
-- To show a "Stop" button to abort the current message.
 - To disable the submit button.
 
 ```tsx filename='app/page.tsx' highlight="6,13-20,24"
 'use client';
 
-import { useObject } from 'ai/react';
+import { useObject } from '@ai-sdk/react';
+
+export default function Page() {
+  const { isLoading, object, submit } = useObject({
+    api: '/api/notifications',
+    schema: notificationSchema,
+  });
+
+  return (
+    <>
+      {isLoading && <Spinner />}
+
+      <button
+        onClick={() => submit('Messages during finals week.')}
+        disabled={isLoading}
+      >
+        Generate notifications
+      </button>
+
+      {object?.notifications?.map((notification, index) => (
+        <div key={index}>
+          <p>{notification?.name}</p>
+          <p>{notification?.message}</p>
+        </div>
+      ))}
+    </>
+  );
+}
+```
+
+### Stop Handler
+
+The `stop` function can be used to stop the object generation process. This can be useful if the user wants to cancel the request or if the server is taking too long to respond.
+
+```tsx filename='app/page.tsx' highlight="6,14-16"
+'use client';
+
+import { useObject } from '@ai-sdk/react';
 
 export default function Page() {
   const { isLoading, stop, object, submit } = useObject({
@@ -122,18 +158,12 @@ export default function Page() {
   return (
     <>
       {isLoading && (
-        <div>
-          <Spinner />
-          <button type="button" onClick={() => stop()}>
-            Stop
-          </button>
-        </div>
+        <button type="button" onClick={() => stop()}>
+          Stop
+        </button>
       )}
 
-      <button
-        onClick={() => submit('Messages during finals week.')}
-        disabled={isLoading}
-      >
+      <button onClick={() => submit('Messages during finals week.')}>
         Generate notifications
       </button>
 
@@ -162,7 +192,7 @@ It can be used to display an error message, or to disable the submit button:
 ```tsx file="app/page.tsx" highlight="6,13"
 'use client';
 
-import { useObject } from 'ai/react';
+import { useObject } from '@ai-sdk/react';
 
 export default function Page() {
   const { error, object, submit } = useObject({
@@ -201,7 +231,7 @@ These callbacks can be used to trigger additional actions, such as logging, anal
 ```tsx filename='app/page.tsx' highlight="10-20"
 'use client';
 
-import { experimental_useObject as useObject } from 'ai/react';
+import { experimental_useObject as useObject } from '@ai-sdk/react';
 import { notificationSchema } from './api/notifications/schema';
 
 export default function Page() {

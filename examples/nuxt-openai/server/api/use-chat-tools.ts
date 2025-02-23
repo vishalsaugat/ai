@@ -1,5 +1,5 @@
-import { convertToCoreMessages, streamText } from 'ai';
 import { createOpenAI } from '@ai-sdk/openai';
+import { streamText } from 'ai';
 import { z } from 'zod';
 
 export default defineLazyEventHandler(async () => {
@@ -10,10 +10,10 @@ export default defineLazyEventHandler(async () => {
   return defineEventHandler(async (event: any) => {
     const { messages } = await readBody(event);
 
-    const result = await streamText({
-      model: openai('gpt-4-turbo'),
-      messages: convertToCoreMessages(messages),
-      experimental_toolCallStreaming: true,
+    const result = streamText({
+      model: openai('gpt-4o'),
+      messages,
+      toolCallStreaming: true,
       maxSteps: 5, // multi-steps for server-side tools
       tools: {
         // server-side tool with execute function:
@@ -21,6 +21,9 @@ export default defineLazyEventHandler(async () => {
           description: 'show the weather in a given city to the user',
           parameters: z.object({ city: z.string() }),
           execute: async ({}: { city: string }) => {
+            // Add artificial delay of 2 seconds
+            await new Promise(resolve => setTimeout(resolve, 2000));
+
             const weatherOptions = [
               'sunny',
               'cloudy',

@@ -1,10 +1,12 @@
+import { formatDataStreamPart } from '@ai-sdk/ui-utils';
+import { DataStreamWriter } from '../core/data-stream/data-stream-writer';
 import { mergeStreams } from '../core/util/merge-streams';
 import { prepareResponseHeaders } from '../core/util/prepare-response-headers';
 import {
-  AIStreamCallbacksAndOptions,
   createCallbacksTransformer,
-} from './ai-stream';
-import { createStreamDataTransformer, StreamData } from './stream-data';
+  StreamCallbacks,
+} from './stream-callbacks';
+import { StreamData } from './stream-data';
 
 type LangChainImageDetail = 'auto' | 'low' | 'high';
 
@@ -45,38 +47,12 @@ type LangChainStreamEvent = {
   data: any;
 };
 
-/**
-Converts LangChain output streams to AIStream.
-
-The following streams are supported:
-- `LangChainAIMessageChunk` streams (LangChain `model.stream` output)
-- `string` streams (LangChain `StringOutputParser` output)
-
-@deprecated Use `toDataStream` instead.
- */
-export function toAIStream(
+function toDataStreamInternal(
   stream:
     | ReadableStream<LangChainStreamEvent>
     | ReadableStream<LangChainAIMessageChunk>
     | ReadableStream<string>,
-  callbacks?: AIStreamCallbacksAndOptions,
-) {
-  return toDataStream(stream, callbacks);
-}
-
-/**
-Converts LangChain output streams to AIStream.
-
-The following streams are supported:
-- `LangChainAIMessageChunk` streams (LangChain `model.stream` output)
-- `string` streams (LangChain `StringOutputParser` output)
- */
-export function toDataStream(
-  stream:
-    | ReadableStream<LangChainStreamEvent>
-    | ReadableStream<LangChainAIMessageChunk>
-    | ReadableStream<string>,
-  callbacks?: AIStreamCallbacksAndOptions,
+  callbacks?: StreamCallbacks,
 ) {
   return stream
     .pipeThrough(
@@ -108,7 +84,33 @@ export function toDataStream(
       }),
     )
     .pipeThrough(createCallbacksTransformer(callbacks))
-    .pipeThrough(createStreamDataTransformer());
+    .pipeThrough(new TextDecoderStream())
+    .pipeThrough(
+      new TransformStream({
+        transform: async (chunk, controller) => {
+          controller.enqueue(formatDataStreamPart('text', chunk));
+        },
+      }),
+    );
+}
+
+/**
+Converts LangChain output streams to an AI SDK Data Stream.
+
+The following streams are supported:
+- `LangChainAIMessageChunk` streams (LangChain `model.stream` output)
+- `string` streams (LangChain `StringOutputParser` output)
+ */
+export function toDataStream(
+  stream:
+    | ReadableStream<LangChainStreamEvent>
+    | ReadableStream<LangChainAIMessageChunk>
+    | ReadableStream<string>,
+  callbacks?: StreamCallbacks,
+) {
+  return toDataStreamInternal(stream, callbacks).pipeThrough(
+    new TextEncoderStream(),
+  );
 }
 
 export function toDataStreamResponse(
@@ -119,10 +121,13 @@ export function toDataStreamResponse(
   options?: {
     init?: ResponseInit;
     data?: StreamData;
-    callbacks?: AIStreamCallbacksAndOptions;
+    callbacks?: StreamCallbacks;
   },
 ) {
-  const dataStream = toDataStream(stream, options?.callbacks);
+  const dataStream = toDataStreamInternal(
+    stream,
+    options?.callbacks,
+  ).pipeThrough(new TextEncoderStream());
   const data = options?.data;
   const init = options?.init;
 
@@ -133,11 +138,21 @@ export function toDataStreamResponse(
   return new Response(responseStream, {
     status: init?.status ?? 200,
     statusText: init?.statusText,
-    headers: prepareResponseHeaders(init, {
+    headers: prepareResponseHeaders(init?.headers, {
       contentType: 'text/plain; charset=utf-8',
       dataStreamVersion: 'v1',
     }),
   });
+}
+
+export function mergeIntoDataStream(
+  stream:
+    | ReadableStream<LangChainStreamEvent>
+    | ReadableStream<LangChainAIMessageChunk>
+    | ReadableStream<string>,
+  options: { dataStream: DataStreamWriter; callbacks?: StreamCallbacks },
+) {
+  options.dataStream.merge(toDataStreamInternal(stream, options.callbacks));
 }
 
 function forwardAIMessageChunk(

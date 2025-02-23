@@ -1,5 +1,429 @@
 # @ai-sdk/google-vertex
 
+## 2.1.17
+
+### Patch Changes
+
+- Updated dependencies [1b2e2a0]
+  - @ai-sdk/google@1.1.16
+
+## 2.1.16
+
+### Patch Changes
+
+- Updated dependencies [2761f06]
+  - @ai-sdk/provider@1.0.8
+  - @ai-sdk/anthropic@1.1.9
+  - @ai-sdk/google@1.1.15
+  - @ai-sdk/provider-utils@2.1.9
+
+## 2.1.15
+
+### Patch Changes
+
+- Updated dependencies [08a3641]
+  - @ai-sdk/google@1.1.14
+
+## 2.1.14
+
+### Patch Changes
+
+- Updated dependencies [2e898b4]
+  - @ai-sdk/provider-utils@2.1.8
+  - @ai-sdk/anthropic@1.1.8
+  - @ai-sdk/google@1.1.13
+
+## 2.1.13
+
+### Patch Changes
+
+- Updated dependencies [3ff4ef8]
+  - @ai-sdk/provider-utils@2.1.7
+  - @ai-sdk/anthropic@1.1.7
+  - @ai-sdk/google@1.1.12
+
+## 2.1.12
+
+### Patch Changes
+
+- Updated dependencies [6eb7fc4]
+  - @ai-sdk/google@1.1.11
+
+## 2.1.11
+
+### Patch Changes
+
+- 4da908a: feat (provider/google-vertex): add new gemini models
+
+## 2.1.10
+
+### Patch Changes
+
+- Updated dependencies [e5567f7]
+  - @ai-sdk/google@1.1.10
+
+## 2.1.9
+
+### Patch Changes
+
+- Updated dependencies [b2573de]
+  - @ai-sdk/google@1.1.9
+
+## 2.1.8
+
+### Patch Changes
+
+- d89c3b9: feat (provider): add image model support to provider specification
+- Updated dependencies [d89c3b9]
+  - @ai-sdk/provider@1.0.7
+  - @ai-sdk/anthropic@1.1.6
+  - @ai-sdk/google@1.1.8
+  - @ai-sdk/provider-utils@2.1.6
+
+## 2.1.7
+
+### Patch Changes
+
+- d399f25: feat (provider/google-vertex): support public file urls in messages
+- Updated dependencies [d399f25]
+  - @ai-sdk/google@1.1.7
+
+## 2.1.6
+
+### Patch Changes
+
+- Updated dependencies [e012cd8]
+  - @ai-sdk/google@1.1.6
+
+## 2.1.5
+
+### Patch Changes
+
+- Updated dependencies [3a602ca]
+  - @ai-sdk/provider-utils@2.1.5
+  - @ai-sdk/anthropic@1.1.5
+  - @ai-sdk/google@1.1.5
+
+## 2.1.4
+
+### Patch Changes
+
+- Updated dependencies [066206e]
+  - @ai-sdk/provider-utils@2.1.4
+  - @ai-sdk/anthropic@1.1.4
+  - @ai-sdk/google@1.1.4
+
+## 2.1.3
+
+### Patch Changes
+
+- Updated dependencies [39e5c1f]
+  - @ai-sdk/provider-utils@2.1.3
+  - @ai-sdk/anthropic@1.1.3
+  - @ai-sdk/google@1.1.3
+
+## 2.1.2
+
+### Patch Changes
+
+- 3a58a2e: feat (ai/core): throw NoImageGeneratedError from generateImage when no predictions are returned.
+- Updated dependencies [ed012d2]
+- Updated dependencies [3a58a2e]
+  - @ai-sdk/provider-utils@2.1.2
+  - @ai-sdk/provider@1.0.6
+  - @ai-sdk/anthropic@1.1.2
+  - @ai-sdk/google@1.1.2
+
+## 2.1.1
+
+### Patch Changes
+
+- b284e2c: feat (provider/google-vertex): support prompt caching for Anthropic Claude models
+- Updated dependencies [e7a9ec9]
+- Updated dependencies [858f934]
+- Updated dependencies [b284e2c]
+- Updated dependencies [0a699f1]
+  - @ai-sdk/provider-utils@2.1.1
+  - @ai-sdk/anthropic@1.1.1
+  - @ai-sdk/provider@1.0.5
+  - @ai-sdk/google@1.1.1
+
+## 2.1.0
+
+### Minor Changes
+
+- 62ba5ad: release: AI SDK 4.1
+
+### Patch Changes
+
+- Updated dependencies [62ba5ad]
+  - @ai-sdk/anthropic@1.1.0
+  - @ai-sdk/google@1.1.0
+  - @ai-sdk/provider-utils@2.1.0
+
+## 2.0.19
+
+### Patch Changes
+
+- Updated dependencies [00114c5]
+  - @ai-sdk/provider-utils@2.0.8
+  - @ai-sdk/anthropic@1.0.9
+  - @ai-sdk/google@1.0.17
+
+## 2.0.18
+
+### Patch Changes
+
+- 218d001: feat (provider): Add maxImagesPerCall setting to all image providers.
+
+## 2.0.17
+
+### Patch Changes
+
+- Updated dependencies [4eb9b41]
+  - @ai-sdk/google@1.0.16
+
+## 2.0.16
+
+### Patch Changes
+
+- Updated dependencies [7611964]
+  - @ai-sdk/google@1.0.15
+
+## 2.0.15
+
+### Patch Changes
+
+- Updated dependencies [90fb95a]
+- Updated dependencies [e6dfef4]
+- Updated dependencies [6636db6]
+  - @ai-sdk/provider-utils@2.0.7
+  - @ai-sdk/anthropic@1.0.8
+  - @ai-sdk/google@1.0.14
+
+## 2.0.14
+
+### Patch Changes
+
+- 19a2ce7: feat (ai/core): add aspectRatio and seed options to generateImage
+- 6337688: feat: change image generation errors to warnings
+- Updated dependencies [19a2ce7]
+- Updated dependencies [19a2ce7]
+- Updated dependencies [6337688]
+  - @ai-sdk/provider@1.0.4
+  - @ai-sdk/provider-utils@2.0.6
+  - @ai-sdk/anthropic@1.0.7
+  - @ai-sdk/google@1.0.13
+
+## 2.0.13
+
+### Patch Changes
+
+- e6ed588: feat (provider/google-vertex): Allow arbitrary image model ids.
+- 6612561: fix (provider/google-vertex): Use optional fetch in embed and streamline config.
+
+## 2.0.12
+
+### Patch Changes
+
+- 5ed5e45: chore (config): Use ts-library.json tsconfig for no-UI libs.
+- Updated dependencies [5ed5e45]
+  - @ai-sdk/provider-utils@2.0.5
+  - @ai-sdk/anthropic@1.0.6
+  - @ai-sdk/provider@1.0.3
+  - @ai-sdk/google@1.0.12
+
+## 2.0.11
+
+### Patch Changes
+
+- 5feec50: feat (provider/google-vertex): Add imagen support.
+
+## 2.0.10
+
+### Patch Changes
+
+- d32abbd: feat (provider/google-vertex): Add gemini 2 models.
+
+## 2.0.9
+
+### Patch Changes
+
+- Updated dependencies [db31e74]
+  - @ai-sdk/google@1.0.11
+
+## 2.0.8
+
+### Patch Changes
+
+- e07439a: feat (provider/google): Include safety ratings response detail.
+- 4017b0f: feat (provider/google-vertex): Enhance grounding metadata response detail.
+- a9df182: feat (provider/google): Add support for search grounding.
+- Updated dependencies [e07439a]
+- Updated dependencies [4017b0f]
+- Updated dependencies [a9df182]
+  - @ai-sdk/google@1.0.10
+
+## 2.0.7
+
+### Patch Changes
+
+- Updated dependencies [c0b1c7e]
+  - @ai-sdk/google@1.0.9
+
+## 2.0.6
+
+### Patch Changes
+
+- b7372dc: feat (provider/google): Include optional response grounding metadata.
+- 8224964: feat (provider/google-vertex): Add support for baseURL in API calls.
+- Updated dependencies [b7372dc]
+  - @ai-sdk/google@1.0.8
+
+## 2.0.5
+
+### Patch Changes
+
+- Updated dependencies [09a9cab]
+  - @ai-sdk/provider@1.0.2
+  - @ai-sdk/anthropic@1.0.5
+  - @ai-sdk/google@1.0.7
+  - @ai-sdk/provider-utils@2.0.4
+
+## 2.0.4
+
+### Patch Changes
+
+- 3cfcd0a: fix (provider/google-vertex): Remove unsupported cache control setting from Vertex Anthropic.
+
+## 2.0.3
+
+### Patch Changes
+
+- Updated dependencies [9e54403]
+  - @ai-sdk/google@1.0.6
+
+## 2.0.2
+
+### Patch Changes
+
+- 5b0366e: fix (provider/vertex): fix internal reference
+
+## 2.0.1
+
+### Patch Changes
+
+- bcd892e: feat (provider/google-vertex): Add support for Anthropic models.
+- Updated dependencies [bcd892e]
+  - @ai-sdk/anthropic@1.0.4
+
+## 2.0.0
+
+### Major Changes
+
+- 0984f0b: feat (provider/google-vertex): Rewrite for Edge runtime support.
+
+### Patch Changes
+
+- 0984f0b: chore (providers/google-vertex): Remove unref'd base default provider.
+- Updated dependencies [0984f0b]
+- Updated dependencies [0984f0b]
+  - @ai-sdk/google@1.0.5
+  - @ai-sdk/provider-utils@2.0.3
+
+## 1.0.4
+
+### Patch Changes
+
+- 6373c60: fix (provider/google): send json schema into provider
+
+## 1.0.3
+
+### Patch Changes
+
+- Updated dependencies [b446ae5]
+  - @ai-sdk/provider@1.0.1
+  - @ai-sdk/provider-utils@2.0.2
+
+## 1.0.2
+
+### Patch Changes
+
+- b748dfb: feat (providers): update model lists
+
+## 1.0.1
+
+### Patch Changes
+
+- Updated dependencies [c3ab5de]
+  - @ai-sdk/provider-utils@2.0.1
+
+## 1.0.0
+
+### Major Changes
+
+- 66060f7: chore (release): bump major version to 4.0
+- 8c5daa3: chore (provider/vertex): remove topK model setting
+
+### Patch Changes
+
+- Updated dependencies [b469a7e]
+- Updated dependencies [dce4158]
+- Updated dependencies [c0ddc24]
+- Updated dependencies [b1da952]
+- Updated dependencies [dce4158]
+- Updated dependencies [8426f55]
+- Updated dependencies [db46ce5]
+  - @ai-sdk/provider-utils@2.0.0
+  - @ai-sdk/provider@1.0.0
+
+## 1.0.0-canary.3
+
+### Patch Changes
+
+- Updated dependencies [8426f55]
+  - @ai-sdk/provider-utils@2.0.0-canary.3
+
+## 1.0.0-canary.2
+
+### Patch Changes
+
+- Updated dependencies [dce4158]
+- Updated dependencies [dce4158]
+  - @ai-sdk/provider-utils@2.0.0-canary.2
+
+## 1.0.0-canary.1
+
+### Major Changes
+
+- 8c5daa3: chore (provider/vertex): remove topK model setting
+
+### Patch Changes
+
+- Updated dependencies [b1da952]
+  - @ai-sdk/provider-utils@2.0.0-canary.1
+
+## 1.0.0-canary.0
+
+### Major Changes
+
+- 66060f7: chore (release): bump major version to 4.0
+
+### Patch Changes
+
+- Updated dependencies [b469a7e]
+- Updated dependencies [c0ddc24]
+- Updated dependencies [db46ce5]
+  - @ai-sdk/provider-utils@2.0.0-canary.0
+  - @ai-sdk/provider@1.0.0-canary.0
+
+## 0.0.43
+
+### Patch Changes
+
+- 4360e2d: feat (provider/vertex): expose search grounding metadata
+- e7823a3: feat (provider/vertex): add embedding support
+
 ## 0.0.42
 
 ### Patch Changes

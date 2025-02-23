@@ -7,7 +7,7 @@ describe('system messages', () => {
       { role: 'system', content: 'World' },
     ]);
 
-    expect(system).toEqual('Hello\nWorld');
+    expect(system).toEqual([{ text: 'Hello' }, { text: 'World' }]);
   });
 
   it('should throw an error if a system message is provided after a non-system message', async () => {
@@ -17,6 +17,21 @@ describe('system messages', () => {
         { role: 'system', content: 'World' },
       ]),
     ).toThrowError();
+  });
+
+  it('should set isSystemCachePoint when system message has cache point', async () => {
+    const result = convertToBedrockChatMessages([
+      {
+        role: 'system',
+        content: 'Hello',
+        providerMetadata: { bedrock: { cachePoint: { type: 'default' } } },
+      },
+    ]);
+
+    expect(result).toEqual({
+      system: [{ text: 'Hello' }, { cachePoint: { type: 'default' } }],
+      messages: [],
+    });
   });
 });
 
@@ -51,14 +66,16 @@ describe('user messages', () => {
           {
             image: {
               format: 'png',
-              source: { bytes: new Uint8Array([0, 1, 2, 3]) },
+              source: { bytes: 'AAECAw==' },
             },
           },
           {
             document: {
               format: 'pdf',
               name: expect.any(String),
-              source: { bytes: Buffer.from(fileData) },
+              source: {
+                bytes: 'AAECAw==',
+              },
             },
           },
         ],
@@ -74,7 +91,27 @@ describe('user messages', () => {
       },
     ]);
 
-    expect(system).toEqual('Hello');
+    expect(system).toEqual([{ text: 'Hello' }]);
+  });
+
+  it('should add cache point to user message content when specified', async () => {
+    const result = convertToBedrockChatMessages([
+      {
+        role: 'user',
+        content: [{ type: 'text', text: 'Hello' }],
+        providerMetadata: { bedrock: { cachePoint: { type: 'default' } } },
+      },
+    ]);
+
+    expect(result).toEqual({
+      messages: [
+        {
+          role: 'user',
+          content: [{ text: 'Hello' }, { cachePoint: { type: 'default' } }],
+        },
+      ],
+      system: [],
+    });
   });
 });
 
@@ -102,7 +139,37 @@ describe('assistant messages', () => {
           content: [{ text: 'assistant content' }],
         },
       ],
-      system: undefined,
+      system: [],
+    });
+  });
+
+  it('should remove trailing whitespace from last assistant message with multi-part content when there is no further user message', async () => {
+    const result = convertToBedrockChatMessages([
+      {
+        role: 'user',
+        content: [{ type: 'text', text: 'user content' }],
+      },
+      {
+        role: 'assistant',
+        content: [
+          { type: 'text', text: 'assistant ' },
+          { type: 'text', text: 'content  ' },
+        ],
+      },
+    ]);
+
+    expect(result).toEqual({
+      messages: [
+        {
+          role: 'user',
+          content: [{ text: 'user content' }],
+        },
+        {
+          role: 'assistant',
+          content: [{ text: 'assistant ' }, { text: 'content' }],
+        },
+      ],
+      system: [],
     });
   });
 
@@ -137,7 +204,7 @@ describe('assistant messages', () => {
           content: [{ text: 'user content 2' }],
         },
       ],
-      system: undefined,
+      system: [],
     });
   });
 
@@ -157,7 +224,27 @@ describe('assistant messages', () => {
           content: [{ text: 'Hello' }, { text: 'World' }, { text: '!' }],
         },
       ],
-      system: undefined,
+      system: [],
+    });
+  });
+
+  it('should add cache point to assistant message content when specified', async () => {
+    const result = convertToBedrockChatMessages([
+      {
+        role: 'assistant',
+        content: [{ type: 'text', text: 'Hello' }],
+        providerMetadata: { bedrock: { cachePoint: { type: 'default' } } },
+      },
+    ]);
+
+    expect(result).toEqual({
+      messages: [
+        {
+          role: 'assistant',
+          content: [{ text: 'Hello' }, { cachePoint: { type: 'default' } }],
+        },
+      ],
+      system: [],
     });
   });
 });

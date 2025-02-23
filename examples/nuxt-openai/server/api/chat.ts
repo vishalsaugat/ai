@@ -1,5 +1,5 @@
-import { convertToCoreMessages, streamText } from 'ai';
 import { createOpenAI } from '@ai-sdk/openai';
+import { streamText } from 'ai';
 
 export default defineLazyEventHandler(async () => {
   const openai = createOpenAI({
@@ -11,9 +11,9 @@ export default defineLazyEventHandler(async () => {
     const { messages } = await readBody(event);
 
     // Call the language model
-    const result = await streamText({
+    const result = streamText({
       model: openai('gpt-4-turbo'),
-      messages: convertToCoreMessages(messages),
+      messages,
       async onFinish({ text, toolCalls, toolResults, usage, finishReason }) {
         // implement your own logic here, e.g. for storing messages
         // or recording token usage

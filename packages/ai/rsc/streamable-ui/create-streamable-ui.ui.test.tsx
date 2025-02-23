@@ -1,4 +1,4 @@
-import { delay } from '../../util/delay';
+import { delay } from '@ai-sdk/provider-utils';
 import { createStreamableUI } from './create-streamable-ui';
 
 // This is a workaround to render the Flight response in a test environment.
@@ -66,7 +66,7 @@ async function simulateFlightServerRender(node: React.ReactNode) {
     if (!node) return {};
 
     // Let's only do one level of promise resolution here. As it's only for testing purposes.
-    const props = await recursiveResolve({ ...node.props } || {});
+    const props = await recursiveResolve({ ...node.props });
 
     const { type } = node;
     const { children, ...otherProps } = props;

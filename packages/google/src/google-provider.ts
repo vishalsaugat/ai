@@ -19,6 +19,7 @@ import {
   LanguageModelV1,
   ProviderV1,
 } from '@ai-sdk/provider';
+import { isSupportedFileUrl } from './google-supported-file-url';
 
 export interface GoogleGenerativeAIProvider extends ProviderV1 {
   (
@@ -74,11 +75,6 @@ The default prefix is `https://generativelanguage.googleapis.com/v1beta`.
   baseURL?: string;
 
   /**
-@deprecated Use `baseURL` instead.
-   */
-  baseUrl?: string;
-
-  /**
 API key that is being send using the `x-goog-api-key` header.
 It defaults to the `GOOGLE_GENERATIVE_AI_API_KEY` environment variable.
    */
@@ -87,7 +83,7 @@ It defaults to the `GOOGLE_GENERATIVE_AI_API_KEY` environment variable.
   /**
 Custom headers to include in the requests.
      */
-  headers?: Record<string, string>;
+  headers?: Record<string, string | undefined>;
 
   /**
 Custom fetch implementation. You can use it as a middleware to intercept requests,
@@ -95,6 +91,9 @@ or to provide a custom fetch implementation for e.g. testing.
     */
   fetch?: FetchFunction;
 
+  /**
+Optional function to generate a unique ID for each request.
+     */
   generateId?: () => string;
 }
 
@@ -105,7 +104,7 @@ export function createGoogleGenerativeAI(
   options: GoogleGenerativeAIProviderSettings = {},
 ): GoogleGenerativeAIProvider {
   const baseURL =
-    withoutTrailingSlash(options.baseURL ?? options.baseUrl) ??
+    withoutTrailingSlash(options.baseURL) ??
     'https://generativelanguage.googleapis.com/v1beta';
 
   const getHeaders = () => ({
@@ -126,6 +125,7 @@ export function createGoogleGenerativeAI(
       baseURL,
       headers: getHeaders,
       generateId: options.generateId ?? generateId,
+      isSupportedUrl: isSupportedFileUrl,
       fetch: options.fetch,
     });
 
@@ -160,7 +160,7 @@ export function createGoogleGenerativeAI(
   provider.textEmbedding = createEmbeddingModel;
   provider.textEmbeddingModel = createEmbeddingModel;
 
-  return provider as GoogleGenerativeAIProvider;
+  return provider;
 }
 
 /**

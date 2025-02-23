@@ -1,4 +1,4 @@
-import { createOpenAI } from '@ai-sdk/openai';
+import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import { streamText } from 'ai';
 import 'dotenv/config';
 
@@ -11,9 +11,11 @@ const basetenExtraPayload = {
   deployment_id: BASETEN_DEPLOYMENT_ID,
 };
 
-const baseten = createOpenAI({
+const baseten = createOpenAICompatible({
   name: 'baseten',
-  apiKey: process.env.BASETEN_API_KEY ?? '',
+  headers: {
+    Authorization: `Bearer ${process.env.BASETEN_API_KEY ?? ''}`,
+  },
   baseURL: 'https://bridge.baseten.co/v1/direct',
   fetch: async (url, request) => {
     if (!request || !request.body) {
@@ -28,7 +30,7 @@ const baseten = createOpenAI({
 });
 
 async function main() {
-  const result = await streamText({
+  const result = streamText({
     model: baseten('<model-name>'), // The name of the model you are serving in the baseten deployment
     prompt: 'Give me a poem about life',
   });

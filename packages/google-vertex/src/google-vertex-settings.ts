@@ -1,64 +1,28 @@
-// https://cloud.google.com/vertex-ai/generative-ai/docs/learn/models
+import type { InternalGoogleGenerativeAISettings } from '@ai-sdk/google/internal';
+
+// https://cloud.google.com/vertex-ai/generative-ai/docs/model-reference/inference#supported-models
+// Note preview and experimental models may only be detailed in AI Studio:
+// https://console.cloud.google.com/vertex-ai/studio/
 export type GoogleVertexModelId =
-  // Stable version
+  // Stable models
+  | 'gemini-2.0-flash-001'
+  | 'gemini-1.5-flash'
   | 'gemini-1.5-flash-001'
   | 'gemini-1.5-flash-002'
+  | 'gemini-1.5-pro'
   | 'gemini-1.5-pro-001'
   | 'gemini-1.5-pro-002'
   | 'gemini-1.0-pro-001'
   | 'gemini-1.0-pro-vision-001'
-  // Auto-updated alias
-  | 'gemini-1.5-flash'
-  | 'gemini-1.5-pro'
   | 'gemini-1.0-pro'
-  | 'gemini-1.0-pro-vision'
+  | 'gemini-1.0-pro-001'
+  | 'gemini-1.0-pro-002'
+  // Preview models
+  | 'gemini-2.0-flash-lite-preview-02-05'
+  // Experimental models
+  | 'gemini-2.0-pro-exp-02-05'
+  | 'gemini-2.0-flash-exp'
   | (string & {});
 
-export interface GoogleVertexSettings {
-  /**
-Optional. The maximum number of tokens to consider when sampling.
-
-Models use nucleus sampling or combined Top-k and nucleus sampling.
-Top-k sampling considers the set of topK most probable tokens.
-Models running with nucleus sampling don't allow topK setting.
-
-@deprecated use the topK setting on the request instead.
-   */
-  topK?: number;
-
-  /**
-   * Optional. Enable structured output. Default is true.
-   *
-   * This is useful when the JSON Schema contains elements that are
-   * not supported by the OpenAPI schema version that
-   * Google Generative AI uses. You can use this to disable
-   * structured outputs if you need to.
-   */
-  structuredOutputs?: boolean;
-
-  /**
-Optional. A list of unique safety settings for blocking unsafe content.
-   */
-  safetySettings?: Array<{
-    category:
-      | 'HARM_CATEGORY_UNSPECIFIED'
-      | 'HARM_CATEGORY_HATE_SPEECH'
-      | 'HARM_CATEGORY_DANGEROUS_CONTENT'
-      | 'HARM_CATEGORY_HARASSMENT'
-      | 'HARM_CATEGORY_SEXUALLY_EXPLICIT';
-
-    threshold:
-      | 'HARM_BLOCK_THRESHOLD_UNSPECIFIED'
-      | 'BLOCK_LOW_AND_ABOVE'
-      | 'BLOCK_MEDIUM_AND_ABOVE'
-      | 'BLOCK_ONLY_HIGH'
-      | 'BLOCK_NONE';
-  }>;
-
-  /**
-Optional. When enabled, the model will use Google search to ground the response.
-
-@see https://cloud.google.com/vertex-ai/generative-ai/docs/grounding/overview
-   */
-  useSearchGrounding?: boolean;
-}
+export interface GoogleVertexSettings
+  extends InternalGoogleGenerativeAISettings {}

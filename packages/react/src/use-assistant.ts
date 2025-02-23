@@ -5,7 +5,7 @@ import {
   Message,
   UseAssistantOptions,
   generateId,
-  readDataStream,
+  processAssistantStream,
 } from '@ai-sdk/ui-utils';
 import { useCallback, useRef, useState } from 'react';
 
@@ -176,71 +176,60 @@ export function useAssistant({
         throw new Error('The response body is empty.');
       }
 
-      for await (const { type, value } of readDataStream(
-        response.body.getReader(),
-      )) {
-        switch (type) {
-          case 'assistant_message': {
-            setMessages(messages => [
-              ...messages,
+      await processAssistantStream({
+        stream: response.body,
+        onAssistantMessagePart(value) {
+          setMessages(messages => [
+            ...messages,
+            {
+              id: value.id,
+              role: value.role,
+              content: value.content[0].text.value,
+              parts: [],
+            },
+          ]);
+        },
+        onTextPart(value) {
+          // text delta - add to last message:
+          setMessages(messages => {
+            const lastMessage = messages[messages.length - 1];
+            return [
+              ...messages.slice(0, messages.length - 1),
               {
-                id: value.id,
-                role: value.role,
-                content: value.content[0].text.value,
+                id: lastMessage.id,
+                role: lastMessage.role,
+                content: lastMessage.content + value,
+                parts: lastMessage.parts,
               },
-            ]);
-            break;
-          }
+            ];
+          });
+        },
+        onAssistantControlDataPart(value) {
+          setCurrentThreadId(value.threadId);
 
-          case 'text': {
-            // text delta - add to last message:
-            setMessages(messages => {
-              const lastMessage = messages[messages.length - 1];
-              return [
-                ...messages.slice(0, messages.length - 1),
-                {
-                  id: lastMessage.id,
-                  role: lastMessage.role,
-                  content: lastMessage.content + value,
-                },
-              ];
-            });
-
-            break;
-          }
-
-          case 'data_message': {
-            setMessages(messages => [
-              ...messages,
-              {
-                id: value.id ?? generateId(),
-                role: 'data',
-                content: '',
-                data: value.data,
-              },
-            ]);
-            break;
-          }
-
-          case 'assistant_control_data': {
-            setCurrentThreadId(value.threadId);
-
-            // set id of last message:
-            setMessages(messages => {
-              const lastMessage = messages[messages.length - 1];
-              lastMessage.id = value.messageId;
-              return [...messages.slice(0, messages.length - 1), lastMessage];
-            });
-
-            break;
-          }
-
-          case 'error': {
-            setError(new Error(value));
-            break;
-          }
-        }
-      }
+          // set id of last message:
+          setMessages(messages => {
+            const lastMessage = messages[messages.length - 1];
+            lastMessage.id = value.messageId;
+            return [...messages.slice(0, messages.length - 1), lastMessage];
+          });
+        },
+        onDataMessagePart(value) {
+          setMessages(messages => [
+            ...messages,
+            {
+              id: value.id ?? generateId(),
+              role: 'data',
+              content: '',
+              data: value.data,
+              parts: [],
+            },
+          ]);
+        },
+        onErrorPart(value) {
+          setError(new Error(value));
+        },
+      });
     } catch (error) {
       // Ignore abort errors as they are expected when the user cancels the request:
       if (isAbortError(error) && abortController.signal.aborted) {
@@ -271,7 +260,7 @@ export function useAssistant({
       return;
     }
 
-    append({ role: 'user', content: input }, requestOptions);
+    append({ role: 'user', content: input, parts: [] }, requestOptions);
   };
 
   const setThreadId = (threadId: string | undefined) => {
@@ -294,8 +283,3 @@ export function useAssistant({
     stop,
   };
 }
-
-/**
-@deprecated Use `useAssistant` instead.
- */
-export const experimental_useAssistant = useAssistant;

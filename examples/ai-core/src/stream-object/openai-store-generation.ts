@@ -4,7 +4,7 @@ import 'dotenv/config';
 import { z } from 'zod';
 
 async function main() {
-  const result = await streamObject({
+  const result = streamObject({
     model: openai('gpt-4-turbo'),
     schema: z.object({
       characters: z.array(
@@ -19,7 +19,7 @@ async function main() {
     }),
     prompt:
       'Generate 3 character descriptions for a fantasy role playing game.',
-    experimental_providerMetadata: {
+    providerOptions: {
       openai: {
         store: true,
         metadata: {

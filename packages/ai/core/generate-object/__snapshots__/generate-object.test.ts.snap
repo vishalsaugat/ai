@@ -4,11 +4,11 @@ exports[`telemetry > should not record telemetry inputs / outputs when disabled 
 [
   {
     "attributes": {
-      "ai.finishReason": "stop",
       "ai.model.id": "mock-model-id",
       "ai.model.provider": "mock-provider",
       "ai.operationId": "ai.generateObject",
       "ai.response.finishReason": "stop",
+      "ai.settings.maxRetries": 2,
       "ai.settings.mode": "json",
       "ai.settings.output": "object",
       "ai.usage.completionTokens": 20,
@@ -20,7 +20,6 @@ exports[`telemetry > should not record telemetry inputs / outputs when disabled 
   },
   {
     "attributes": {
-      "ai.finishReason": "stop",
       "ai.model.id": "mock-model-id",
       "ai.model.provider": "mock-provider",
       "ai.operationId": "ai.generateObject.doGenerate",
@@ -28,6 +27,7 @@ exports[`telemetry > should not record telemetry inputs / outputs when disabled 
       "ai.response.id": "test-id-from-model",
       "ai.response.model": "test-response-model-id",
       "ai.response.timestamp": "1970-01-01T00:00:10.000Z",
+      "ai.settings.maxRetries": 2,
       "ai.settings.mode": "json",
       "ai.usage.completionTokens": 20,
       "ai.usage.promptTokens": 10,
@@ -52,11 +52,11 @@ exports[`telemetry > should not record telemetry inputs / outputs when disabled 
 [
   {
     "attributes": {
-      "ai.finishReason": "stop",
       "ai.model.id": "mock-model-id",
       "ai.model.provider": "mock-provider",
       "ai.operationId": "ai.generateObject",
       "ai.response.finishReason": "stop",
+      "ai.settings.maxRetries": 2,
       "ai.settings.mode": "tool",
       "ai.settings.output": "object",
       "ai.usage.completionTokens": 20,
@@ -68,7 +68,6 @@ exports[`telemetry > should not record telemetry inputs / outputs when disabled 
   },
   {
     "attributes": {
-      "ai.finishReason": "stop",
       "ai.model.id": "mock-model-id",
       "ai.model.provider": "mock-provider",
       "ai.operationId": "ai.generateObject.doGenerate",
@@ -76,6 +75,7 @@ exports[`telemetry > should not record telemetry inputs / outputs when disabled 
       "ai.response.id": "test-id-from-model",
       "ai.response.model": "test-response-model-id",
       "ai.response.timestamp": "1970-01-01T00:00:10.000Z",
+      "ai.settings.maxRetries": 2,
       "ai.settings.mode": "tool",
       "ai.usage.completionTokens": 20,
       "ai.usage.promptTokens": 10,
@@ -100,7 +100,6 @@ exports[`telemetry > should record telemetry data when enabled with mode "json" 
 [
   {
     "attributes": {
-      "ai.finishReason": "stop",
       "ai.model.id": "mock-model-id",
       "ai.model.provider": "mock-provider",
       "ai.operationId": "ai.generateObject",
@@ -109,11 +108,11 @@ exports[`telemetry > should record telemetry data when enabled with mode "json" 
       "ai.request.headers.header2": "value2",
       "ai.response.finishReason": "stop",
       "ai.response.object": "{"content":"Hello, world!"}",
-      "ai.result.object": "{"content":"Hello, world!"}",
       "ai.schema": "{"type":"object","properties":{"content":{"type":"string"}},"required":["content"],"additionalProperties":false,"$schema":"http://json-schema.org/draft-07/schema#"}",
       "ai.schema.description": "test description",
       "ai.schema.name": "test-name",
       "ai.settings.frequencyPenalty": 0.3,
+      "ai.settings.maxRetries": 2,
       "ai.settings.mode": "json",
       "ai.settings.output": "object",
       "ai.settings.presencePenalty": 0.4,
@@ -133,7 +132,6 @@ exports[`telemetry > should record telemetry data when enabled with mode "json" 
   },
   {
     "attributes": {
-      "ai.finishReason": "stop",
       "ai.model.id": "mock-model-id",
       "ai.model.provider": "mock-provider",
       "ai.operationId": "ai.generateObject.doGenerate",
@@ -146,8 +144,8 @@ exports[`telemetry > should record telemetry data when enabled with mode "json" 
       "ai.response.model": "test-response-model-id",
       "ai.response.object": "{ "content": "Hello, world!" }",
       "ai.response.timestamp": "1970-01-01T00:00:10.000Z",
-      "ai.result.object": "{ "content": "Hello, world!" }",
       "ai.settings.frequencyPenalty": 0.3,
+      "ai.settings.maxRetries": 2,
       "ai.settings.mode": "json",
       "ai.settings.presencePenalty": 0.4,
       "ai.settings.temperature": 0.5,
@@ -185,7 +183,6 @@ exports[`telemetry > should record telemetry data when enabled with mode "tool" 
 [
   {
     "attributes": {
-      "ai.finishReason": "stop",
       "ai.model.id": "mock-model-id",
       "ai.model.provider": "mock-provider",
       "ai.operationId": "ai.generateObject",
@@ -194,11 +191,11 @@ exports[`telemetry > should record telemetry data when enabled with mode "tool" 
       "ai.request.headers.header2": "value2",
       "ai.response.finishReason": "stop",
       "ai.response.object": "{"content":"Hello, world!"}",
-      "ai.result.object": "{"content":"Hello, world!"}",
       "ai.schema": "{"type":"object","properties":{"content":{"type":"string"}},"required":["content"],"additionalProperties":false,"$schema":"http://json-schema.org/draft-07/schema#"}",
       "ai.schema.description": "test description",
       "ai.schema.name": "test-name",
       "ai.settings.frequencyPenalty": 0.3,
+      "ai.settings.maxRetries": 2,
       "ai.settings.mode": "tool",
       "ai.settings.output": "object",
       "ai.settings.presencePenalty": 0.4,
@@ -218,7 +215,6 @@ exports[`telemetry > should record telemetry data when enabled with mode "tool" 
   },
   {
     "attributes": {
-      "ai.finishReason": "stop",
       "ai.model.id": "mock-model-id",
       "ai.model.provider": "mock-provider",
       "ai.operationId": "ai.generateObject.doGenerate",
@@ -231,8 +227,8 @@ exports[`telemetry > should record telemetry data when enabled with mode "tool" 
       "ai.response.model": "test-response-model-id",
       "ai.response.object": "{ "content": "Hello, world!" }",
       "ai.response.timestamp": "1970-01-01T00:00:10.000Z",
-      "ai.result.object": "{ "content": "Hello, world!" }",
       "ai.settings.frequencyPenalty": 0.3,
+      "ai.settings.maxRetries": 2,
       "ai.settings.mode": "tool",
       "ai.settings.presencePenalty": 0.4,
       "ai.settings.temperature": 0.5,

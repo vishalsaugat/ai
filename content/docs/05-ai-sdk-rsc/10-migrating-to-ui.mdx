@@ -102,18 +102,16 @@ The `streamUI` function combines generating text and rendering the user interfac
 The `streamText` function executes as part of a route handler and streams the response to the client. The `useChat` hook on the client decodes this stream and renders the response within the chat interface.
 
 ```ts filename="@/app/api/chat/route.ts"
-import { streamText, convertToCoreMessages } from 'ai';
+import { streamText } from 'ai';
 import { openai } from '@ai-sdk/openai';
 
 export async function POST(request) {
   const { messages } = await request.json();
 
-  const coreMessages = convertToCoreMessages(messages);
-
-  const result = await streamText({
+  const result = streamText({
     model: openai('gpt-4o'),
     system: 'you are a friendly assistant!',
-    messages: coreMessages,
+    messages,
     tools: {
       // tool definitions
     },
@@ -128,7 +126,7 @@ export async function POST(request) {
 ```tsx filename="@/app/page.tsx"
 'use client';
 
-import { useChat } from 'ai/react';
+import { useChat } from '@ai-sdk/react';
 
 export default function Page() {
   const { messages, input, setInput, handleSubmit } = useChat();
@@ -218,17 +216,15 @@ The `streamText` function streams the props data as response to the client, whil
 import { z } from 'zod';
 import { openai } from '@ai-sdk/openai';
 import { getWeather } from '@/utils/queries';
-import { streamText, convertToCoreMessages } from 'ai';
+import { streamText } from 'ai';
 
 export async function POST(request) {
   const { messages } = await request.json();
 
-  const coreMessages = convertToCoreMessages(messages);
-
-  const result = await streamText({
+  const result = streamText({
     model: openai('gpt-4o'),
     system: 'you are a friendly assistant!',
-    messages: coreMessages,
+    messages,
     tools: {
       displayWeather: {
         description: 'Display the weather for a location',
@@ -253,7 +249,7 @@ export async function POST(request) {
 ```tsx filename="@/app/page.tsx"
 'use client';
 
-import { useChat } from 'ai/react';
+import { useChat } from '@ai-sdk/react';
 import { Weather } from '@/components/weather';
 
 export default function Page() {
@@ -352,7 +348,7 @@ After switching to AI SDK UI, these messages are synced by initializing the `use
 ```tsx filename="@/app/components/list-flights.tsx"
 'use client';
 
-import { useChat } from 'ai/react';
+import { useChat } from '@ai-sdk/react';
 
 export function ListFlights({ chatId, flights }) {
   const { append } = useChat({
@@ -494,15 +490,15 @@ export async function POST(request) {
 
   const coreMessages = convertToCoreMessages(messages);
 
-  const result = await streamText({
+  const result = streamText({
     model: openai('gpt-4o'),
     system: 'you are a friendly assistant!',
     messages: coreMessages,
-    onFinish: async ({ responseMessages }) => {
+    onFinish: async ({ response }) => {
       try {
         await saveChat({
           id,
-          messages: [...coreMessages, ...responseMessages],
+          messages: [...coreMessages, ...response.messages],
         });
       } catch (error) {
         console.error('Failed to save chat');
@@ -573,7 +569,7 @@ export default async function Page({ params }: { params: any }) {
 'use client';
 
 import { Message } from 'ai';
-import { useChat } from 'ai/react';
+import { useChat } from '@ai-sdk/react';
 
 export function Chat({
   id,
@@ -618,7 +614,7 @@ export async function generateSampleNotifications() {
   const stream = createStreamableValue();
 
   (async () => {
-    const { partialObjectStream } = await streamObject({
+    const { partialObjectStream } = streamObject({
       model: openai('gpt-4o'),
       system: 'generate sample ios messages for testing',
       prompt: 'messages from a family group chat during diwali, max 4',
@@ -683,7 +679,7 @@ import { notificationSchema } from '@/utils/schemas';
 export async function POST(req: Request) {
   const context = await req.json();
 
-  const result = await streamObject({
+  const result = streamObject({
     model: openai('gpt-4-turbo'),
     schema: notificationSchema,
     prompt:
@@ -699,7 +695,7 @@ export async function POST(req: Request) {
 ```tsx filename="@/app/page.tsx"
 'use client';
 
-import { useObject } from 'ai/react';
+import { useObject } from '@ai-sdk/react';
 import { notificationSchema } from '@/utils/schemas';
 
 export default function Page() {

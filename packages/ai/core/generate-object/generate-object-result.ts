@@ -11,11 +11,11 @@ import { LanguageModelUsage } from '../types/usage';
 /**
 The result of a `generateObject` call.
  */
-export interface GenerateObjectResult<T> {
+export interface GenerateObjectResult<OBJECT> {
   /**
   The generated object (typed according to the schema).
      */
-  readonly object: T;
+  readonly object: OBJECT;
 
   /**
   The reason why the generation finished.
@@ -31,18 +31,6 @@ export interface GenerateObjectResult<T> {
   Warnings from the model provider (e.g. unsupported settings).
      */
   readonly warnings: CallWarning[] | undefined;
-
-  /**
- Optional raw response data.
-
-@deprecated Use `response.headers` instead.
-     */
-  readonly rawResponse?: {
-    /**
-  Response headers.
-   */
-    headers?: Record<string, string>;
-  };
 
   /**
 Additional request information.
@@ -66,6 +54,11 @@ Additional response information.
 Additional provider-specific metadata. They are passed through
 from the provider to the AI SDK and enable provider-specific
 results that can be fully encapsulated in the provider.
+   */
+  readonly providerMetadata: ProviderMetadata | undefined;
+
+  /**
+@deprecated Use `providerMetadata` instead.
    */
   readonly experimental_providerMetadata: ProviderMetadata | undefined;
 

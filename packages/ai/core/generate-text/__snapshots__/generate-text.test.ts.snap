@@ -7,6 +7,8 @@ exports[`options.maxSteps > 2 steps: initial, tool-result > onStepFinish should 
     "finishReason": "tool-calls",
     "isContinued": false,
     "logprobs": undefined,
+    "providerMetadata": undefined,
+    "reasoning": undefined,
     "request": {},
     "response": {
       "headers": undefined,
@@ -27,6 +29,7 @@ exports[`options.maxSteps > 2 steps: initial, tool-result > onStepFinish should 
               "type": "tool-call",
             },
           ],
+          "id": "msg-0",
           "role": "assistant",
         },
         {
@@ -38,12 +41,14 @@ exports[`options.maxSteps > 2 steps: initial, tool-result > onStepFinish should 
               "type": "tool-result",
             },
           ],
+          "id": "msg-1",
           "role": "tool",
         },
       ],
       "modelId": "test-response-model-id",
       "timestamp": 1970-01-01T00:00:00.000Z,
     },
+    "sources": [],
     "stepType": "initial",
     "text": "",
     "toolCalls": [
@@ -64,6 +69,7 @@ exports[`options.maxSteps > 2 steps: initial, tool-result > onStepFinish should 
         "result": "result1",
         "toolCallId": "call-1",
         "toolName": "tool1",
+        "type": "tool-result",
       },
     ],
     "usage": {
@@ -78,6 +84,8 @@ exports[`options.maxSteps > 2 steps: initial, tool-result > onStepFinish should 
     "finishReason": "stop",
     "isContinued": false,
     "logprobs": undefined,
+    "providerMetadata": undefined,
+    "reasoning": undefined,
     "request": {},
     "response": {
       "headers": {
@@ -100,6 +108,7 @@ exports[`options.maxSteps > 2 steps: initial, tool-result > onStepFinish should 
               "type": "tool-call",
             },
           ],
+          "id": "msg-0",
           "role": "assistant",
         },
         {
@@ -111,6 +120,7 @@ exports[`options.maxSteps > 2 steps: initial, tool-result > onStepFinish should 
               "type": "tool-result",
             },
           ],
+          "id": "msg-1",
           "role": "tool",
         },
         {
@@ -120,12 +130,14 @@ exports[`options.maxSteps > 2 steps: initial, tool-result > onStepFinish should 
               "type": "text",
             },
           ],
+          "id": "msg-2",
           "role": "assistant",
         },
       ],
       "modelId": "test-response-model-id",
       "timestamp": 1970-01-01T00:00:10.000Z,
     },
+    "sources": [],
     "stepType": "tool-result",
     "text": "Hello, world!",
     "toolCalls": [],
@@ -140,7 +152,7 @@ exports[`options.maxSteps > 2 steps: initial, tool-result > onStepFinish should 
 ]
 `;
 
-exports[`options.maxSteps > 2 steps: initial, tool-result > result.responseMessages should contain response messages from all steps 1`] = `
+exports[`options.maxSteps > 2 steps: initial, tool-result > result.response.messages should contain response messages from all steps 1`] = `
 [
   {
     "content": [
@@ -157,6 +169,7 @@ exports[`options.maxSteps > 2 steps: initial, tool-result > result.responseMessa
         "type": "tool-call",
       },
     ],
+    "id": "msg-0",
     "role": "assistant",
   },
   {
@@ -168,6 +181,7 @@ exports[`options.maxSteps > 2 steps: initial, tool-result > result.responseMessa
         "type": "tool-result",
       },
     ],
+    "id": "msg-1",
     "role": "tool",
   },
   {
@@ -177,6 +191,7 @@ exports[`options.maxSteps > 2 steps: initial, tool-result > result.responseMessa
         "type": "text",
       },
     ],
+    "id": "msg-2",
     "role": "assistant",
   },
 ]
@@ -189,6 +204,8 @@ exports[`options.maxSteps > 2 steps: initial, tool-result > result.steps should 
     "finishReason": "tool-calls",
     "isContinued": false,
     "logprobs": undefined,
+    "providerMetadata": undefined,
+    "reasoning": undefined,
     "request": {},
     "response": {
       "headers": undefined,
@@ -209,6 +226,7 @@ exports[`options.maxSteps > 2 steps: initial, tool-result > result.steps should 
               "type": "tool-call",
             },
           ],
+          "id": "msg-0",
           "role": "assistant",
         },
         {
@@ -220,12 +238,14 @@ exports[`options.maxSteps > 2 steps: initial, tool-result > result.steps should 
               "type": "tool-result",
             },
           ],
+          "id": "msg-1",
           "role": "tool",
         },
       ],
       "modelId": "test-response-model-id",
       "timestamp": 1970-01-01T00:00:00.000Z,
     },
+    "sources": [],
     "stepType": "initial",
     "text": "",
     "toolCalls": [
@@ -246,6 +266,7 @@ exports[`options.maxSteps > 2 steps: initial, tool-result > result.steps should 
         "result": "result1",
         "toolCallId": "call-1",
         "toolName": "tool1",
+        "type": "tool-result",
       },
     ],
     "usage": {
@@ -260,6 +281,8 @@ exports[`options.maxSteps > 2 steps: initial, tool-result > result.steps should 
     "finishReason": "stop",
     "isContinued": false,
     "logprobs": undefined,
+    "providerMetadata": undefined,
+    "reasoning": undefined,
     "request": {},
     "response": {
       "headers": {
@@ -282,6 +305,7 @@ exports[`options.maxSteps > 2 steps: initial, tool-result > result.steps should 
               "type": "tool-call",
             },
           ],
+          "id": "msg-0",
           "role": "assistant",
         },
         {
@@ -293,6 +317,7 @@ exports[`options.maxSteps > 2 steps: initial, tool-result > result.steps should 
               "type": "tool-result",
             },
           ],
+          "id": "msg-1",
           "role": "tool",
         },
         {
@@ -302,12 +327,14 @@ exports[`options.maxSteps > 2 steps: initial, tool-result > result.steps should 
               "type": "text",
             },
           ],
+          "id": "msg-2",
           "role": "assistant",
         },
       ],
       "modelId": "test-response-model-id",
       "timestamp": 1970-01-01T00:00:10.000Z,
     },
+    "sources": [],
     "stepType": "tool-result",
     "text": "Hello, world!",
     "toolCalls": [],
@@ -322,13 +349,15 @@ exports[`options.maxSteps > 2 steps: initial, tool-result > result.steps should 
 ]
 `;
 
-exports[`options.maxSteps > 3 steps: initial, continue, continue > onStepFinish should be called for each step 1`] = `
+exports[`options.maxSteps > 4 steps: initial, continue, continue, continue > onStepFinish should be called for each step 1`] = `
 [
   {
     "experimental_providerMetadata": undefined,
     "finishReason": "length",
     "isContinued": true,
     "logprobs": undefined,
+    "providerMetadata": undefined,
+    "reasoning": undefined,
     "request": {},
     "response": {
       "headers": undefined,
@@ -342,12 +371,14 @@ exports[`options.maxSteps > 3 steps: initial, continue, continue > onStepFinish 
               "type": "text",
             },
           ],
+          "id": "msg-0",
           "role": "assistant",
         },
       ],
       "modelId": "test-response-model-id",
       "timestamp": 1970-01-01T00:00:00.000Z,
     },
+    "sources": [],
     "stepType": "initial",
     "text": "part 1 
  ",
@@ -365,6 +396,8 @@ exports[`options.maxSteps > 3 steps: initial, continue, continue > onStepFinish 
     "finishReason": "length",
     "isContinued": true,
     "logprobs": undefined,
+    "providerMetadata": undefined,
+    "reasoning": undefined,
     "request": {},
     "response": {
       "headers": {
@@ -384,12 +417,26 @@ exports[`options.maxSteps > 3 steps: initial, continue, continue > onStepFinish 
               "type": "text",
             },
           ],
+          "id": "msg-0",
           "role": "assistant",
         },
       ],
       "modelId": "test-response-model-id",
       "timestamp": 1970-01-01T00:00:10.000Z,
     },
+    "sources": [
+      {
+        "id": "123",
+        "providerMetadata": {
+          "provider": {
+            "custom": "value",
+          },
+        },
+        "sourceType": "url",
+        "title": "Example",
+        "url": "https://example.com",
+      },
+    ],
     "stepType": "continue",
     "text": "no-whitespace",
     "toolCalls": [],
@@ -403,9 +450,11 @@ exports[`options.maxSteps > 3 steps: initial, continue, continue > onStepFinish 
   },
   {
     "experimental_providerMetadata": undefined,
-    "finishReason": "stop",
-    "isContinued": false,
+    "finishReason": "length",
+    "isContinued": true,
     "logprobs": undefined,
+    "providerMetadata": undefined,
+    "reasoning": undefined,
     "request": {},
     "response": {
       "headers": undefined,
@@ -423,17 +472,93 @@ exports[`options.maxSteps > 3 steps: initial, continue, continue > onStepFinish 
               "type": "text",
             },
             {
-              "text": "final value keep all whitespace
- end",
+              "text": "immediatefollow  ",
               "type": "text",
             },
           ],
+          "id": "msg-0",
           "role": "assistant",
         },
       ],
       "modelId": "test-response-model-id",
       "timestamp": 1970-01-01T00:00:20.000Z,
     },
+    "sources": [
+      {
+        "id": "456",
+        "providerMetadata": {
+          "provider": {
+            "custom": "value2",
+          },
+        },
+        "sourceType": "url",
+        "title": "Example 2",
+        "url": "https://example.com/2",
+      },
+      {
+        "id": "789",
+        "providerMetadata": {
+          "provider": {
+            "custom": "value3",
+          },
+        },
+        "sourceType": "url",
+        "title": "Example 3",
+        "url": "https://example.com/3",
+      },
+    ],
+    "stepType": "continue",
+    "text": "immediatefollow  ",
+    "toolCalls": [],
+    "toolResults": [],
+    "usage": {
+      "completionTokens": 2,
+      "promptTokens": 3,
+      "totalTokens": 5,
+    },
+    "warnings": undefined,
+  },
+  {
+    "experimental_providerMetadata": undefined,
+    "finishReason": "stop",
+    "isContinued": false,
+    "logprobs": undefined,
+    "providerMetadata": undefined,
+    "reasoning": undefined,
+    "request": {},
+    "response": {
+      "headers": undefined,
+      "id": "test-id-4-from-model",
+      "messages": [
+        {
+          "content": [
+            {
+              "text": "part 1 
+ ",
+              "type": "text",
+            },
+            {
+              "text": "no-whitespace",
+              "type": "text",
+            },
+            {
+              "text": "immediatefollow  ",
+              "type": "text",
+            },
+            {
+              "text": "final value keep all whitespace
+ end",
+              "type": "text",
+            },
+          ],
+          "id": "msg-0",
+          "role": "assistant",
+        },
+      ],
+      "modelId": "test-response-model-id",
+      "timestamp": 1970-01-01T00:00:20.000Z,
+    },
+    "sources": [],
     "stepType": "continue",
     "text": "final value keep all whitespace
  end",
@@ -449,13 +574,53 @@ exports[`options.maxSteps > 3 steps: initial, continue, continue > onStepFinish 
 ]
 `;
 
-exports[`options.maxSteps > 3 steps: initial, continue, continue > result.steps should contain all steps 1`] = `
+exports[`options.maxSteps > 4 steps: initial, continue, continue, continue > result.sources should contain sources from all steps 1`] = `
+[
+  {
+    "id": "123",
+    "providerMetadata": {
+      "provider": {
+        "custom": "value",
+      },
+    },
+    "sourceType": "url",
+    "title": "Example",
+    "url": "https://example.com",
+  },
+  {
+    "id": "456",
+    "providerMetadata": {
+      "provider": {
+        "custom": "value2",
+      },
+    },
+    "sourceType": "url",
+    "title": "Example 2",
+    "url": "https://example.com/2",
+  },
+  {
+    "id": "789",
+    "providerMetadata": {
+      "provider": {
+        "custom": "value3",
+      },
+    },
+    "sourceType": "url",
+    "title": "Example 3",
+    "url": "https://example.com/3",
+  },
+]
+`;
+
+exports[`options.maxSteps > 4 steps: initial, continue, continue, continue > result.steps should contain all steps 1`] = `
 [
   {
     "experimental_providerMetadata": undefined,
     "finishReason": "length",
     "isContinued": true,
     "logprobs": undefined,
+    "providerMetadata": undefined,
+    "reasoning": undefined,
     "request": {},
     "response": {
       "headers": undefined,
@@ -469,12 +634,14 @@ exports[`options.maxSteps > 3 steps: initial, continue, continue > result.steps 
               "type": "text",
             },
           ],
+          "id": "msg-0",
           "role": "assistant",
         },
       ],
       "modelId": "test-response-model-id",
       "timestamp": 1970-01-01T00:00:00.000Z,
     },
+    "sources": [],
     "stepType": "initial",
     "text": "part 1 
  ",
@@ -492,6 +659,8 @@ exports[`options.maxSteps > 3 steps: initial, continue, continue > result.steps 
     "finishReason": "length",
     "isContinued": true,
     "logprobs": undefined,
+    "providerMetadata": undefined,
+    "reasoning": undefined,
     "request": {},
     "response": {
       "headers": {
@@ -511,12 +680,26 @@ exports[`options.maxSteps > 3 steps: initial, continue, continue > result.steps 
               "type": "text",
             },
           ],
+          "id": "msg-0",
           "role": "assistant",
         },
       ],
       "modelId": "test-response-model-id",
       "timestamp": 1970-01-01T00:00:10.000Z,
     },
+    "sources": [
+      {
+        "id": "123",
+        "providerMetadata": {
+          "provider": {
+            "custom": "value",
+          },
+        },
+        "sourceType": "url",
+        "title": "Example",
+        "url": "https://example.com",
+      },
+    ],
     "stepType": "continue",
     "text": "no-whitespace",
     "toolCalls": [],
@@ -530,9 +713,11 @@ exports[`options.maxSteps > 3 steps: initial, continue, continue > result.steps 
   },
   {
     "experimental_providerMetadata": undefined,
-    "finishReason": "stop",
-    "isContinued": false,
+    "finishReason": "length",
+    "isContinued": true,
     "logprobs": undefined,
+    "providerMetadata": undefined,
+    "reasoning": undefined,
     "request": {},
     "response": {
       "headers": undefined,
@@ -550,17 +735,93 @@ exports[`options.maxSteps > 3 steps: initial, continue, continue > result.steps 
               "type": "text",
             },
             {
-              "text": "final value keep all whitespace
- end",
+              "text": "immediatefollow  ",
               "type": "text",
             },
           ],
+          "id": "msg-0",
           "role": "assistant",
         },
       ],
       "modelId": "test-response-model-id",
       "timestamp": 1970-01-01T00:00:20.000Z,
     },
+    "sources": [
+      {
+        "id": "456",
+        "providerMetadata": {
+          "provider": {
+            "custom": "value2",
+          },
+        },
+        "sourceType": "url",
+        "title": "Example 2",
+        "url": "https://example.com/2",
+      },
+      {
+        "id": "789",
+        "providerMetadata": {
+          "provider": {
+            "custom": "value3",
+          },
+        },
+        "sourceType": "url",
+        "title": "Example 3",
+        "url": "https://example.com/3",
+      },
+    ],
+    "stepType": "continue",
+    "text": "immediatefollow  ",
+    "toolCalls": [],
+    "toolResults": [],
+    "usage": {
+      "completionTokens": 2,
+      "promptTokens": 3,
+      "totalTokens": 5,
+    },
+    "warnings": undefined,
+  },
+  {
+    "experimental_providerMetadata": undefined,
+    "finishReason": "stop",
+    "isContinued": false,
+    "logprobs": undefined,
+    "providerMetadata": undefined,
+    "reasoning": undefined,
+    "request": {},
+    "response": {
+      "headers": undefined,
+      "id": "test-id-4-from-model",
+      "messages": [
+        {
+          "content": [
+            {
+              "text": "part 1 
+ ",
+              "type": "text",
+            },
+            {
+              "text": "no-whitespace",
+              "type": "text",
+            },
+            {
+              "text": "immediatefollow  ",
+              "type": "text",
+            },
+            {
+              "text": "final value keep all whitespace
+ end",
+              "type": "text",
+            },
+          ],
+          "id": "msg-0",
+          "role": "assistant",
+        },
+      ],
+      "modelId": "test-response-model-id",
+      "timestamp": 1970-01-01T00:00:20.000Z,
+    },
+    "sources": [],
     "stepType": "continue",
     "text": "final value keep all whitespace
  end",
@@ -590,6 +851,7 @@ exports[`result.response > should contain response information 1`] = `
           "type": "text",
         },
       ],
+      "id": "msg-0",
       "role": "assistant",
     },
   ],
@@ -598,7 +860,7 @@ exports[`result.response > should contain response information 1`] = `
 }
 `;
 
-exports[`result.responseMessages > should contain assistant response message and tool message when there are tool calls with results 1`] = `
+exports[`result.response.messages > should contain assistant response message and tool message when there are tool calls with results 1`] = `
 [
   {
     "content": [
@@ -615,6 +877,7 @@ exports[`result.responseMessages > should contain assistant response message and
         "type": "tool-call",
       },
     ],
+    "id": "msg-0",
     "role": "assistant",
   },
   {
@@ -626,12 +889,13 @@ exports[`result.responseMessages > should contain assistant response message and
         "type": "tool-result",
       },
     ],
+    "id": "msg-1",
     "role": "tool",
   },
 ]
 `;
 
-exports[`result.responseMessages > should contain assistant response message when there are no tool calls 1`] = `
+exports[`result.response.messages > should contain assistant response message when there are no tool calls 1`] = `
 [
   {
     "content": [
@@ -640,7 +904,144 @@ exports[`result.responseMessages > should contain assistant response message whe
         "type": "text",
       },
     ],
+    "id": "msg-0",
     "role": "assistant",
+  },
+]
+`;
+
+exports[`result.sources > should contain sources 1`] = `
+[
+  {
+    "id": "123",
+    "providerMetadata": {
+      "provider": {
+        "custom": "value",
+      },
+    },
+    "sourceType": "url",
+    "title": "Example",
+    "url": "https://example.com",
+  },
+  {
+    "id": "456",
+    "providerMetadata": {
+      "provider": {
+        "custom": "value2",
+      },
+    },
+    "sourceType": "url",
+    "title": "Example 2",
+    "url": "https://example.com/2",
+  },
+]
+`;
+
+exports[`result.steps > should add the reasoning from the model response to the step result 1`] = `
+[
+  {
+    "experimental_providerMetadata": undefined,
+    "finishReason": "stop",
+    "isContinued": false,
+    "logprobs": undefined,
+    "providerMetadata": undefined,
+    "reasoning": "I will open the conversation with witty banter.",
+    "request": {},
+    "response": {
+      "headers": undefined,
+      "id": "id-0",
+      "messages": [
+        {
+          "content": [
+            {
+              "text": "Hello, world!",
+              "type": "text",
+            },
+          ],
+          "id": "msg-0",
+          "role": "assistant",
+        },
+      ],
+      "modelId": "mock-model-id",
+      "timestamp": 1970-01-01T00:00:00.000Z,
+    },
+    "sources": [],
+    "stepType": "initial",
+    "text": "Hello, world!",
+    "toolCalls": [],
+    "toolResults": [],
+    "usage": {
+      "completionTokens": 20,
+      "promptTokens": 10,
+      "totalTokens": 30,
+    },
+    "warnings": undefined,
+  },
+]
+`;
+
+exports[`result.steps > should contain sources 1`] = `
+[
+  {
+    "experimental_providerMetadata": undefined,
+    "finishReason": "stop",
+    "isContinued": false,
+    "logprobs": undefined,
+    "providerMetadata": undefined,
+    "reasoning": undefined,
+    "request": {},
+    "response": {
+      "headers": undefined,
+      "id": "id-0",
+      "messages": [
+        {
+          "content": [
+            {
+              "text": "",
+              "type": "text",
+            },
+          ],
+          "id": "msg-0",
+          "role": "assistant",
+        },
+      ],
+      "modelId": "mock-model-id",
+      "timestamp": 1970-01-01T00:00:00.000Z,
+    },
+    "sources": [
+      {
+        "id": "123",
+        "providerMetadata": {
+          "provider": {
+            "custom": "value",
+          },
+        },
+        "sourceType": "url",
+        "title": "Example",
+        "url": "https://example.com",
+      },
+      {
+        "id": "456",
+        "providerMetadata": {
+          "provider": {
+            "custom": "value2",
+          },
+        },
+        "sourceType": "url",
+        "title": "Example 2",
+        "url": "https://example.com/2",
+      },
+    ],
+    "stepType": "initial",
+    "text": "",
+    "toolCalls": [],
+    "toolResults": [],
+    "usage": {
+      "completionTokens": 20,
+      "promptTokens": 10,
+      "totalTokens": 30,
+    },
+    "warnings": undefined,
   },
 ]
 `;
@@ -651,11 +1052,11 @@ exports[`telemetry > should not record telemetry inputs / outputs when disabled 
 [
   {
     "attributes": {
-      "ai.finishReason": "stop",
       "ai.model.id": "mock-model-id",
       "ai.model.provider": "mock-provider",
       "ai.operationId": "ai.generateText",
       "ai.response.finishReason": "stop",
+      "ai.settings.maxRetries": 2,
       "ai.settings.maxSteps": 1,
       "ai.usage.completionTokens": 20,
       "ai.usage.promptTokens": 10,
@@ -666,7 +1067,6 @@ exports[`telemetry > should not record telemetry inputs / outputs when disabled 
   },
   {
     "attributes": {
-      "ai.finishReason": "stop",
       "ai.model.id": "mock-model-id",
       "ai.model.provider": "mock-provider",
       "ai.operationId": "ai.generateText.doGenerate",
@@ -674,6 +1074,7 @@ exports[`telemetry > should not record telemetry inputs / outputs when disabled 
       "ai.response.id": "test-id",
       "ai.response.model": "mock-model-id",
       "ai.response.timestamp": "1970-01-01T00:00:00.000Z",
+      "ai.settings.maxRetries": 2,
       "ai.usage.completionTokens": 20,
       "ai.usage.promptTokens": 10,
       "gen_ai.request.model": "mock-model-id",
@@ -707,14 +1108,13 @@ exports[`telemetry > should record successful tool call 1`] = `
 [
   {
     "attributes": {
-      "ai.finishReason": "stop",
       "ai.model.id": "mock-model-id",
       "ai.model.provider": "mock-provider",
       "ai.operationId": "ai.generateText",
       "ai.prompt": "{"prompt":"test-input"}",
       "ai.response.finishReason": "stop",
       "ai.response.toolCalls": "[{"toolCallType":"function","toolCallId":"call-1","toolName":"tool1","args":"{ \\"value\\": \\"value\\" }"}]",
-      "ai.result.toolCalls": "[{"toolCallType":"function","toolCallId":"call-1","toolName":"tool1","args":"{ \\"value\\": \\"value\\" }"}]",
+      "ai.settings.maxRetries": 2,
       "ai.settings.maxSteps": 1,
       "ai.usage.completionTokens": 20,
       "ai.usage.promptTokens": 10,
@@ -725,18 +1125,21 @@ exports[`telemetry > should record successful tool call 1`] = `
   },
   {
     "attributes": {
-      "ai.finishReason": "stop",
       "ai.model.id": "mock-model-id",
       "ai.model.provider": "mock-provider",
       "ai.operationId": "ai.generateText.doGenerate",
       "ai.prompt.format": "prompt",
       "ai.prompt.messages": "[{"role":"user","content":[{"type":"text","text":"test-input"}]}]",
+      "ai.prompt.toolChoice": "{"type":"auto"}",
+      "ai.prompt.tools": [
+        "{"type":"function","name":"tool1","parameters":{"type":"object","properties":{"value":{"type":"string"}},"required":["value"],"additionalProperties":false,"$schema":"http://json-schema.org/draft-07/schema#"}}",
+      ],
       "ai.response.finishReason": "stop",
       "ai.response.id": "test-id",
       "ai.response.model": "mock-model-id",
       "ai.response.timestamp": "1970-01-01T00:00:00.000Z",
       "ai.response.toolCalls": "[{"toolCallType":"function","toolCallId":"call-1","toolName":"tool1","args":"{ \\"value\\": \\"value\\" }"}]",
-      "ai.result.toolCalls": "[{"toolCallType":"function","toolCallId":"call-1","toolName":"tool1","args":"{ \\"value\\": \\"value\\" }"}]",
+      "ai.settings.maxRetries": 2,
       "ai.usage.completionTokens": 20,
       "ai.usage.promptTokens": 10,
       "gen_ai.request.model": "mock-model-id",
@@ -772,7 +1175,6 @@ exports[`telemetry > should record telemetry data when enabled 1`] = `
 [
   {
     "attributes": {
-      "ai.finishReason": "stop",
       "ai.model.id": "mock-model-id",
       "ai.model.provider": "mock-provider",
       "ai.operationId": "ai.generateText",
@@ -781,8 +1183,8 @@ exports[`telemetry > should record telemetry data when enabled 1`] = `
       "ai.request.headers.header2": "value2",
       "ai.response.finishReason": "stop",
       "ai.response.text": "Hello, world!",
-      "ai.result.text": "Hello, world!",
       "ai.settings.frequencyPenalty": 0.3,
+      "ai.settings.maxRetries": 2,
       "ai.settings.maxSteps": 1,
       "ai.settings.presencePenalty": 0.4,
       "ai.settings.stopSequences": [
@@ -804,7 +1206,6 @@ exports[`telemetry > should record telemetry data when enabled 1`] = `
   },
   {
     "attributes": {
-      "ai.finishReason": "stop",
       "ai.model.id": "mock-model-id",
       "ai.model.provider": "mock-provider",
       "ai.operationId": "ai.generateText.doGenerate",
@@ -817,8 +1218,8 @@ exports[`telemetry > should record telemetry data when enabled 1`] = `
       "ai.response.model": "test-response-model-id",
       "ai.response.text": "Hello, world!",
       "ai.response.timestamp": "1970-01-01T00:00:10.000Z",
-      "ai.result.text": "Hello, world!",
       "ai.settings.frequencyPenalty": 0.3,
+      "ai.settings.maxRetries": 2,
       "ai.settings.presencePenalty": 0.4,
       "ai.settings.stopSequences": [
         "stop",

@@ -1,16 +1,10 @@
-import { createOpenAI } from '@ai-sdk/openai';
+import { fireworks } from '@ai-sdk/fireworks';
 import { streamObject } from 'ai';
 import 'dotenv/config';
 import { z } from 'zod';
 
-const fireworks = createOpenAI({
-  name: 'fireworks',
-  apiKey: process.env.FIREWORKS_API_KEY ?? '',
-  baseURL: 'https://api.fireworks.ai/inference/v1',
-});
-
 async function main() {
-  const result = await streamObject({
+  const result = streamObject({
     model: fireworks('accounts/fireworks/models/firefunction-v1'),
     maxTokens: 2000,
     schema: z.object({

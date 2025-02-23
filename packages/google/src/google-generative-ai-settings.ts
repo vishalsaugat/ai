@@ -1,27 +1,29 @@
-// https://ai.google.dev/models/gemini
 export type GoogleGenerativeAIModelId =
-  | 'gemini-1.5-flash-latest'
+  // Stable models
+  // https://ai.google.dev/gemini-api/docs/models/gemini
+  | 'gemini-2.0-flash-001'
   | 'gemini-1.5-flash'
+  | 'gemini-1.5-flash-latest'
+  | 'gemini-1.5-flash-001'
   | 'gemini-1.5-flash-002'
-  | 'gemini-1.5-pro-latest'
+  | 'gemini-1.5-flash-8b'
+  | 'gemini-1.5-flash-8b-latest'
+  | 'gemini-1.5-flash-8b-001'
   | 'gemini-1.5-pro'
+  | 'gemini-1.5-pro-latest'
+  | 'gemini-1.5-pro-001'
   | 'gemini-1.5-pro-002'
-  | 'gemini-1.0-pro'
-  | 'gemini-pro'
+  // Experimental models
+  // https://ai.google.dev/gemini-api/docs/models/experimental-models
+  | 'gemini-2.0-flash-lite-preview-02-05'
+  | 'gemini-2.0-pro-exp-02-05'
+  | 'gemini-2.0-flash-thinking-exp-01-21'
+  | 'gemini-2.0-flash-exp'
+  | 'gemini-exp-1206'
+  | 'learnlm-1.5-pro-experimental'
   | (string & {});
 
 export interface GoogleGenerativeAISettings {
-  /**
-Optional. The maximum number of tokens to consider when sampling.
-
-Models use nucleus sampling or combined Top-k and nucleus sampling.
-Top-k sampling considers the set of topK most probable tokens.
-Models running with nucleus sampling don't allow topK setting.
-
-@deprecated use the topK setting on the request instead.
-   */
-  topK?: number;
-
   /**
 Optional.
 The name of the cached content used as context to serve the prediction.
@@ -44,10 +46,12 @@ Optional. A list of unique safety settings for blocking unsafe content.
    */
   safetySettings?: Array<{
     category:
+      | 'HARM_CATEGORY_UNSPECIFIED'
       | 'HARM_CATEGORY_HATE_SPEECH'
       | 'HARM_CATEGORY_DANGEROUS_CONTENT'
       | 'HARM_CATEGORY_HARASSMENT'
-      | 'HARM_CATEGORY_SEXUALLY_EXPLICIT';
+      | 'HARM_CATEGORY_SEXUALLY_EXPLICIT'
+      | 'HARM_CATEGORY_CIVIC_INTEGRITY';
 
     threshold:
       | 'HARM_BLOCK_THRESHOLD_UNSPECIFIED'
@@ -56,4 +60,20 @@ Optional. A list of unique safety settings for blocking unsafe content.
       | 'BLOCK_ONLY_HIGH'
       | 'BLOCK_NONE';
   }>;
+  /**
+   * Optional. Enables timestamp understanding for audio-only files.
+   *
+   * https://cloud.google.com/vertex-ai/generative-ai/docs/multimodal/audio-understanding
+   */
+  audioTimestamp?: boolean;
+
+  /**
+Optional. When enabled, the model will use Google search to ground the response.
+
+@see https://cloud.google.com/vertex-ai/generative-ai/docs/grounding/overview
+   */
+  useSearchGrounding?: boolean;
 }
+
+export interface InternalGoogleGenerativeAISettings
+  extends GoogleGenerativeAISettings {}

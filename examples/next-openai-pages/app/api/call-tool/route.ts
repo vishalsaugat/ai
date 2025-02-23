@@ -1,4 +1,4 @@
-import { ToolInvocation, convertToCoreMessages, streamText } from 'ai';
+import { ToolInvocation, streamText } from 'ai';
 import { openai } from '@ai-sdk/openai';
 import { z } from 'zod';
 
@@ -11,11 +11,10 @@ interface Message {
 export async function POST(req: Request) {
   const { messages }: { messages: Message[] } = await req.json();
 
-  const result = await streamText({
+  const result = streamText({
     model: openai('gpt-4'),
     system: 'You are a helpful assistant.',
-    // @ts-ignore
-    messages: convertToCoreMessages(messages),
+    messages,
     tools: {
       celsiusToFahrenheit: {
         description: 'Converts celsius to fahrenheit',

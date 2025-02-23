@@ -1,6 +1,6 @@
 ---
 title: Tool Calling
-description: Learn about tool calling with AI SDK Core.
+description: Learn about tool calling and multi-step calls (using maxSteps) with AI SDK Core.
 ---
 
 # Tool Calling
@@ -49,15 +49,22 @@ const result = await generateText({
 Tool calling is not restricted to only text generation.
 You can also use it to render user interfaces (Generative UI).
 
-## Multi-Step Calls
+## Multi-Step Calls (using maxSteps)
 
-Large language models need to know the tool results before they can continue to generate text.
-This requires sending the tool results back to the model.
-You can enable this feature by setting the `maxSteps` setting to a number greater than 1.
-
-When `maxSteps` is set to a number greater than 1, the language model will be called
-in a loop when there are tool calls and for every tool call there is a tool result, until there
+With the `maxSteps` setting, you can enable multi-step calls in `generateText` and `streamText`. When `maxSteps` is set to a number greater than 1 and the model generates a tool call, the AI SDK will trigger a new generation passing in the tool result until there
 are no further tool calls or the maximum number of tool steps is reached.
+
+<Note>
+  To decide what value to set for `maxSteps`, consider the most complex task the
+  call might handle and the number of sequential steps required for completion,
+  rather than just the number of available tools.
+</Note>
+
+By default, when you use `generateText` or `streamText`, it triggers a single generation (`maxSteps: 1`). This works well for many use cases where you can rely on the model's training data to generate a response. However, when you provide tools, the model now has the choice to either generate a normal text response, or generate a tool call. If the model generates a tool call, it's generation is complete and that step is finished.
+
+You may want the model to generate text after the tool has been executed, either to summarize the tool results in the context of the users query. In many cases, you may also want the model to use multiple tools in a single response. This is where multi-step calls come in.
+
+You can think of multi-step calls in a similar way to a conversation with a human. When you ask a question, if the person does not have the requisite knowledge in their common knowledge (a model's training data), the person may need to look up information (use a tool) before they can provide you with an answer. In the same way, the model may need to call a tool to get the information it needs to answer your question where each generation (tool call or text generation) is a step.
 
 ### Example
 
@@ -140,11 +147,11 @@ const result = await generateText({
 Adding the generated assistant and tool messages to your conversation history is a common task,
 especially if you are using multi-step tool calls.
 
-Both `generateText` and `streamText` have a `responseMessages` property that you can use to
+Both `generateText` and `streamText` have a `response.messages` property that you can use to
 add the assistant and tool messages to your conversation history.
 It is also available in the `onFinish` callback of `streamText`.
 
-The `responseMessages` property contains an array of `CoreMessage` objects that you can add to your conversation history:
+The `response.messages` property contains an array of `CoreMessage` objects that you can add to your conversation history:
 
 ```ts
 import { generateText } from 'ai';
@@ -153,13 +160,13 @@ const messages: CoreMessage[] = [
   // ...
 ];
 
-const { responseMessages } = await generateText({
+const { response } = await generateText({
   // ...
   messages,
 });
 
 // add the response messages to your conversation history:
-messages.push(...responseMessages); // streamText: ...(await responseMessages)
+messages.push(...response.messages); // streamText: ...((await response).messages)
 ```
 
 ## Tool Choice
@@ -195,7 +202,73 @@ const result = await generateText({
 });
 ```
 
-## Abort Signals
+## Tool Execution Options
+
+When tools are called, they receive additional options as a second parameter.
+
+### Tool Call ID
+
+The ID of the tool call is forwarded to the tool execution.
+You can use it e.g. when sending tool-call related information with stream data.
+
+```ts highlight="14-20"
+import { StreamData, streamText, tool } from 'ai';
+
+export async function POST(req: Request) {
+  const { messages } = await req.json();
+
+  const data = new StreamData();
+
+  const result = streamText({
+    // ...
+    messages,
+    tools: {
+      myTool: tool({
+        // ...
+        execute: async (args, { toolCallId }) => {
+          // return e.g. custom status for tool call
+          data.appendMessageAnnotation({
+            type: 'tool-status',
+            toolCallId,
+            status: 'in-progress',
+          });
+          // ...
+        },
+      }),
+    },
+    onFinish() {
+      data.close();
+    },
+  });
+
+  return result.toDataStreamResponse({ data });
+}
+```
+
+### Messages
+
+The messages that were sent to the language model to initiate the response that contained the tool call are forwarded to the tool execution.
+You can access them in the second parameter of the `execute` function.
+In multi-step calls, the messages contain the text, tool calls, and tool results from all previous steps.
+
+```ts highlight="8-9"
+import { generateText, tool } from 'ai';
+
+const result = await generateText({
+  // ...
+  tools: {
+    myTool: tool({
+      // ...
+      execute: async (args, { messages }) => {
+        // use the message history in e.g. calls to other language models
+        return something;
+      },
+    }),
+  },
+});
+```
+
+### Abort Signals
 
 The abort signals from `generateText` and `streamText` are forwarded to the tool execution.
 You can access them in the second parameter of the `execute` function and e.g. abort long-running computations or forward them to fetch calls inside tools.
@@ -229,20 +302,20 @@ Modularizing your code often requires defining types to ensure type safety and r
 To enable this, the AI SDK provides several helper types for tools, tool calls, and tool results.
 
 You can use them to strongly type your variables, function parameters, and return types
-in parts of the code that are not directly related to `steamText` or `generateText`.
+in parts of the code that are not directly related to `streamText` or `generateText`.
 
-Each tool call is typed with `CoreToolCall<NAME extends string, ARGS>`, depending
+Each tool call is typed with `ToolCall<NAME extends string, ARGS>`, depending
 on the tool that has been invoked.
-Similarly, the tool results are typed with `CoreToolResult<NAME extends string, ARGS, RESULT>`.
+Similarly, the tool results are typed with `ToolResult<NAME extends string, ARGS, RESULT>`.
 
-The tools in `streamText` and `generateText` are defined as a `Record<string, CoreTool>`.
-The type inference helpers `CoreToolCallUnion<TOOLS extends Record<string, CoreTool>>`
-and `CoreToolResultUnion<TOOLS extends Record<string, CoreTool>>` can be used to
+The tools in `streamText` and `generateText` are defined as a `ToolSet`.
+The type inference helpers `ToolCallUnion<TOOLS extends ToolSet>`
+and `ToolResultUnion<TOOLS extends ToolSet>` can be used to
 extract the tool call and tool result types from the tools.
 
 ```ts highlight="18-19,23-24"
 import { openai } from '@ai-sdk/openai';
-import { CoreToolCallUnion, CoreToolResultUnion, generateText, tool } from 'ai';
+import { ToolCallUnion, ToolResultUnion, generateText, tool } from 'ai';
 import { z } from 'zod';
 
 const myToolSet = {
@@ -258,8 +331,8 @@ const myToolSet = {
   }),
 };
 
-type MyToolCall = CoreToolCallUnion<typeof myToolSet>;
-type MyToolResult = CoreToolResultUnion<typeof myToolSet>;
+type MyToolCall = ToolCallUnion<typeof myToolSet>;
+type MyToolResult = ToolResultUnion<typeof myToolSet>;
 
 async function generateSomething(prompt: string): Promise<{
   text: string;
@@ -272,6 +345,187 @@ async function generateSomething(prompt: string): Promise<{
     prompt,
   });
 }
+```
+
+## Handling Errors
+
+The AI SDK has three tool-call related errors:
+
+- [`NoSuchToolError`](/docs/reference/ai-sdk-errors/ai-no-such-tool-error): the model tries to call a tool that is not defined in the tools object
+- [`InvalidToolArgumentsError`](/docs/reference/ai-sdk-errors/ai-invalid-tool-arguments-error): the model calls a tool with arguments that do not match the tool's parameters
+- [`ToolExecutionError`](/docs/reference/ai-sdk-errors/ai-tool-execution-error): an error that occurred during tool execution
+- [`ToolCallRepairError`](/docs/reference/ai-sdk-errors/ai-tool-call-repair-error): an error that occurred during tool call repair
+
+### `generateText`
+
+`generateText` throws errors and can be handled using a `try`/`catch` block:
+
+```ts
+try {
+  const result = await generateText({
+    //...
+  });
+} catch (error) {
+  if (NoSuchToolError.isInstance(error)) {
+    // handle the no such tool error
+  } else if (InvalidToolArgumentsError.isInstance(error)) {
+    // handle the invalid tool arguments error
+  } else if (ToolExecutionError.isInstance(error)) {
+    // handle the tool execution error
+  } else {
+    // handle other errors
+  }
+}
+```
+
+### `streamText`
+
+`streamText` sends the errors as part of the full stream. The error parts contain the error object.
+
+When using `toDataStreamResponse`, you can pass an `getErrorMessage` function to extract the error message from the error part and forward it as part of the data stream response:
+
+```ts
+const result = streamText({
+  // ...
+});
+
+return result.toDataStreamResponse({
+  getErrorMessage: error => {
+    if (NoSuchToolError.isInstance(error)) {
+      return 'The model tried to call a unknown tool.';
+    } else if (InvalidToolArgumentsError.isInstance(error)) {
+      return 'The model called a tool with invalid arguments.';
+    } else if (ToolExecutionError.isInstance(error)) {
+      return 'An error occurred during tool execution.';
+    } else {
+      return 'An unknown error occurred.';
+    }
+  },
+});
+```
+
+## Tool Call Repair
+
+<Note type="warning">
+  The tool call repair feature is experimental and may change in the future.
+</Note>
+
+Language models sometimes fail to generate valid tool calls,
+especially when the parameters are complex or the model is smaller.
+
+You can use the `experimental_toToolCallRepair` function to attempt to repair the tool call
+with a custom function.
+
+You can use different strategies to repair the tool call:
+
+- Use a model with structured outputs to generate the arguments.
+- Send the messages, system prompt, and tool schema to a stronger model to generate the arguments.
+- Provide more specific repair instructions based on which tool was called.
+
+### Example: Use a model with structured outputs for repair
+
+```ts
+import { openai } from '@ai-sdk/openai';
+import { generateObject, generateText, NoSuchToolError, tool } from 'ai';
+
+const result = await generateText({
+  model,
+  tools,
+  prompt,
+
+  experimental_repairToolCall: async ({
+    toolCall,
+    tools,
+    parameterSchema,
+    error,
+  }) => {
+    if (NoSuchToolError.isInstance(error)) {
+      return null; // do not attempt to fix invalid tool names
+    }
+
+    const tool = tools[toolCall.toolName as keyof typeof tools];
+
+    const { object: repairedArgs } = await generateObject({
+      model: openai('gpt-4o', { structuredOutputs: true }),
+      schema: tool.parameters,
+      prompt: [
+        `The model tried to call the tool "${toolCall.toolName}"` +
+          ` with the following arguments:`,
+        JSON.stringify(toolCall.args),
+        `The tool accepts the following schema:`,
+        JSON.stringify(parameterSchema(toolCall)),
+        'Please fix the arguments.',
+      ].join('\n'),
+    });
+
+    return { ...toolCall, args: JSON.stringify(repairedArgs) };
+  },
+});
+```
+
+### Example: Use the re-ask strategy for repair
+
+```ts
+import { openai } from '@ai-sdk/openai';
+import { generateObject, generateText, NoSuchToolError, tool } from 'ai';
+
+const result = await generateText({
+  model,
+  tools,
+  prompt,
+
+  experimental_repairToolCall: async ({
+    toolCall,
+    tools,
+    error,
+    messages,
+    system,
+  }) => {
+    const result = await generateText({
+      model,
+      system,
+      messages: [
+        ...messages,
+        {
+          role: 'assistant',
+          content: [
+            {
+              type: 'tool-call',
+              toolCallId: toolCall.toolCallId,
+              toolName: toolCall.toolName,
+              args: toolCall.args,
+            },
+          ],
+        },
+        {
+          role: 'tool' as const,
+          content: [
+            {
+              type: 'tool-result',
+              toolCallId: toolCall.toolCallId,
+              toolName: toolCall.toolName,
+              result: error.message,
+            },
+          ],
+        },
+      ],
+      tools,
+    });
+
+    const newToolCall = result.toolCalls.find(
+      newToolCall => newToolCall.toolName === toolCall.toolName,
+    );
+
+    return newToolCall != null
+      ? {
+          toolCallType: 'function' as const,
+          toolCallId: toolCall.toolCallId,
+          toolName: toolCall.toolName,
+          args: JSON.stringify(newToolCall.args),
+        }
+      : null;
+  },
+});
 ```
 
 ## Active Tools
@@ -346,29 +600,27 @@ const result = await generateText({
 });
 ```
 
-When working with multi-modal tool results in a chat context, you'll need to provide the tools to `convertToCoreMessages` to properly convert the tool results back into content. This is particularly important when passing messages between the UI and core functions:
+## Extracting Tools
 
-```ts
-import { convertToCoreMessages, generateText } from 'ai';
+Once you start having many tools, you might want to extract them into separate files.
+The `tool` helper function is crucial for this, because it ensures correct type inference.
 
-// Define your tools with multi-modal capabilities
-const tools = {
-  screenshot: tool({
-    // ... tool definition
-    experimental_toToolResultContent: result => [
-      { type: 'image', data: result.data },
-    ],
+Here is an example of an extracted tool:
+
+```ts filename="tools/weather-tool.ts" highlight="1,4-5"
+import { tool } from 'ai';
+import { z } from 'zod';
+
+// the `tool` helper function ensures correct type inference:
+export const weatherTool = tool({
+  description: 'Get the weather in a location',
+  parameters: z.object({
+    location: z.string().describe('The location to get the weather for'),
   }),
-};
-
-// When converting UI messages to core messages, pass the tools
-const coreMessages = convertToCoreMessages(uiMessages, { tools });
-
-const result = await generateText({
-  model: anthropic('claude-3-5-sonnet-20241022'),
-  messages: coreMessages,
-  tools,
-  // ... other options
+  execute: async ({ location }) => ({
+    location,
+    temperature: 72 + Math.floor(Math.random() * 21) - 10,
+  }),
 });
 ```
 

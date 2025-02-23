@@ -1,8 +1,10 @@
-import { JSONValue, formatStreamPart } from '@ai-sdk/ui-utils';
+import { JSONValue, formatDataStreamPart } from '@ai-sdk/ui-utils';
 import { HANGING_STREAM_WARNING_TIME_MS } from '../util/constants';
 
 /**
  * A stream wrapper to send custom JSON-encoded data back to the client.
+ *
+ * @deprecated Please use `createDataStream`, `createDataStreamResponse`, and `pipeDataStreamToResponse` instead.
  */
 export class StreamData {
   private encoder = new TextEncoder();
@@ -66,7 +68,7 @@ export class StreamData {
     }
 
     this.controller.enqueue(
-      this.encoder.encode(formatStreamPart('data', [value])),
+      this.encoder.encode(formatDataStreamPart('data', [value])),
     );
   }
 
@@ -80,27 +82,7 @@ export class StreamData {
     }
 
     this.controller.enqueue(
-      this.encoder.encode(formatStreamPart('message_annotations', [value])),
+      this.encoder.encode(formatDataStreamPart('message_annotations', [value])),
     );
   }
 }
-
-/**
- * A TransformStream for LLMs that do not have their own transform stream handlers managing encoding (e.g. OpenAIStream has one for function call handling).
- * This assumes every chunk is a 'text' chunk.
- */
-export function createStreamDataTransformer() {
-  const encoder = new TextEncoder();
-  const decoder = new TextDecoder();
-  return new TransformStream({
-    transform: async (chunk, controller) => {
-      const message = decoder.decode(chunk);
-      controller.enqueue(encoder.encode(formatStreamPart('text', message)));
-    },
-  });
-}
-
-/**
-@deprecated Use `StreamData` instead.
- */
-export class experimental_StreamData extends StreamData {}

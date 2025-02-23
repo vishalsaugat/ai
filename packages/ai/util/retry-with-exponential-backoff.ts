@@ -1,6 +1,5 @@
 import { APICallError } from '@ai-sdk/provider';
-import { getErrorMessage, isAbortError } from '@ai-sdk/provider-utils';
-import { delay } from './delay';
+import { delay, getErrorMessage, isAbortError } from '@ai-sdk/provider-utils';
 import { RetryError } from './retry-error';
 
 export type RetryFunction = <OUTPUT>(
@@ -58,7 +57,7 @@ async function _retryWithExponentialBackoff<OUTPUT>(
 
     if (
       error instanceof Error &&
-      APICallError.isAPICallError(error) &&
+      APICallError.isInstance(error) &&
       error.isRetryable === true &&
       tryNumber <= maxRetries
     ) {

@@ -1,13 +1,11 @@
 'use client';
 
-import { Message, useAssistant as useAssistant } from 'ai/react';
+import { Message, useAssistant as useAssistant } from '@ai-sdk/react';
 import { useEffect, useRef } from 'react';
 
 const roleToColorMap: Record<Message['role'], string> = {
   system: 'red',
   user: 'black',
-  function: 'blue',
-  tool: 'purple',
   assistant: 'green',
   data: 'orange',
 };

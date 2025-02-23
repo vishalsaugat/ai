@@ -47,8 +47,8 @@ export function parseJSON<T>({
     return validateTypes({ value, schema });
   } catch (error) {
     if (
-      JSONParseError.isJSONParseError(error) ||
-      TypeValidationError.isTypeValidationError(error)
+      JSONParseError.isInstance(error) ||
+      TypeValidationError.isInstance(error)
     ) {
       throw error;
     }
@@ -58,7 +58,7 @@ export function parseJSON<T>({
 }
 
 export type ParseResult<T> =
-  | { success: true; value: T }
+  | { success: true; value: T; rawValue: unknown }
   | { success: false; error: JSONParseError | TypeValidationError };
 
 /**
@@ -89,24 +89,23 @@ export function safeParseJSON<T>({
 }: {
   text: string;
   schema?: ZodSchema<T> | Validator<T>;
-}):
-  | { success: true; value: T }
-  | { success: false; error: JSONParseError | TypeValidationError } {
+}): ParseResult<T> {
   try {
     const value = SecureJSON.parse(text);
 
     if (schema == null) {
-      return {
-        success: true,
-        value: value as T,
-      };
+      return { success: true, value: value as T, rawValue: value };
     }
 
-    return safeValidateTypes({ value, schema });
+    const validationResult = safeValidateTypes({ value, schema });
+
+    return validationResult.success
+      ? { ...validationResult, rawValue: value }
+      : validationResult;
   } catch (error) {
     return {
       success: false,
-      error: JSONParseError.isJSONParseError(error)
+      error: JSONParseError.isInstance(error)
         ? error
         : new JSONParseError({ text, cause: error }),
     };
@@ -121,8 +120,3 @@ export function isParsableJson(input: string): boolean {
     return false;
   }
 }
-
-/**
-@deprecated Use `isParsableJson` instead.
- */
-export const isParseableJson = isParsableJson;

@@ -1,6 +1,6 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`output = "object" > options.onFinish > should be called when a valid object is generated 1`] = `
+exports[`streamObject > output = "object" > options.onFinish > should be called when a valid object is generated 1`] = `
 {
   "error": undefined,
   "experimental_providerMetadata": {
@@ -11,7 +11,11 @@ exports[`output = "object" > options.onFinish > should be called when a valid ob
   "object": {
     "content": "Hello, world!",
   },
-  "rawResponse": undefined,
+  "providerMetadata": {
+    "testProvider": {
+      "testKey": "testValue",
+    },
+  },
   "response": {
     "headers": undefined,
     "id": "id-0",
@@ -27,23 +31,12 @@ exports[`output = "object" > options.onFinish > should be called when a valid ob
 }
 `;
 
-exports[`output = "object" > options.onFinish > should be called when object doesn't match the schema 1`] = `
+exports[`streamObject > output = "object" > options.onFinish > should be called when object doesn't match the schema 1`] = `
 {
-  "error": [AI_TypeValidationError: Type validation failed: Value: {"invalid":"Hello, world!"}.
-Error message: [
-  {
-    "code": "invalid_type",
-    "expected": "string",
-    "received": "undefined",
-    "path": [
-      "content"
-    ],
-    "message": "Required"
-  }
-]],
+  "error": [AI_NoObjectGeneratedError: No object generated: response did not match schema.],
   "experimental_providerMetadata": undefined,
   "object": undefined,
-  "rawResponse": undefined,
+  "providerMetadata": undefined,
   "response": {
     "headers": undefined,
     "id": "id-0",
@@ -59,7 +52,7 @@ Error message: [
 }
 `;
 
-exports[`output = "object" > result.fullStream > should send full stream data 1`] = `
+exports[`streamObject > output = "object" > result.fullStream > should send full stream data 1`] = `
 [
   {
     "object": {},
@@ -127,15 +120,16 @@ exports[`output = "object" > result.fullStream > should send full stream data 1`
 ]
 `;
 
-exports[`telemetry > should not record any telemetry data when not explicitly enabled 1`] = `[]`;
+exports[`streamObject > telemetry > should not record any telemetry data when not explicitly enabled 1`] = `[]`;
 
-exports[`telemetry > should not record telemetry inputs / outputs when disabled with mode "json" 1`] = `
+exports[`streamObject > telemetry > should not record telemetry inputs / outputs when disabled with mode "json" 1`] = `
 [
   {
     "attributes": {
       "ai.model.id": "mock-model-id",
       "ai.model.provider": "mock-provider",
       "ai.operationId": "ai.streamObject",
+      "ai.settings.maxRetries": 2,
       "ai.settings.mode": "json",
       "ai.settings.output": "object",
       "ai.usage.completionTokens": 10,
@@ -147,7 +141,6 @@ exports[`telemetry > should not record telemetry inputs / outputs when disabled 
   },
   {
     "attributes": {
-      "ai.finishReason": "stop",
       "ai.model.id": "mock-model-id",
       "ai.model.provider": "mock-provider",
       "ai.operationId": "ai.streamObject.doStream",
@@ -155,6 +148,7 @@ exports[`telemetry > should not record telemetry inputs / outputs when disabled 
       "ai.response.id": "id-0",
       "ai.response.model": "mock-model-id",
       "ai.response.timestamp": "1970-01-01T00:00:00.000Z",
+      "ai.settings.maxRetries": 2,
       "ai.settings.mode": "json",
       "ai.stream.msToFirstChunk": 0,
       "ai.usage.completionTokens": 10,
@@ -183,13 +177,14 @@ exports[`telemetry > should not record telemetry inputs / outputs when disabled 
 ]
 `;
 
-exports[`telemetry > should not record telemetry inputs / outputs when disabled with mode "tool" 1`] = `
+exports[`streamObject > telemetry > should not record telemetry inputs / outputs when disabled with mode "tool" 1`] = `
 [
   {
     "attributes": {
       "ai.model.id": "mock-model-id",
       "ai.model.provider": "mock-provider",
       "ai.operationId": "ai.streamObject",
+      "ai.settings.maxRetries": 2,
       "ai.settings.mode": "tool",
       "ai.settings.output": "object",
       "ai.usage.completionTokens": 10,
@@ -201,7 +196,6 @@ exports[`telemetry > should not record telemetry inputs / outputs when disabled 
   },
   {
     "attributes": {
-      "ai.finishReason": "stop",
       "ai.model.id": "mock-model-id",
       "ai.model.provider": "mock-provider",
       "ai.operationId": "ai.streamObject.doStream",
@@ -209,6 +203,7 @@ exports[`telemetry > should not record telemetry inputs / outputs when disabled 
       "ai.response.id": "id-0",
       "ai.response.model": "mock-model-id",
       "ai.response.timestamp": "1970-01-01T00:00:00.000Z",
+      "ai.settings.maxRetries": 2,
       "ai.settings.mode": "tool",
       "ai.stream.msToFirstChunk": 0,
       "ai.usage.completionTokens": 10,
@@ -237,7 +232,7 @@ exports[`telemetry > should not record telemetry inputs / outputs when disabled 
 ]
 `;
 
-exports[`telemetry > should record telemetry data when enabled with mode "json" 1`] = `
+exports[`streamObject > telemetry > should record telemetry data when enabled with mode "json" 1`] = `
 [
   {
     "attributes": {
@@ -248,11 +243,11 @@ exports[`telemetry > should record telemetry data when enabled with mode "json" 
       "ai.request.headers.header1": "value1",
       "ai.request.headers.header2": "value2",
       "ai.response.object": "{"content":"Hello, world!"}",
-      "ai.result.object": "{"content":"Hello, world!"}",
       "ai.schema": "{"type":"object","properties":{"content":{"type":"string"}},"required":["content"],"additionalProperties":false,"$schema":"http://json-schema.org/draft-07/schema#"}",
       "ai.schema.description": "test description",
       "ai.schema.name": "test-name",
       "ai.settings.frequencyPenalty": 0.3,
+      "ai.settings.maxRetries": 2,
       "ai.settings.mode": "json",
       "ai.settings.output": "object",
       "ai.settings.presencePenalty": 0.4,
@@ -272,7 +267,6 @@ exports[`telemetry > should record telemetry data when enabled with mode "json" 
   },
   {
     "attributes": {
-      "ai.finishReason": "stop",
       "ai.model.id": "mock-model-id",
       "ai.model.provider": "mock-provider",
       "ai.operationId": "ai.streamObject.doStream",
@@ -285,8 +279,8 @@ exports[`telemetry > should record telemetry data when enabled with mode "json" 
       "ai.response.model": "mock-model-id",
       "ai.response.object": "{"content":"Hello, world!"}",
       "ai.response.timestamp": "1970-01-01T00:00:00.000Z",
-      "ai.result.object": "{"content":"Hello, world!"}",
       "ai.settings.frequencyPenalty": 0.3,
+      "ai.settings.maxRetries": 2,
       "ai.settings.mode": "json",
       "ai.settings.presencePenalty": 0.4,
       "ai.settings.temperature": 0.5,
@@ -328,7 +322,7 @@ exports[`telemetry > should record telemetry data when enabled with mode "json" 
 ]
 `;
 
-exports[`telemetry > should record telemetry data when enabled with mode "tool" 1`] = `
+exports[`streamObject > telemetry > should record telemetry data when enabled with mode "tool" 1`] = `
 [
   {
     "attributes": {
@@ -339,11 +333,11 @@ exports[`telemetry > should record telemetry data when enabled with mode "tool" 
       "ai.request.headers.header1": "value1",
       "ai.request.headers.header2": "value2",
       "ai.response.object": "{"content":"Hello, world!"}",
-      "ai.result.object": "{"content":"Hello, world!"}",
       "ai.schema": "{"type":"object","properties":{"content":{"type":"string"}},"required":["content"],"additionalProperties":false,"$schema":"http://json-schema.org/draft-07/schema#"}",
       "ai.schema.description": "test description",
       "ai.schema.name": "test-name",
       "ai.settings.frequencyPenalty": 0.3,
+      "ai.settings.maxRetries": 2,
       "ai.settings.mode": "tool",
       "ai.settings.output": "object",
       "ai.settings.presencePenalty": 0.4,
@@ -363,7 +357,6 @@ exports[`telemetry > should record telemetry data when enabled with mode "tool" 
   },
   {
     "attributes": {
-      "ai.finishReason": "stop",
       "ai.model.id": "mock-model-id",
       "ai.model.provider": "mock-provider",
       "ai.operationId": "ai.streamObject.doStream",
@@ -376,8 +369,8 @@ exports[`telemetry > should record telemetry data when enabled with mode "tool" 
       "ai.response.model": "mock-model-id",
       "ai.response.object": "{"content":"Hello, world!"}",
       "ai.response.timestamp": "1970-01-01T00:00:00.000Z",
-      "ai.result.object": "{"content":"Hello, world!"}",
       "ai.settings.frequencyPenalty": 0.3,
+      "ai.settings.maxRetries": 2,
       "ai.settings.mode": "tool",
       "ai.settings.presencePenalty": 0.4,
       "ai.settings.temperature": 0.5,

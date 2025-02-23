@@ -1,29 +1,38 @@
 import { LanguageModelV1StreamPart } from '@ai-sdk/provider';
 import { generateId } from '@ai-sdk/ui-utils';
 import { Tracer } from '@opentelemetry/api';
-import { NoSuchToolError } from '../../errors/no-such-tool-error';
+import { ToolExecutionError } from '../../errors';
+import { CoreMessage } from '../prompt/message';
 import { assembleOperationName } from '../telemetry/assemble-operation-name';
 import { recordSpan } from '../telemetry/record-span';
 import { selectTelemetryAttributes } from '../telemetry/select-telemetry-attributes';
 import { TelemetrySettings } from '../telemetry/telemetry-settings';
-import { CoreTool } from '../tool';
 import {
   FinishReason,
   LanguageModelUsage,
   LogProbs,
   ProviderMetadata,
 } from '../types';
+import { Source } from '../types/language-model';
 import { calculateLanguageModelUsage } from '../types/usage';
 import { parseToolCall } from './parse-tool-call';
 import { ToolCallUnion } from './tool-call';
+import { ToolCallRepairFunction } from './tool-call-repair';
 import { ToolResultUnion } from './tool-result';
+import { ToolSet } from './tool-set';
 
-export type SingleRequestTextStreamPart<
-  TOOLS extends Record<string, CoreTool>,
-> =
+export type SingleRequestTextStreamPart<TOOLS extends ToolSet> =
   | {
       type: 'text-delta';
       textDelta: string;
+    }
+  | {
+      type: 'reasoning';
+      textDelta: string;
+    }
+  | {
+      type: 'source';
+      source: Source;
     }
   | ({
       type: 'tool-call';
@@ -60,20 +69,26 @@ export type SingleRequestTextStreamPart<
       error: unknown;
     };
 
-export function runToolsTransformation<TOOLS extends Record<string, CoreTool>>({
+export function runToolsTransformation<TOOLS extends ToolSet>({
   tools,
   generatorStream,
   toolCallStreaming,
   tracer,
   telemetry,
+  system,
+  messages,
   abortSignal,
+  repairToolCall,
 }: {
   tools: TOOLS | undefined;
   generatorStream: ReadableStream<LanguageModelV1StreamPart>;
   toolCallStreaming: boolean;
   tracer: Tracer;
   telemetry: TelemetrySettings | undefined;
+  system: string | undefined;
+  messages: CoreMessage[];
   abortSignal: AbortSignal | undefined;
+  repairToolCall: ToolCallRepairFunction<TOOLS> | undefined;
 }): ReadableStream<SingleRequestTextStreamPart<TOOLS>> {
   // tool results stream
   let toolResultsStreamController: ReadableStreamDefaultController<
@@ -117,7 +132,7 @@ export function runToolsTransformation<TOOLS extends Record<string, CoreTool>>({
     LanguageModelV1StreamPart,
     SingleRequestTextStreamPart<TOOLS>
   >({
-    transform(
+    async transform(
       chunk: LanguageModelV1StreamPart,
       controller: TransformStreamDefaultController<
         SingleRequestTextStreamPart<TOOLS>
@@ -128,6 +143,8 @@ export function runToolsTransformation<TOOLS extends Record<string, CoreTool>>({
       switch (chunkType) {
         // forward:
         case 'text-delta':
+        case 'reasoning':
+        case 'source':
         case 'response-metadata':
         case 'error': {
           controller.enqueue(chunk);
@@ -159,37 +176,18 @@ export function runToolsTransformation<TOOLS extends Record<string, CoreTool>>({
 
         // process tool call:
         case 'tool-call': {
-          const toolName = chunk.toolName as keyof TOOLS & string;
-
-          if (tools == null) {
-            toolResultsStreamController!.enqueue({
-              type: 'error',
-              error: new NoSuchToolError({ toolName: chunk.toolName }),
-            });
-            break;
-          }
-
-          const tool = tools[toolName];
-
-          if (tool == null) {
-            toolResultsStreamController!.enqueue({
-              type: 'error',
-              error: new NoSuchToolError({
-                toolName: chunk.toolName,
-                availableTools: Object.keys(tools),
-              }),
-            });
-
-            break;
-          }
-
           try {
-            const toolCall = parseToolCall({
+            const toolCall = await parseToolCall({
               toolCall: chunk,
               tools,
+              repairToolCall,
+              system,
+              messages,
             });
 
             controller.enqueue(toolCall);
+
+            const tool = tools![toolCall.toolName];
 
             if (tool.execute != null) {
               const toolExecutionId = generateId(); // use our own id to guarantee uniqueness
@@ -216,7 +214,11 @@ export function runToolsTransformation<TOOLS extends Record<string, CoreTool>>({
                 }),
                 tracer,
                 fn: async span =>
-                  tool.execute!(toolCall.args, { abortSignal }).then(
+                  tool.execute!(toolCall.args, {
+                    toolCallId: toolCall.toolCallId,
+                    messages,
+                    abortSignal,
+                  }).then(
                     (result: any) => {
                       toolResultsStreamController!.enqueue({
                         ...toolCall,
@@ -250,7 +252,12 @@ export function runToolsTransformation<TOOLS extends Record<string, CoreTool>>({
                     (error: any) => {
                       toolResultsStreamController!.enqueue({
                         type: 'error',
-                        error,
+                        error: new ToolExecutionError({
+                          toolCallId: toolCall.toolCallId,
+                          toolName: toolCall.toolName,
+                          toolArgs: toolCall.args,
+                          cause: error,
+                        }),
                       });
 
                       outstandingToolResults.delete(toolExecutionId);

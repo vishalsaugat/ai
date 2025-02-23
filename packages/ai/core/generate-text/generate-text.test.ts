@@ -1,8 +1,13 @@
+import { LanguageModelV1CallOptions } from '@ai-sdk/provider';
+import { mockId } from '@ai-sdk/provider-utils/test';
 import { jsonSchema } from '@ai-sdk/ui-utils';
 import assert from 'node:assert';
 import { z } from 'zod';
+import { Output } from '.';
+import { ToolExecutionError } from '../../errors';
 import { MockLanguageModelV1 } from '../test/mock-language-model-v1';
 import { MockTracer } from '../test/mock-tracer';
+import { tool } from '../tool/tool';
 import { generateText } from './generate-text';
 import { GenerateTextResult } from './generate-text-result';
 import { StepResult } from './step-result';
@@ -13,12 +18,34 @@ const dummyResponseValues = {
   usage: { promptTokens: 10, completionTokens: 20 },
 };
 
+const modelWithSources = new MockLanguageModelV1({
+  doGenerate: async () => ({
+    ...dummyResponseValues,
+    sources: [
+      {
+        sourceType: 'url' as const,
+        id: '123',
+        url: 'https://example.com',
+        title: 'Example',
+        providerMetadata: { provider: { custom: 'value' } },
+      },
+      {
+        sourceType: 'url' as const,
+        id: '456',
+        url: 'https://example.com/2',
+        title: 'Example 2',
+        providerMetadata: { provider: { custom: 'value2' } },
+      },
+    ],
+  }),
+});
+
 describe('result.text', () => {
   it('should generate text', async () => {
     const result = await generateText({
       model: new MockLanguageModelV1({
         doGenerate: async ({ prompt, mode }) => {
-          assert.deepStrictEqual(mode, {
+          expect(mode).toStrictEqual({
             type: 'regular',
             tools: undefined,
             toolChoice: undefined,
@@ -41,7 +68,75 @@ describe('result.text', () => {
       prompt: 'prompt',
     });
 
-    assert.deepStrictEqual(result.text, 'Hello, world!');
+    expect(result.text).toStrictEqual('Hello, world!');
+  });
+});
+
+describe('result.reasoning', () => {
+  it('should contain reasoning from model response', async () => {
+    const result = await generateText({
+      model: new MockLanguageModelV1({
+        doGenerate: async () => ({
+          ...dummyResponseValues,
+          text: 'Hello, world!',
+          reasoning: 'I will open the conversation with witty banter.',
+        }),
+      }),
+      prompt: 'prompt',
+    });
+
+    expect(result.reasoning).toStrictEqual(
+      'I will open the conversation with witty banter.',
+    );
+  });
+});
+
+describe('result.sources', () => {
+  it('should contain sources', async () => {
+    const result = await generateText({
+      model: modelWithSources,
+      prompt: 'prompt',
+    });
+
+    expect(result.sources).toMatchSnapshot();
+  });
+});
+
+describe('result.steps', () => {
+  it('should add the reasoning from the model response to the step result', async () => {
+    const result = await generateText({
+      model: new MockLanguageModelV1({
+        doGenerate: async () => ({
+          ...dummyResponseValues,
+          text: 'Hello, world!',
+          reasoning: 'I will open the conversation with witty banter.',
+        }),
+      }),
+      prompt: 'prompt',
+      experimental_generateMessageId: mockId({
+        prefix: 'msg',
+      }),
+      _internal: {
+        generateId: mockId({ prefix: 'id' }),
+        currentDate: () => new Date(0),
+      },
+    });
+
+    expect(result.steps).toMatchSnapshot();
+  });
+
+  it('should contain sources', async () => {
+    const result = await generateText({
+      model: modelWithSources,
+      prompt: 'prompt',
+      experimental_generateMessageId: mockId({ prefix: 'msg' }),
+      _internal: {
+        generateId: mockId({ prefix: 'id' }),
+        currentDate: () => new Date(0),
+      },
+    });
+
+    expect(result.steps).toMatchSnapshot();
   });
 });
 
@@ -120,7 +215,7 @@ describe('result.toolCalls', () => {
       assertType<string>(result.toolCalls[0].args.value);
     }
 
-    assert.deepStrictEqual(result.toolCalls, [
+    expect(result.toolCalls).toStrictEqual([
       {
         type: 'tool-call',
         toolCallId: 'call-1',
@@ -136,7 +231,7 @@ describe('result.toolResults', () => {
     const result = await generateText({
       model: new MockLanguageModelV1({
         doGenerate: async ({ prompt, mode }) => {
-          assert.deepStrictEqual(mode, {
+          expect(mode).toStrictEqual({
             type: 'regular',
             toolChoice: { type: 'auto' },
             tools: [
@@ -180,7 +275,7 @@ describe('result.toolResults', () => {
         tool1: {
           parameters: z.object({ value: z.string() }),
           execute: async args => {
-            assert.deepStrictEqual(args, { value: 'value' });
+            expect(args).toStrictEqual({ value: 'value' });
             return 'result1';
           },
         },
@@ -193,8 +288,9 @@ describe('result.toolResults', () => {
       assertType<string>(result.toolResults[0].result);
     }
 
-    assert.deepStrictEqual(result.toolResults, [
+    expect(result.toolResults).toStrictEqual([
       {
+        type: 'tool-result',
         toolCallId: 'call-1',
         toolName: 'tool1',
         args: { value: 'value' },
@@ -221,7 +317,7 @@ describe('result.providerMetadata', () => {
       prompt: 'test-input',
     });
 
-    assert.deepStrictEqual(result.experimental_providerMetadata, {
+    expect(result.providerMetadata).toStrictEqual({
       anthropic: {
         cacheCreationInputTokens: 10,
         cacheReadInputTokens: 20,
@@ -230,7 +326,7 @@ describe('result.providerMetadata', () => {
   });
 });
 
-describe('result.responseMessages', () => {
+describe('result.response.messages', () => {
   it('should contain assistant response message when there are no tool calls', async () => {
     const result = await generateText({
       model: new MockLanguageModelV1({
@@ -240,9 +336,10 @@ describe('result.responseMessages', () => {
         }),
       }),
       prompt: 'test-input',
+      experimental_generateMessageId: mockId({ prefix: 'msg' }),
     });
 
-    expect(result.responseMessages).toMatchSnapshot();
+    expect(result.response.messages).toMatchSnapshot();
   });
 
   it('should contain assistant response message and tool message when there are tool calls with results', async () => {
@@ -272,16 +369,20 @@ describe('result.responseMessages', () => {
       tools: {
         tool1: {
           parameters: z.object({ value: z.string() }),
-          execute: async args => {
-            assert.deepStrictEqual(args, { value: 'value' });
+          execute: async (args, options) => {
+            expect(args).toStrictEqual({ value: 'value' });
+            expect(options.messages).toStrictEqual([
+              { role: 'user', content: 'test-input' },
+            ]);
             return 'result1';
           },
         },
       },
       prompt: 'test-input',
+      experimental_generateMessageId: mockId({ prefix: 'msg' }),
     });
 
-    expect(result.responseMessages).toMatchSnapshot();
+    expect(result.response.messages).toMatchSnapshot();
   });
 });
 
@@ -326,6 +427,7 @@ describe('result.response', () => {
         }),
       }),
       prompt: 'prompt',
+      experimental_generateMessageId: mockId({ prefix: 'msg' }),
     });
 
     expect(result.response).toMatchSnapshot();
@@ -334,7 +436,7 @@ describe('result.response', () => {
 
 describe('options.maxSteps', () => {
   describe('2 steps: initial, tool-result', () => {
-    let result: GenerateTextResult<any>;
+    let result: GenerateTextResult<any, any>;
     let onStepFinishResults: StepResult<any>[];
 
     beforeEach(async () => {
@@ -474,19 +576,23 @@ describe('options.maxSteps', () => {
           },
         }),
         tools: {
-          tool1: {
+          tool1: tool({
             parameters: z.object({ value: z.string() }),
-            execute: async (args: any) => {
-              assert.deepStrictEqual(args, { value: 'value' });
+            execute: async (args, options) => {
+              expect(args).toStrictEqual({ value: 'value' });
+              expect(options.messages).toStrictEqual([
+                { role: 'user', content: 'test-input' },
+              ]);
               return 'result1';
             },
-          },
+          }),
         },
         prompt: 'test-input',
         maxSteps: 3,
         onStepFinish: async event => {
           onStepFinishResults.push(event);
         },
+        experimental_generateMessageId: mockId({ prefix: 'msg' }),
       });
     });
 
@@ -502,8 +608,8 @@ describe('options.maxSteps', () => {
       assert.deepStrictEqual(result.toolResults, []);
     });
 
-    it('result.responseMessages should contain response messages from all steps', () => {
-      expect(result.responseMessages).toMatchSnapshot();
+    it('result.response.messages should contain response messages from all steps', () => {
+      expect(result.response.messages).toMatchSnapshot();
     });
 
     it('result.usage should sum token usage', () => {
@@ -523,8 +629,8 @@ describe('options.maxSteps', () => {
     });
   });
 
-  describe('3 steps: initial, continue, continue', () => {
-    let result: GenerateTextResult<any>;
+  describe('4 steps: initial, continue, continue, continue', () => {
+    let result: GenerateTextResult<any, any>;
     let onStepFinishResults: StepResult<any>[];
 
     beforeEach(async () => {
@@ -552,6 +658,7 @@ describe('options.maxSteps', () => {
 
                 return {
                   ...dummyResponseValues,
+                  // trailing text is to be discarded, trailing whitespace is to be kept:
                   text: 'part 1 \n to-be-discarded',
                   finishReason: 'length', // trigger continue
                   usage: { completionTokens: 20, promptTokens: 10 },
@@ -590,6 +697,7 @@ describe('options.maxSteps', () => {
 
                 return {
                   ...dummyResponseValues,
+                  // case where there is no leading nor trailing whitespace:
                   text: 'no-whitespace',
                   finishReason: 'length',
                   response: {
@@ -597,6 +705,15 @@ describe('options.maxSteps', () => {
                     timestamp: new Date(10000),
                     modelId: 'test-response-model-id',
                   },
+                  sources: [
+                    {
+                      sourceType: 'url' as const,
+                      id: '123',
+                      url: 'https://example.com',
+                      title: 'Example',
+                      providerMetadata: { provider: { custom: 'value' } },
+                    },
+                  ],
                   usage: { completionTokens: 5, promptTokens: 30 },
                   // test handling of custom response headers:
                   rawResponse: {
@@ -638,10 +755,76 @@ describe('options.maxSteps', () => {
 
                 return {
                   ...dummyResponseValues,
-                  text: 'final value keep all whitespace\n end',
-                  finishReason: 'stop',
+                  // set up trailing whitespace for next step:
+                  text: 'immediatefollow  ',
+                  finishReason: 'length',
+                  sources: [
+                    {
+                      sourceType: 'url' as const,
+                      id: '456',
+                      url: 'https://example.com/2',
+                      title: 'Example 2',
+                      providerMetadata: { provider: { custom: 'value2' } },
+                    },
+                    {
+                      sourceType: 'url' as const,
+                      id: '789',
+                      url: 'https://example.com/3',
+                      title: 'Example 3',
+                      providerMetadata: { provider: { custom: 'value3' } },
+                    },
+                  ],
                   response: {
                     id: 'test-id-3-from-model',
+                    timestamp: new Date(20000),
+                    modelId: 'test-response-model-id',
+                  },
+                  usage: { completionTokens: 2, promptTokens: 3 },
+                };
+              }
+              case 3: {
+                expect(mode).toStrictEqual({
+                  type: 'regular',
+                  toolChoice: undefined,
+                  tools: undefined,
+                });
+                expect(prompt).toStrictEqual([
+                  {
+                    role: 'user',
+                    content: [{ type: 'text', text: 'test-input' }],
+                    providerMetadata: undefined,
+                  },
+                  {
+                    role: 'assistant',
+                    content: [
+                      {
+                        type: 'text',
+                        text: 'part 1 \n ',
+                        providerMetadata: undefined,
+                      },
+                      {
+                        type: 'text',
+                        text: 'no-whitespace',
+                        providerMetadata: undefined,
+                      },
+                      {
+                        type: 'text',
+                        text: 'immediatefollow  ',
+                        providerMetadata: undefined,
+                      },
+                    ],
+                    providerMetadata: undefined,
+                  },
+                ]);
+
+                return {
+                  ...dummyResponseValues,
+                  // leading whitespace is to be discarded when there is whitespace from previous step
+                  // (for models such as Anthropic that trim trailing whitespace in their inputs):
+                  text: '  final value keep all whitespace\n end',
+                  finishReason: 'stop',
+                  response: {
+                    id: 'test-id-4-from-model',
                     timestamp: new Date(20000),
                     modelId: 'test-response-model-id',
                   },
@@ -659,18 +842,21 @@ describe('options.maxSteps', () => {
         onStepFinish: async event => {
           onStepFinishResults.push(event);
         },
+        experimental_generateMessageId: mockId({ prefix: 'msg' }),
       });
     });
 
     it('result.text should return text from both steps separated by space', async () => {
       expect(result.text).toStrictEqual(
-        'part 1 \n no-whitespacefinal value keep all whitespace\n end',
+        'part 1 \n no-whitespaceimmediatefollow  final value keep all whitespace\n end',
       );
     });
 
-    it('result.responseMessages should contain an assistant message with the combined text', () => {
-      expect(result.responseMessages).toStrictEqual([
+    it('result.response.messages should contain an assistant message with the combined text', () => {
+      expect(result.response.messages).toStrictEqual([
         {
+          role: 'assistant',
+          id: 'msg-0',
           content: [
             {
               text: 'part 1 \n ',
@@ -681,20 +867,23 @@ describe('options.maxSteps', () => {
               type: 'text',
             },
             {
+              text: 'immediatefollow  ',
+              type: 'text',
+            },
+            {
               text: 'final value keep all whitespace\n end',
               type: 'text',
             },
           ],
-          role: 'assistant',
         },
       ]);
     });
 
     it('result.usage should sum token usage', () => {
       expect(result.usage).toStrictEqual({
-        completionTokens: 27,
-        promptTokens: 43,
-        totalTokens: 70,
+        completionTokens: 29,
+        promptTokens: 46,
+        totalTokens: 75,
       });
     });
 
@@ -704,6 +893,10 @@ describe('options.maxSteps', () => {
 
     it('onStepFinish should be called for each step', () => {
       expect(onStepFinishResults).toMatchSnapshot();
+    });
+
+    it('result.sources should contain sources from all steps', () => {
+      expect(result.sources).toMatchSnapshot();
     });
   });
 });
@@ -731,8 +924,8 @@ describe('options.headers', () => {
   });
 });
 
-describe('options.providerMetadata', () => {
-  it('should pass provider metadata to model', async () => {
+describe('options.providerOptions', () => {
+  it('should pass provider options to model', async () => {
     const result = await generateText({
       model: new MockLanguageModelV1({
         doGenerate: async ({ providerMetadata }) => {
@@ -744,7 +937,7 @@ describe('options.providerMetadata', () => {
         },
       }),
       prompt: 'test-input',
-      experimental_providerMetadata: {
+      providerOptions: {
         aProvider: { someKey: 'someValue' },
       },
     });
@@ -789,7 +982,11 @@ describe('options.abortSignal', () => {
 
     expect(toolExecuteMock).toHaveBeenCalledWith(
       { value: 'value' },
-      { abortSignal: abortController.signal },
+      {
+        abortSignal: abortController.signal,
+        toolCallId: 'call-1',
+        messages: expect.any(Array),
+      },
     );
   });
 });
@@ -1022,5 +1219,355 @@ describe('tools with custom schema', () => {
         args: { value: 'value' },
       },
     ]);
+  });
+});
+
+describe('options.messages', () => {
+  it('should detect and convert ui messages', async () => {
+    const result = await generateText({
+      model: new MockLanguageModelV1({
+        doGenerate: async ({ prompt }) => {
+          expect(prompt).toStrictEqual([
+            {
+              content: [
+                {
+                  text: 'prompt',
+                  type: 'text',
+                },
+              ],
+              providerMetadata: undefined,
+              role: 'user',
+            },
+            {
+              content: [
+                {
+                  args: {
+                    value: 'test-value',
+                  },
+                  providerMetadata: undefined,
+                  toolCallId: 'call-1',
+                  toolName: 'test-tool',
+                  type: 'tool-call',
+                },
+              ],
+              providerMetadata: undefined,
+              role: 'assistant',
+            },
+            {
+              content: [
+                {
+                  content: undefined,
+                  isError: undefined,
+                  providerMetadata: undefined,
+                  result: 'test result',
+                  toolCallId: 'call-1',
+                  toolName: 'test-tool',
+                  type: 'tool-result',
+                },
+              ],
+              providerMetadata: undefined,
+              role: 'tool',
+            },
+          ]);
+
+          return {
+            ...dummyResponseValues,
+            text: `Hello, world!`,
+          };
+        },
+      }),
+      messages: [
+        {
+          role: 'user',
+          content: 'prompt',
+        },
+        {
+          role: 'assistant',
+          content: '',
+          toolInvocations: [
+            {
+              state: 'result',
+              toolCallId: 'call-1',
+              toolName: 'test-tool',
+              args: { value: 'test-value' },
+              result: 'test result',
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(result.text).toStrictEqual('Hello, world!');
+  });
+
+  it('should support models that use "this" context in supportsUrl', async () => {
+    let supportsUrlCalled = false;
+    class MockLanguageModelWithImageSupport extends MockLanguageModelV1 {
+      readonly supportsImageUrls = false;
+
+      constructor() {
+        super({
+          supportsUrl(url: URL) {
+            supportsUrlCalled = true;
+            // Reference 'this' to verify context
+            return this.modelId === 'mock-model-id';
+          },
+          doGenerate: async () => ({
+            ...dummyResponseValues,
+            text: 'Hello, world!',
+          }),
+        });
+      }
+    }
+
+    const model = new MockLanguageModelWithImageSupport();
+
+    const result = await generateText({
+      model,
+      messages: [
+        {
+          role: 'user',
+          content: [{ type: 'image', image: 'https://example.com/test.jpg' }],
+        },
+      ],
+    });
+
+    expect(result.text).toStrictEqual('Hello, world!');
+    expect(supportsUrlCalled).toBe(true);
+  });
+});
+
+describe('options.output', () => {
+  describe('no output', () => {
+    it('should throw error when accessing output', async () => {
+      const result = await generateText({
+        model: new MockLanguageModelV1({
+          doGenerate: async () => ({
+            ...dummyResponseValues,
+            text: `Hello, world!`,
+          }),
+        }),
+        prompt: 'prompt',
+      });
+
+      expect(() => {
+        result.experimental_output;
+      }).toThrow('No output specified');
+    });
+  });
+
+  describe('text output', () => {
+    it('should forward text as output', async () => {
+      const result = await generateText({
+        model: new MockLanguageModelV1({
+          doGenerate: async () => ({
+            ...dummyResponseValues,
+            text: `Hello, world!`,
+          }),
+        }),
+        prompt: 'prompt',
+        experimental_output: Output.text(),
+      });
+
+      expect(result.experimental_output).toStrictEqual('Hello, world!');
+    });
+
+    it('should set responseFormat to text and not change the prompt', async () => {
+      let callOptions: LanguageModelV1CallOptions;
+
+      await generateText({
+        model: new MockLanguageModelV1({
+          doGenerate: async args => {
+            callOptions = args;
+            return {
+              ...dummyResponseValues,
+              text: `Hello, world!`,
+            };
+          },
+        }),
+        prompt: 'prompt',
+        experimental_output: Output.text(),
+      });
+
+      expect(callOptions!).toEqual({
+        temperature: 0,
+        mode: { type: 'regular' },
+        responseFormat: { type: 'text' },
+        inputFormat: 'prompt',
+        prompt: [
+          {
+            content: [{ text: 'prompt', type: 'text' }],
+            providerMetadata: undefined,
+            role: 'user',
+          },
+        ],
+      });
+    });
+  });
+
+  describe('object output', () => {
+    describe('without structured output model', () => {
+      it('should parse the output', async () => {
+        const result = await generateText({
+          model: new MockLanguageModelV1({
+            supportsStructuredOutputs: false,
+            doGenerate: async () => ({
+              ...dummyResponseValues,
+              text: `{ "value": "test-value" }`,
+            }),
+          }),
+          prompt: 'prompt',
+          experimental_output: Output.object({
+            schema: z.object({ value: z.string() }),
+          }),
+        });
+
+        expect(result.experimental_output).toEqual({ value: 'test-value' });
+      });
+
+      it('should set responseFormat to json and inject schema and JSON instruction into the prompt', async () => {
+        let callOptions: LanguageModelV1CallOptions;
+
+        await generateText({
+          model: new MockLanguageModelV1({
+            supportsStructuredOutputs: false,
+            doGenerate: async args => {
+              callOptions = args;
+              return {
+                ...dummyResponseValues,
+                text: `{ "value": "test-value" }`,
+              };
+            },
+          }),
+          prompt: 'prompt',
+          experimental_output: Output.object({
+            schema: z.object({ value: z.string() }),
+          }),
+        });
+
+        expect(callOptions!).toEqual({
+          temperature: 0,
+          mode: { type: 'regular' },
+          inputFormat: 'prompt',
+          responseFormat: { type: 'json', schema: undefined },
+          prompt: [
+            {
+              content:
+                'JSON schema:\n' +
+                '{"type":"object","properties":{"value":{"type":"string"}},"required":["value"],"additionalProperties":false,"$schema":"http://json-schema.org/draft-07/schema#"}\n' +
+                'You MUST answer with a JSON object that matches the JSON schema above.',
+              role: 'system',
+            },
+            {
+              content: [{ text: 'prompt', type: 'text' }],
+              providerMetadata: undefined,
+              role: 'user',
+            },
+          ],
+        });
+      });
+    });
+
+    describe('with structured output model', () => {
+      it('should parse the output', async () => {
+        const result = await generateText({
+          model: new MockLanguageModelV1({
+            supportsStructuredOutputs: true,
+            doGenerate: async () => ({
+              ...dummyResponseValues,
+              text: `{ "value": "test-value" }`,
+            }),
+          }),
+          prompt: 'prompt',
+          experimental_output: Output.object({
+            schema: z.object({ value: z.string() }),
+          }),
+        });
+
+        expect(result.experimental_output).toEqual({ value: 'test-value' });
+      });
+
+      it('should set responseFormat to json and send schema as part of the responseFormat', async () => {
+        let callOptions: LanguageModelV1CallOptions;
+
+        await generateText({
+          model: new MockLanguageModelV1({
+            supportsStructuredOutputs: true,
+            doGenerate: async args => {
+              callOptions = args;
+              return {
+                ...dummyResponseValues,
+                text: `{ "value": "test-value" }`,
+              };
+            },
+          }),
+          prompt: 'prompt',
+          experimental_output: Output.object({
+            schema: z.object({ value: z.string() }),
+          }),
+        });
+
+        expect(callOptions!).toEqual({
+          temperature: 0,
+          mode: { type: 'regular' },
+          inputFormat: 'prompt',
+          responseFormat: {
+            type: 'json',
+            schema: {
+              $schema: 'http://json-schema.org/draft-07/schema#',
+              additionalProperties: false,
+              properties: { value: { type: 'string' } },
+              required: ['value'],
+              type: 'object',
+            },
+          },
+          prompt: [
+            {
+              content: [{ text: 'prompt', type: 'text' }],
+              providerMetadata: undefined,
+              role: 'user',
+            },
+          ],
+        });
+      });
+    });
+  });
+});
+
+describe('tool execution errors', () => {
+  it('should throw a ToolExecutionError when a tool execution throws an error', async () => {
+    await expect(async () => {
+      await generateText({
+        model: new MockLanguageModelV1({
+          doGenerate: async () => ({
+            ...dummyResponseValues,
+            toolCalls: [
+              {
+                toolCallType: 'function',
+                toolCallId: 'call-1',
+                toolName: 'tool1',
+                args: `{ "value": "value" }`,
+              },
+            ],
+          }),
+        }),
+        tools: {
+          tool1: {
+            parameters: z.object({ value: z.string() }),
+            execute: async () => {
+              throw new Error('test error');
+            },
+          },
+        },
+        prompt: 'test-input',
+      });
+    }).rejects.toThrow(
+      new ToolExecutionError({
+        toolName: 'tool1',
+        toolCallId: 'call-1',
+        toolArgs: { value: 'value' },
+        cause: new Error('test error'),
+      }),
+    );
   });
 });

@@ -13,8 +13,8 @@ You can use the streamText function for interactive use cases such as chat bots 
 import { openai } from '@ai-sdk/openai';
 import { streamText } from 'ai';
 
-const { textStream } = await streamText({
-  model: openai('gpt-4-turbo'),
+const { textStream } = streamText({
+  model: openai('gpt-4o'),
   prompt: 'Invent a new holiday and describe its traditions.',
 });
 
@@ -53,8 +53,9 @@ To see `streamText` in action, check out [these examples](#examples).
     },
     {
       name: 'messages',
-      type: 'Array<CoreSystemMessage | CoreUserMessage | CoreAssistantMessage | CoreToolMessage>',
-      description: 'A list of messages that represent a conversation.',
+      type: 'Array<CoreSystemMessage | CoreUserMessage | CoreAssistantMessage | CoreToolMessage> | Array<UIMessage>',
+      description:
+        'A list of messages that represent a conversation. Automatically converts UI messages from the useChat hook.',
       properties: [
         {
           type: 'CoreSystemMessage',
@@ -261,12 +262,12 @@ To see `streamText` in action, check out [these examples](#examples).
     },
     {
       name: 'tools',
-      type: 'Record<string, CoreTool>',
+      type: 'ToolSet',
       description:
         'Tools that are accessible to and can be called by the model. The model needs to support calling tools.',
       properties: [
         {
-          type: 'CoreTool',
+          type: 'Tool',
           parameters: [
             {
               name: 'description',
@@ -284,9 +285,34 @@ To see `streamText` in action, check out [these examples](#examples).
             {
               name: 'execute',
               isOptional: true,
-              type: 'async (parameters: T, options: { abortSignal: AbortSignal }) => JSONValue',
+              type: 'async (parameters: T, options: ToolExecutionOptions) => RESULT',
               description:
                 'An async function that is called with the arguments from the tool call and produces a result. If not provided, the tool will not be executed automatically.',
+              properties: [
+                {
+                  type: 'ToolExecutionOptions',
+                  parameters: [
+                    {
+                      name: 'toolCallId',
+                      type: 'string',
+                      description:
+                        'The ID of the tool call. You can use it e.g. when sending tool-call related information with stream data.',
+                    },
+                    {
+                      name: 'messages',
+                      type: 'CoreMessage[]',
+                      description:
+                        'Messages that were sent to the language model to initiate the response that contained the tool call. The messages do not include the system prompt nor the assistant response that contained the tool call.',
+                    },
+                    {
+                      name: 'abortSignal',
+                      type: 'AbortSignal',
+                      description:
+                        'An optional abort signal that indicates that the overall operation should be aborted.',
+                    },
+                  ],
+                },
+              ],
             },
           ],
         },
@@ -383,6 +409,13 @@ To see `streamText` in action, check out [these examples](#examples).
         'Maximum number of sequential LLM calls (steps), e.g. when you use tool calls. A maximum number is required to prevent infinite loops in the case of misconfigured tools. By default, it is set to 1.',
     },
     {
+      name: 'experimental_generateMessageId',
+      type: '() => string',
+      isOptional: true,
+      description:
+        'Function used to generate a unique ID for each message. This is an experimental feature.',
+    },
+    {
       name: 'experimental_continueSteps',
       type: 'boolean',
       isOptional: true,
@@ -437,18 +470,54 @@ To see `streamText` in action, check out [these examples](#examples).
       ],
     },
     {
-      name: 'experimental_toolCallStreaming',
+      name: 'toolCallStreaming',
       type: 'boolean',
       isOptional: true,
       description:
         'Enable streaming of tool call deltas as they are generated. Disabled by default.',
     },
     {
-      name: 'experimental_providerMetadata',
+      name: 'experimental_transform',
+      type: 'StreamTextTransform | Array<StreamTextTransform>',
+      isOptional: true,
+      description:
+        'Optional stream transformations. They are applied in the order they are provided. The stream transformations must maintain the stream structure for streamText to work correctly.',
+      properties: [
+        {
+          type: 'StreamTextTransform',
+          parameters: [
+            {
+              name: 'transform',
+              type: '(options: TransformOptions) => TransformStream<TextStreamPart<TOOLS>, TextStreamPart<TOOLS>>',
+              description: 'A transformation that is applied to the stream.',
+              properties: [
+                {
+                  type: 'TransformOptions',
+                  parameters: [
+                    {
+                      name: 'stopStream',
+                      type: '() => void',
+                      description: 'A function that stops the stream.',
+                    },
+                    {
+                      name: 'tools',
+                      type: 'TOOLS',
+                      description: 'The tools that are available.',
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+    {
+      name: 'providerOptions',
       type: 'Record<string,Record<string,JSONValue>> | undefined',
       isOptional: true,
       description:
-        'Optional metadata from the provider. The outer key is the provider name. The inner values are the metadata. Details depend on the provider.',
+        'Provider-specific options. The outer key is the provider name. The inner values are the metadata. Details depend on the provider.',
     },
     {
       name: 'experimental_activeTools',
@@ -456,6 +525,52 @@ To see `streamText` in action, check out [these examples](#examples).
       isOptional: true,
       description:
         'The tools that are currently active. All tools are active by default.',
+    },
+    {
+      name: 'experimental_repairToolCall',
+      type: '(options: ToolCallRepairOptions) => Promise<LanguageModelV1FunctionToolCall | null>',
+      isOptional: true,
+      description:
+        'A function that attempts to repair a tool call that failed to parse. Return either a repaired tool call or null if the tool call cannot be repaired.',
+      properties: [
+        {
+          type: 'ToolCallRepairOptions',
+          parameters: [
+            {
+              name: 'system',
+              type: 'string | undefined',
+              description: 'The system prompt.',
+            },
+            {
+              name: 'messages',
+              type: 'CoreMessage[]',
+              description: 'The messages in the current generation step.',
+            },
+            {
+              name: 'toolCall',
+              type: 'LanguageModelV1FunctionToolCall',
+              description: 'The tool call that failed to parse.',
+            },
+            {
+              name: 'tools',
+              type: 'TOOLS',
+              description: 'The tools that are available.',
+            },
+            {
+              name: 'parameterSchema',
+              type: '(options: { toolName: string }) => JSONSchema7',
+              description:
+                'A function that returns the JSON Schema for a tool.',
+            },
+            {
+              name: 'error',
+              type: 'NoSuchToolError | InvalidToolArgumentsError',
+              description:
+                'The error that occurred while parsing the tool call.',
+            },
+          ],
+        },
+      ],
     },
     {
       name: 'onChunk',
@@ -485,6 +600,37 @@ To see `streamText` in action, check out [these examples](#examples).
                       name: 'textDelta',
                       type: 'string',
                       description: 'The text delta.',
+                    },
+                  ],
+                },
+                {
+                  type: 'TextStreamPart',
+                  parameters: [
+                    {
+                      name: 'type',
+                      type: "'reasoning'",
+                      description:
+                        'The type to identify the object as reasoning.',
+                    },
+                    {
+                      name: 'textDelta',
+                      type: 'string',
+                      description: 'The reasoning text delta.',
+                    },
+                  ],
+                },
+                {
+                  type: 'TextStreamPart',
+                  parameters: [
+                    {
+                      name: 'type',
+                      type: "'source'",
+                      description: 'The type to identify the object as source.',
+                    },
+                    {
+                      name: 'source',
+                      type: 'Source',
+                      description: 'The source.',
                     },
                   ],
                 },
@@ -607,6 +753,60 @@ To see `streamText` in action, check out [these examples](#examples).
       ],
     },
     {
+      name: 'onError',
+      type: '(event: OnErrorResult) => Promise<void> |void',
+      isOptional: true,
+      description:
+        'Callback that is called when an error occurs during streaming. You can use it to log errors.',
+      properties: [
+        {
+          type: 'OnErrorResult',
+          parameters: [
+            {
+              name: 'error',
+              type: 'unknown',
+              description: 'The error that occurred.',
+            },
+          ],
+        },
+      ],
+    },
+    {
+      name: 'experimental_output',
+      type: 'Output',
+      isOptional: true,
+      description: 'Experimental setting for generating structured outputs.',
+      properties: [
+        {
+          type: 'Output',
+          parameters: [
+            {
+              name: 'Output.text()',
+              type: 'Output',
+              description: 'Forward text output.',
+            },
+            {
+              name: 'Output.object()',
+              type: 'Output',
+              description: 'Generate a JSON object of type OBJECT.',
+              properties: [
+                {
+                  type: 'Options',
+                  parameters: [
+                    {
+                      name: 'schema',
+                      type: 'Schema<OBJECT>',
+                      description: 'The schema of the JSON object to generate.',
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+    {
       name: 'onStepFinish',
       type: '(result: onStepFinishResult) => Promise<void> | void',
       isOptional: true,
@@ -659,6 +859,54 @@ To see `streamText` in action, check out [these examples](#examples).
               name: 'text',
               type: 'string',
               description: 'The full text that has been generated.',
+            },
+            {
+              name: 'reasoning',
+              type: 'string | undefined',
+              description:
+                'The reasoning text of the model (only available for some models).',
+            },
+            {
+              name: 'sources',
+              type: 'Array<Source>',
+              description:
+                'Sources that have been used as input to generate the response. For multi-step generation, the sources are accumulated from all steps.',
+              properties: [
+                {
+                  type: 'Source',
+                  parameters: [
+                    {
+                      name: 'sourceType',
+                      type: "'url'",
+                      description:
+                        'A URL source. This is return by web search RAG models.',
+                    },
+                    {
+                      name: 'id',
+                      type: 'string',
+                      description: 'The ID of the source.',
+                    },
+                    {
+                      name: 'url',
+                      type: 'string',
+                      description: 'The URL of the source.',
+                    },
+                    {
+                      name: 'title',
+                      type: 'string',
+                      isOptional: true,
+                      description: 'The title of the source.',
+                    },
+                    {
+                      name: 'providerMetadata',
+                      type: 'LanguageModelV1ProviderMetadata',
+                      isOptional: true,
+                      description:
+                        'Additional provider metadata for the source.',
+                    },
+                  ],
+                },
+              ],
             },
             {
               name: 'toolCalls',
@@ -720,7 +968,7 @@ To see `streamText` in action, check out [these examples](#examples).
                 'True when there will be a continuation step with a continuation text.',
             },
             {
-              name: 'experimental_providerMetadata',
+              name: 'providerMetadata',
               type: 'Record<string,Record<string,JSONValue>> | undefined',
               isOptional: true,
               description:
@@ -774,7 +1022,7 @@ To see `streamText` in action, check out [these examples](#examples).
               ],
             },
             {
-              name: 'experimental_providerMetadata',
+              name: 'providerMetadata',
               type: 'Record<string,Record<string,JSONValue>> | undefined',
               description:
                 'Optional metadata from the provider. The outer key is the provider name. The inner values are the metadata. Details depend on the provider.',
@@ -783,6 +1031,54 @@ To see `streamText` in action, check out [these examples](#examples).
               name: 'text',
               type: 'string',
               description: 'The full text that has been generated.',
+            },
+            {
+              name: 'reasoning',
+              type: 'string | undefined',
+              description:
+                'The reasoning text of the model (only available for some models).',
+            },
+            {
+              name: 'sources',
+              type: 'Array<Source>',
+              description:
+                'Sources that have been used as input to generate the response. For multi-step generation, the sources are accumulated from all steps.',
+              properties: [
+                {
+                  type: 'Source',
+                  parameters: [
+                    {
+                      name: 'sourceType',
+                      type: "'url'",
+                      description:
+                        'A URL source. This is return by web search RAG models.',
+                    },
+                    {
+                      name: 'id',
+                      type: 'string',
+                      description: 'The ID of the source.',
+                    },
+                    {
+                      name: 'url',
+                      type: 'string',
+                      description: 'The URL of the source.',
+                    },
+                    {
+                      name: 'title',
+                      type: 'string',
+                      isOptional: true,
+                      description: 'The title of the source.',
+                    },
+                    {
+                      name: 'providerMetadata',
+                      type: 'LanguageModelV1ProviderMetadata',
+                      isOptional: true,
+                      description:
+                        'Additional provider metadata for the source.',
+                    },
+                  ],
+                },
+              ],
             },
             {
               name: 'toolCalls',
@@ -835,7 +1131,7 @@ To see `streamText` in action, check out [these examples](#examples).
                     },
                     {
                       name: 'messages',
-                      type: 'Array<CoreAssistantMessage | CoreToolMessage>',
+                      type: 'Array<ResponseMessage>',
                       description:
                         'The response messages that were generated during the call. It consists of an assistant message, potentially containing tool calls.  When there are tool results, there is an additional tool message with the tool results that are available. If there are tools that do not have execute functions, they are not included in the tool results and need to be added separately.',
                     },
@@ -895,22 +1191,63 @@ To see `streamText` in action, check out [these examples](#examples).
       ],
     },
     {
-      name: 'experimental_providerMetadata',
+      name: 'providerMetadata',
       type: 'Promise<Record<string,Record<string,JSONValue>> | undefined>',
       description:
         'Optional metadata from the provider. Resolved whe the response is finished. The outer key is the provider name. The inner values are the metadata. Details depend on the provider.',
-    },
-    {
-      name: 'responseMessages',
-      type: 'Promise<Array<CoreAssistantMessage | CoreToolMessage>>',
-      description:
-        'The response messages that were generated during the call. It consists of an assistant message, potentially containing tool calls.  When there are tool results, there is an additional tool message with the tool results that are available. If there are tools that do not have execute functions, they are not included in the tool results and need to be added separately. Resolved when the response is finished.',
     },
     {
       name: 'text',
       type: 'Promise<string>',
       description:
         'The full text that has been generated. Resolved when the response is finished.',
+    },
+    {
+      name: 'reasoning',
+      type: 'Promise<string | undefined>',
+      description:
+        'The reasoning text of the model (only available for some models). Resolved when the response is finished.',
+    },
+    {
+      name: 'sources',
+      type: 'Promise<Array<Source>>',
+      description:
+        'Sources that have been used as input to generate the response. For multi-step generation, the sources are accumulated from all steps. Resolved when the response is finished.',
+      properties: [
+        {
+          type: 'Source',
+          parameters: [
+            {
+              name: 'sourceType',
+              type: "'url'",
+              description:
+                'A URL source. This is return by web search RAG models.',
+            },
+            {
+              name: 'id',
+              type: 'string',
+              description: 'The ID of the source.',
+            },
+            {
+              name: 'url',
+              type: 'string',
+              description: 'The URL of the source.',
+            },
+            {
+              name: 'title',
+              type: 'string',
+              isOptional: true,
+              description: 'The title of the source.',
+            },
+            {
+              name: 'providerMetadata',
+              type: 'LanguageModelV1ProviderMetadata',
+              isOptional: true,
+              description: 'Additional provider metadata for the source.',
+            },
+          ],
+        },
+      ],
     },
     {
       name: 'toolCalls',
@@ -978,7 +1315,7 @@ To see `streamText` in action, check out [these examples](#examples).
             },
             {
               name: 'messages',
-              type: 'Array<CoreAssistantMessage | CoreToolMessage>',
+              type: 'Array<ResponseMessage>',
               description:
                 'The response messages that were generated during the call. It consists of an assistant message, potentially containing tool calls.  When there are tool results, there is an additional tool message with the tool results that are available. If there are tools that do not have execute functions, they are not included in the tool results and need to be added separately.',
             },
@@ -1011,6 +1348,53 @@ To see `streamText` in action, check out [these examples](#examples).
               name: 'text',
               type: 'string',
               description: 'The generated text by the model.',
+            },
+            {
+              name: 'reasoning',
+              type: 'string | undefined',
+              description:
+                'The reasoning text of the model (only available for some models).',
+            },
+            {
+              name: 'sources',
+              type: 'Array<Source>',
+              description: 'Sources that have been used as input.',
+              properties: [
+                {
+                  type: 'Source',
+                  parameters: [
+                    {
+                      name: 'sourceType',
+                      type: "'url'",
+                      description:
+                        'A URL source. This is return by web search RAG models.',
+                    },
+                    {
+                      name: 'id',
+                      type: 'string',
+                      description: 'The ID of the source.',
+                    },
+                    {
+                      name: 'url',
+                      type: 'string',
+                      description: 'The URL of the source.',
+                    },
+                    {
+                      name: 'title',
+                      type: 'string',
+                      isOptional: true,
+                      description: 'The title of the source.',
+                    },
+                    {
+                      name: 'providerMetadata',
+                      type: 'LanguageModelV1ProviderMetadata',
+                      isOptional: true,
+                      description:
+                        'Additional provider metadata for the source.',
+                    },
+                  ],
+                },
+              ],
             },
             {
               name: 'toolCalls',
@@ -1110,7 +1494,7 @@ To see `streamText` in action, check out [these examples](#examples).
                     },
                     {
                       name: 'messages',
-                      type: 'Array<CoreAssistantMessage | CoreToolMessage>',
+                      type: 'Array<ResponseMessage>',
                       description:
                         'The response messages that were generated during the call. It consists of an assistant message, potentially containing tool calls.  When there are tool results, there is an additional tool message with the tool results that are available. If there are tools that do not have execute functions, they are not included in the tool results and need to be added separately.',
                     },
@@ -1131,7 +1515,7 @@ To see `streamText` in action, check out [these examples](#examples).
                 'True when there will be a continuation step with a continuation text.',
             },
             {
-              name: 'experimental_providerMetadata',
+              name: 'providerMetadata',
               type: 'Record<string,Record<string,JSONValue>> | undefined',
               isOptional: true,
               description:
@@ -1145,7 +1529,7 @@ To see `streamText` in action, check out [these examples](#examples).
       name: 'textStream',
       type: 'AsyncIterable<string> & ReadableStream<string>',
       description:
-        'A text stream that returns only the generated text deltas. You can use it as either an AsyncIterable or a ReadableStream. When an error occurs, the stream will throw the error.',
+        'A text stream that returns only the generated text deltas. You can use it as either an AsyncIterable or a ReadableStream. Errors are suppressed to prevent server crashes. Use the onError callback to log errors.',
     },
     {
       name: 'fullStream',
@@ -1165,6 +1549,36 @@ To see `streamText` in action, check out [these examples](#examples).
               name: 'textDelta',
               type: 'string',
               description: 'The text delta.',
+            },
+          ],
+        },
+        {
+          type: 'TextStreamPart',
+          parameters: [
+            {
+              name: 'type',
+              type: "'reasoning'",
+              description: 'The type to identify the object as reasoning.',
+            },
+            {
+              name: 'textDelta',
+              type: 'string',
+              description: 'The reasoning text delta.',
+            },
+          ],
+        },
+        {
+          type: 'TextStreamPart',
+          parameters: [
+            {
+              name: 'type',
+              type: "'source'",
+              description: 'The type to identify the object as source.',
+            },
+            {
+              name: 'source',
+              type: 'Source',
+              description: 'The source.',
             },
           ],
         },
@@ -1283,14 +1697,39 @@ To see `streamText` in action, check out [these examples](#examples).
           parameters: [
             {
               name: 'type',
-              type: "'error'",
-              description: 'The type to identify the object as error.',
+              type: "'step-start'",
+              description: 'Indicates the start of a new step in the stream.',
             },
             {
-              name: 'error',
-              type: 'Error',
+              name: 'messageId',
+              type: 'string',
               description:
-                'Describes the error that may have occurred during execution.',
+                'The ID of the assistant message that started the step.',
+            },
+            {
+              name: 'request',
+              type: 'RequestMetadata',
+              description:
+                'Information about the request that was sent to the language model provider.',
+              properties: [
+                {
+                  type: 'RequestMetadata',
+                  parameters: [
+                    {
+                      name: 'body',
+                      type: 'string',
+                      description:
+                        'Raw request HTTP body that was sent to the provider API as a string.',
+                    },
+                  ],
+                },
+              ],
+            },
+            {
+              name: 'warnings',
+              type: 'Warning[]',
+              description:
+                'Warnings from the model provider (e.g. unsupported settings).',
             },
           ],
         },
@@ -1300,12 +1739,83 @@ To see `streamText` in action, check out [these examples](#examples).
             {
               name: 'type',
               type: "'step-finish'",
-              description: 'The type to identify the object as step finish.',
+              description:
+                'Indicates the end of the current step in the stream.',
             },
             {
-              name: 'finishReason',
-              type: "'stop' | 'length' | 'content-filter' | 'tool-calls' | 'error' | 'other' | 'unknown'",
-              description: 'The reason the model finished generating the text.',
+              name: 'messageId',
+              type: 'string',
+              description:
+                'The ID of the assistant message that ended the step.',
+            },
+            {
+              name: 'logprobs',
+              type: 'LogProbs',
+              isOptional: true,
+              description:
+                'Optional log probabilities for tokens returned by some providers.',
+            },
+            {
+              name: 'request',
+              type: 'RequestMetadata',
+              description:
+                'Information about the request that was sent to the language model provider.',
+              properties: [
+                {
+                  type: 'RequestMetadata',
+                  parameters: [
+                    {
+                      name: 'body',
+                      type: 'string',
+                      description:
+                        'Raw request HTTP body that was sent to the provider API as a string.',
+                    },
+                  ],
+                },
+              ],
+            },
+            {
+              name: 'warnings',
+              type: 'Warning[]',
+              isOptional: true,
+              description:
+                'Warnings from the model provider (e.g. unsupported settings).',
+            },
+            {
+              name: 'response',
+              type: 'ResponseMetadata',
+              description:
+                'Response metadata from the language model provider.',
+              properties: [
+                {
+                  type: 'ResponseMetadata',
+                  parameters: [
+                    {
+                      name: 'id',
+                      type: 'string',
+                      description:
+                        'The response identifier. The AI SDK uses the ID from the provider response when available, and generates an ID otherwise.',
+                    },
+                    {
+                      name: 'model',
+                      type: 'string',
+                      description:
+                        'The model that was used to generate the response. The AI SDK uses the response model from the provider response when available, and the model from the function call otherwise.',
+                    },
+                    {
+                      name: 'timestamp',
+                      type: 'Date',
+                      description:
+                        'The timestamp of the response. The AI SDK uses the response timestamp from the provider response when available, and creates a timestamp otherwise.',
+                    },
+                    {
+                      name: 'headers',
+                      type: 'Record<string, string>',
+                      description: 'The response headers.',
+                    },
+                  ],
+                },
+              ],
             },
             {
               name: 'usage',
@@ -1336,41 +1846,22 @@ To see `streamText` in action, check out [these examples](#examples).
               ],
             },
             {
+              name: 'finishReason',
+              type: "'stop' | 'length' | 'content-filter' | 'tool-calls' | 'error' | 'other' | 'unknown'",
+              description: 'The reason the model finished generating the text.',
+            },
+            {
+              name: 'providerMetadata',
+              type: 'Record<string,Record<string,JSONValue>> | undefined',
+              isOptional: true,
+              description:
+                'Optional metadata from the provider. The outer key is the provider name. The inner values are the metadata. Details depend on the provider.',
+            },
+            {
               name: 'isContinued',
               type: 'boolean',
               description:
                 'True when there will be a continuation step with a continuation text.',
-            },
-            {
-              name: 'response',
-              type: 'Response',
-              isOptional: true,
-              description: 'Response metadata.',
-              properties: [
-                {
-                  type: 'Response',
-                  parameters: [
-                    {
-                      name: 'id',
-                      type: 'string',
-                      description:
-                        'The response identifier. The AI SDK uses the ID from the provider response when available, and generates an ID otherwise.',
-                    },
-                    {
-                      name: 'model',
-                      type: 'string',
-                      description:
-                        'The model that was used to generate the response. The AI SDK uses the response model from the provider response when available, and the model from the function call otherwise.',
-                    },
-                    {
-                      name: 'timestamp',
-                      type: 'Date',
-                      description:
-                        'The timestamp of the response. The AI SDK uses the response timestamp from the provider response when available, and creates a timestamp otherwise.',
-                    },
-                  ],
-                },
-              ],
             },
           ],
         },
@@ -1416,13 +1907,27 @@ To see `streamText` in action, check out [these examples](#examples).
               ],
             },
             {
-              name: 'response',
-              type: 'Response',
+              name: 'providerMetadata',
+              type: 'Record<string,Record<string,JSONValue>> | undefined',
               isOptional: true,
-              description: 'Response metadata.',
+              description:
+                'Optional metadata from the provider. The outer key is the provider name. The inner values are the metadata. Details depend on the provider.',
+            },
+            {
+              name: 'logprobs',
+              type: 'LogProbs',
+              isOptional: true,
+              description:
+                'Optional log probabilities for tokens returned by some providers.',
+            },
+            {
+              name: 'response',
+              type: 'ResponseMetadata',
+              description:
+                'Response metadata from the language model provider.',
               properties: [
                 {
-                  type: 'Response',
+                  type: 'ResponseMetadata',
                   parameters: [
                     {
                       name: 'id',
@@ -1442,13 +1947,46 @@ To see `streamText` in action, check out [these examples](#examples).
                       description:
                         'The timestamp of the response. The AI SDK uses the response timestamp from the provider response when available, and creates a timestamp otherwise.',
                     },
+                    {
+                      name: 'headers',
+                      type: 'Record<string, string>',
+                      description: 'The response headers.',
+                    },
                   ],
                 },
               ],
             },
           ],
         },
+        {
+          type: 'TextStreamPart',
+          parameters: [
+            {
+              name: 'type',
+              type: "'error'",
+              description: 'The type to identify the object as error.',
+            },
+            {
+              name: 'error',
+              type: 'unknown',
+              description:
+                'Describes the error that may have occurred during execution.',
+            },
+          ],
+        },
       ],
+    },
+    {
+      name: 'experimental_partialOutputStream',
+      type: 'AsyncIterableStream<PARTIAL_OUTPUT>',
+      description:
+        'A stream of partial outputs. It uses the `experimental_output` specification.',
+    },
+    {
+      name: 'consumeStream',
+      type: '() => Promise<void>',
+      description:
+        'Consumes the stream without processing the parts. This is useful to force the stream to finish.',
     },
     {
       name: 'pipeDataStreamToResponse',
@@ -1460,35 +1998,22 @@ To see `streamText` in action, check out [these examples](#examples).
           type: 'PipeDataStreamToResponseOptions',
           parameters: [
             {
-              name: 'init',
-              type: 'ResponseInit',
+              name: 'status',
+              type: 'number',
               isOptional: true,
-              description: 'The response init options.',
-              properties: [
-                {
-                  type: 'ResponseInit',
-                  parameters: [
-                    {
-                      name: 'status',
-                      type: 'number',
-                      isOptional: true,
-                      description: 'The response status code.',
-                    },
-                    {
-                      name: 'statusText',
-                      type: 'string',
-                      isOptional: true,
-                      description: 'The response status text.',
-                    },
-                    {
-                      name: 'headers',
-                      type: 'Record<string, string>',
-                      isOptional: true,
-                      description: 'The response headers.',
-                    },
-                  ],
-                },
-              ],
+              description: 'The response status code.',
+            },
+            {
+              name: 'statusText',
+              type: 'string',
+              isOptional: true,
+              description: 'The response status text.',
+            },
+            {
+              name: 'headers',
+              type: 'HeadersInit',
+              isOptional: true,
+              description: 'The response headers.',
             },
             {
               name: 'data',
@@ -1509,6 +2034,20 @@ To see `streamText` in action, check out [these examples](#examples).
               isOptional: true,
               description:
                 'Whether to send the usage information in the stream. Defaults to true.',
+            },
+            {
+              name: 'sendReasoning',
+              type: 'boolean',
+              isOptional: true,
+              description:
+                'Whether to send the reasoning information in the stream. Defaults to false.',
+            },
+            {
+              name: 'sendSources',
+              type: 'boolean',
+              isOptional: true,
+              description:
+                'Whether to send the sources information in the stream. Defaults to false.',
             },
           ],
         },
@@ -1573,6 +2112,20 @@ To see `streamText` in action, check out [these examples](#examples).
               description:
                 'Whether to send the usage information in the stream. Defaults to true.',
             },
+            {
+              name: 'sendReasoning',
+              type: 'boolean',
+              isOptional: true,
+              description:
+                'Whether to send the reasoning information in the stream. Defaults to false.',
+            },
+            {
+              name: 'sendSources',
+              type: 'boolean',
+              isOptional: true,
+              description:
+                'Whether to send the sources information in the stream. Defaults to false.',
+            },
           ],
         },
       ],
@@ -1587,35 +2140,22 @@ To see `streamText` in action, check out [these examples](#examples).
           type: 'ToDataStreamResponseOptions',
           parameters: [
             {
-              name: 'init',
-              type: 'ResponseInit',
+              name: 'status',
+              type: 'number',
               isOptional: true,
-              description: 'The response init options.',
-              properties: [
-                {
-                  type: 'ResponseInit',
-                  parameters: [
-                    {
-                      name: 'status',
-                      type: 'number',
-                      isOptional: true,
-                      description: 'The response status code.',
-                    },
-                    {
-                      name: 'statusText',
-                      type: 'string',
-                      isOptional: true,
-                      description: 'The response status text.',
-                    },
-                    {
-                      name: 'headers',
-                      type: 'Record<string, string>',
-                      isOptional: true,
-                      description: 'The response headers.',
-                    },
-                  ],
-                },
-              ],
+              description: 'The response status code.',
+            },
+            {
+              name: 'statusText',
+              type: 'string',
+              isOptional: true,
+              description: 'The response status text.',
+            },
+            {
+              name: 'headers',
+              type: 'Record<string, string>',
+              isOptional: true,
+              description: 'The response headers.',
             },
             {
               name: 'data',
@@ -1636,6 +2176,20 @@ To see `streamText` in action, check out [these examples](#examples).
               isOptional: true,
               description:
                 'Whether to send the usage information in the stream. Defaults to true.',
+            },
+            {
+              name: 'sendReasoning',
+              type: 'boolean',
+              isOptional: true,
+              description:
+                'Whether to send the reasoning information in the stream. Defaults to false.',
+            },
+            {
+              name: 'sendSources',
+              type: 'boolean',
+              isOptional: true,
+              description:
+                'Whether to send the sources information in the stream. Defaults to false.',
             },
           ],
         },
@@ -1667,6 +2221,40 @@ To see `streamText` in action, check out [these examples](#examples).
               type: 'Record<string, string>',
               isOptional: true,
               description: 'The response headers.',
+            },
+          ],
+        },
+      ],
+    },
+    {
+      name: 'mergeIntoDataStream',
+      type: '(dataStream: DataStreamWriter, options?: DataStreamOptions) => void',
+      description:
+        'Merges the result as a data stream into another data stream.',
+      properties: [
+        {
+          type: 'DataStreamOptions',
+          parameters: [
+            {
+              name: 'sendUsage',
+              type: 'boolean',
+              isOptional: true,
+              description:
+                'Whether to send the usage information to the client. Defaults to true.',
+            },
+            {
+              name: 'sendReasoning',
+              type: 'boolean',
+              isOptional: true,
+              description:
+                'Whether to send the reasoning information in the stream. Defaults to false.',
+            },
+            {
+              name: 'sendSources',
+              type: 'boolean',
+              isOptional: true,
+              description:
+                'Whether to send the sources information in the stream. Defaults to false.',
             },
           ],
         },

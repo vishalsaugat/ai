@@ -14,11 +14,13 @@ import {
 
 export function convertToAnthropicMessagesPrompt({
   prompt,
-  cacheControl: isCacheControlEnabled,
 }: {
   prompt: LanguageModelV1Prompt;
-  cacheControl: boolean;
-}): AnthropicMessagesPrompt {
+}): {
+  prompt: AnthropicMessagesPrompt;
+  betas: Set<string>;
+} {
+  const betas = new Set<string>();
   const blocks = groupIntoBlocks(prompt);
 
   let system: AnthropicMessagesPrompt['system'] = undefined;
@@ -27,10 +29,6 @@ export function convertToAnthropicMessagesPrompt({
   function getCacheControl(
     providerMetadata: LanguageModelV1ProviderMetadata | undefined,
   ): AnthropicCacheControl | undefined {
-    if (isCacheControlEnabled === false) {
-      return undefined;
-    }
-
     const anthropic = providerMetadata?.anthropic;
 
     // allow both cacheControl and cache_control:
@@ -44,6 +42,7 @@ export function convertToAnthropicMessagesPrompt({
 
   for (let i = 0; i < blocks.length; i++) {
     const block = blocks[i];
+    const isLastBlock = i === blocks.length - 1;
     const type = block.type;
 
     switch (type) {
@@ -95,6 +94,7 @@ export function convertToAnthropicMessagesPrompt({
                     });
                     break;
                   }
+
                   case 'image': {
                     if (part.image instanceof URL) {
                       // The AI SDK automatically downloads images for user image parts with URLs
@@ -109,6 +109,35 @@ export function convertToAnthropicMessagesPrompt({
                         type: 'base64',
                         media_type: part.mimeType ?? 'image/jpeg',
                         data: convertUint8ArrayToBase64(part.image),
+                      },
+                      cache_control: cacheControl,
+                    });
+
+                    break;
+                  }
+
+                  case 'file': {
+                    if (part.data instanceof URL) {
+                      // The AI SDK automatically downloads files for user file parts with URLs
+                      throw new UnsupportedFunctionalityError({
+                        functionality: 'Image URLs in user messages',
+                      });
+                    }
+
+                    if (part.mimeType !== 'application/pdf') {
+                      throw new UnsupportedFunctionalityError({
+                        functionality: 'Non-PDF files in user messages',
+                      });
+                    }
+
+                    betas.add('pdfs-2024-09-25');
+
+                    anthropicContent.push({
+                      type: 'document',
+                      source: {
+                        type: 'base64',
+                        media_type: 'application/pdf',
+                        data: part.data,
                       },
                       cache_control: cacheControl,
                     });
@@ -186,20 +215,21 @@ export function convertToAnthropicMessagesPrompt({
         // combines multiple assistant messages in this block into a single message:
         const anthropicContent: AnthropicAssistantMessage['content'] = [];
 
-        for (const message of block.messages) {
+        for (let j = 0; j < block.messages.length; j++) {
+          const message = block.messages[j];
+          const isLastMessage = j === block.messages.length - 1;
           const { content } = message;
 
-          for (let j = 0; j < content.length; j++) {
-            const part = content[j];
+          for (let k = 0; k < content.length; k++) {
+            const part = content[k];
+            const isLastContentPart = k === content.length - 1;
 
             // cache control: first add cache control from part.
             // for the last part of a message,
             // check also if the message has cache control.
-            const isLastPart = j === content.length - 1;
-
             const cacheControl =
               getCacheControl(part.providerMetadata) ??
-              (isLastPart
+              (isLastContentPart
                 ? getCacheControl(message.providerMetadata)
                 : undefined);
 
@@ -211,7 +241,7 @@ export function convertToAnthropicMessagesPrompt({
                     // trim the last text part if it's the last message in the block
                     // because Anthropic does not allow trailing whitespace
                     // in pre-filled assistant responses
-                    i === blocks.length - 1 && j === block.messages.length - 1
+                    isLastBlock && isLastMessage && isLastContentPart
                       ? part.text.trim()
                       : part.text,
 
@@ -247,8 +277,8 @@ export function convertToAnthropicMessagesPrompt({
   }
 
   return {
-    system,
-    messages,
+    prompt: { system, messages },
+    betas,
   };
 }
 

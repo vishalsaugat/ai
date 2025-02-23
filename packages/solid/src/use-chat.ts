@@ -3,32 +3,42 @@ import type {
   ChatRequest,
   ChatRequestOptions,
   CreateMessage,
-  IdGenerator,
   JSONValue,
   Message,
   UseChatOptions as SharedUseChatOptions,
+  UIMessage,
 } from '@ai-sdk/ui-utils';
 import {
   callChatApi,
+  extractMaxToolInvocationStep,
+  fillMessageParts,
   generateId as generateIdFunc,
-  processChatStream,
+  getMessageParts,
+  isAssistantMessageWithCompletedToolCalls,
+  prepareAttachmentsForRequest,
+  shouldResubmitMessages,
+  updateToolCallResult,
 } from '@ai-sdk/ui-utils';
 import {
   Accessor,
-  JSX,
-  Setter,
   createEffect,
   createMemo,
   createSignal,
-  createUniqueId,
+  JSX,
+  Setter,
 } from 'solid-js';
-import { createStore } from 'solid-js/store';
+import { createStore, reconcile, Store } from 'solid-js/store';
+import { convertToAccessorOptions } from './utils/convert-to-accessor-options';
+import { ReactiveLRU } from './utils/reactive-lru';
 
 export type { CreateMessage, Message };
 
 export type UseChatHelpers = {
-  /** Current messages in the chat */
-  messages: Accessor<Message[]>;
+  /**
+   * Current messages in the chat as a SolidJS store.
+   */
+  messages: () => Store<UIMessage[]>;
+
   /** The error object of the API request */
   error: Accessor<undefined | Error>;
   /**
@@ -75,8 +85,23 @@ export type UseChatHelpers = {
     event?: { preventDefault?: () => void },
     chatRequestOptions?: ChatRequestOptions,
   ) => void;
-  /** Whether the API request is in progress */
+
+  /**
+   * Whether the API request is in progress
+   *
+   * @deprecated use `status` instead
+   */
   isLoading: Accessor<boolean>;
+
+  /**
+   * Hook status:
+   *
+   * - `submitted`: The message has been sent to the API and we're awaiting the start of the response stream.
+   * - `streaming`: The response is actively streaming in from the API, receiving chunks of data.
+   * - `ready`: The full response has been received and processed; a new user message can be submitted.
+   * - `error`: An error occurred during the API request, preventing successful completion.
+   */
+  status: Accessor<'submitted' | 'streaming' | 'ready' | 'error'>;
 
   /** Additional data added on the server via StreamData */
   data: Accessor<JSONValue[] | undefined>;
@@ -93,99 +118,22 @@ Custom fetch implementation. You can use it as a middleware to intercept request
 or to provide a custom fetch implementation for e.g. testing.
     */
   fetch?: FetchFunction;
+
+  addToolResult: ({
+    toolCallId,
+    result,
+  }: {
+    toolCallId: string;
+    result: any;
+  }) => void;
+
+  /** The id of the chat */
+  id: string;
 };
 
-const getStreamedResponse = async (
-  api: string,
-  chatRequest: ChatRequest,
-  mutate: (data: Message[]) => void,
-  setStreamData: Setter<JSONValue[] | undefined>,
-  streamData: Accessor<JSONValue[] | undefined>,
-  extraMetadata: any,
-  messagesRef: Message[],
-  abortController: AbortController | null,
-  generateId: IdGenerator,
-  streamProtocol: UseChatOptions['streamProtocol'],
-  onFinish: UseChatOptions['onFinish'],
-  onResponse: UseChatOptions['onResponse'] | undefined,
-  onToolCall: UseChatOptions['onToolCall'] | undefined,
-  sendExtraMessageFields: boolean | undefined,
-  fetch: FetchFunction | undefined,
-  keepLastMessageOnError: boolean,
-) => {
-  // Do an optimistic update to the chat state to show the updated messages
-  // immediately.
-  const previousMessages = messagesRef;
-
-  mutate(chatRequest.messages);
-
-  const existingStreamData = streamData() ?? [];
-
-  const constructedMessagesPayload = sendExtraMessageFields
-    ? chatRequest.messages
-    : chatRequest.messages.map(
-        ({ role, content, name, data, annotations, toolInvocations }) => ({
-          role,
-          content,
-          ...(name !== undefined && { name }),
-          ...(data !== undefined && { data }),
-          ...(annotations !== undefined && { annotations }),
-          ...(toolInvocations !== undefined && { toolInvocations }),
-        }),
-      );
-
-  return await callChatApi({
-    api,
-    body: {
-      messages: constructedMessagesPayload,
-      data: chatRequest.data,
-      ...extraMetadata.body,
-      ...chatRequest.body,
-    },
-    streamProtocol,
-    credentials: extraMetadata.credentials,
-    headers: {
-      ...extraMetadata.headers,
-      ...chatRequest.headers,
-    },
-    abortController: () => abortController,
-    restoreMessagesOnFailure() {
-      if (!keepLastMessageOnError) {
-        mutate(previousMessages);
-      }
-    },
-    onResponse,
-    onUpdate(merged, data) {
-      mutate([...chatRequest.messages, ...merged]);
-      setStreamData([...existingStreamData, ...(data ?? [])]);
-    },
-    onToolCall,
-    onFinish,
-    generateId,
-    fetch,
-  });
-};
-
-// This store saves the messages for each chat ID
-const [store, setStore] = createStore<Record<string, Message[]>>({});
+const chatCache = new ReactiveLRU<string, Message[]>();
 
 export type UseChatOptions = SharedUseChatOptions & {
-  /**
-Maximum number of automatic roundtrips for tool calls.
-
-An automatic tool call roundtrip is a call to the server with the
-tool call results when all tool calls in the last assistant
-message have results.
-
-A maximum number is required to prevent infinite loops in the
-case of misconfigured tools.
-
-By default, it's set to 0, which will disable the feature.
-
-@deprecated Use `maxSteps` instead (which is `maxToolRoundtrips` + 1).
-     */
-  maxToolRoundtrips?: number;
-
   /**
 Maximum number of sequential LLM calls (steps), e.g. when you use tool calls. Must be at least 1.
 
@@ -194,50 +142,74 @@ A maximum number is required to prevent infinite loops in the case of misconfigu
 By default, it's set to 1, which means that only a single LLM call is made.
 */
   maxSteps?: number;
+
+  /**
+   * Experimental (SolidJS only). When a function is provided, it will be used
+   * to prepare the request body for the chat API. This can be useful for
+   * customizing the request body based on the messages and data in the chat.
+   *
+   * @param id The chat ID
+   * @param messages The current messages in the chat
+   * @param requestData The data object passed in the chat request
+   * @param requestBody The request body object passed in the chat request
+   */
+  experimental_prepareRequestBody?: (options: {
+    id: string;
+    messages: UIMessage[];
+    requestData?: JSONValue;
+    requestBody?: object;
+  }) => unknown;
 };
 
 export function useChat(
   rawUseChatOptions: UseChatOptions | Accessor<UseChatOptions> = {},
-): UseChatHelpers & {
-  addToolResult: ({
-    toolCallId,
-    result,
-  }: {
-    toolCallId: string;
-    result: any;
-  }) => void;
-} {
-  const useChatOptions = createMemo(() =>
+): UseChatHelpers {
+  const resolvedOptions = createMemo(() =>
     convertToAccessorOptions(rawUseChatOptions),
   );
+  const prepareFn = createMemo(() => {
+    const opts = resolvedOptions();
+    return opts.experimental_prepareRequestBody?.();
+  });
+  const useChatOptions = createMemo(() => ({
+    ...resolvedOptions(),
+    experimental_prepareRequestBody: prepareFn,
+  }));
 
   const api = createMemo(() => useChatOptions().api?.() ?? '/api/chat');
   const generateId = createMemo(
     () => useChatOptions().generateId?.() ?? generateIdFunc,
   );
+  const chatId = createMemo(() => useChatOptions().id?.() ?? generateId()());
+  const chatKey = createMemo(() => `${api()}|${chatId()}|messages`);
 
-  const idKey = createMemo(
-    () => useChatOptions().id?.() ?? `chat-${createUniqueId()}`,
+  const _messages = createMemo(
+    () =>
+      chatCache.get(chatKey()) ?? useChatOptions().initialMessages?.() ?? [],
   );
-  const chatKey = createMemo(() => `${api()}|${idKey()}|messages`);
 
-  const messages = createMemo(() => {
-    return store[chatKey()] ?? useChatOptions().initialMessages?.() ?? [];
+  const [messagesStore, setMessagesStore] = createStore<UIMessage[]>(
+    fillMessageParts(_messages()),
+  );
+  createEffect(() => {
+    setMessagesStore(reconcile(fillMessageParts(_messages()), { merge: true }));
   });
 
-  const mutate = (data: Message[]) => {
-    setStore(chatKey(), data);
+  const mutate = (messages: UIMessage[]) => {
+    chatCache.set(chatKey(), messages);
   };
 
   const [error, setError] = createSignal<undefined | Error>(undefined);
   const [streamData, setStreamData] = createSignal<JSONValue[] | undefined>(
     undefined,
   );
-  const [isLoading, setIsLoading] = createSignal(false);
+  const [status, setStatus] = createSignal<
+    'submitted' | 'streaming' | 'ready' | 'error'
+  >('ready');
 
-  let messagesRef: Message[] = messages() || [];
+  let messagesRef: UIMessage[] = fillMessageParts(_messages()) || [];
   createEffect(() => {
-    messagesRef = messages() || [];
+    messagesRef = fillMessageParts(_messages()) || [];
   });
 
   let abortController: AbortController | null = null;
@@ -256,51 +228,120 @@ export function useChat(
   });
 
   const triggerRequest = async (chatRequest: ChatRequest) => {
+    setError(undefined);
+    setStatus('submitted');
+
     const messageCount = messagesRef.length;
+    const maxStep = extractMaxToolInvocationStep(
+      chatRequest.messages[chatRequest.messages.length - 1]?.toolInvocations,
+    );
 
     try {
-      setError(undefined);
-      setIsLoading(true);
-
       abortController = new AbortController();
 
-      await processChatStream({
-        getStreamedResponse: () =>
-          getStreamedResponse(
-            api(),
-            chatRequest,
-            mutate,
-            setStreamData,
-            streamData,
-            extraMetadata,
-            messagesRef,
-            abortController,
-            generateId(),
-            // streamMode is deprecated, use streamProtocol instead:
-            useChatOptions().streamProtocol?.() ??
-              useChatOptions().streamMode?.() === 'text'
-              ? 'text'
-              : undefined,
-            useChatOptions().onFinish?.(),
-            useChatOptions().onResponse?.(),
-            useChatOptions().onToolCall?.(),
-            useChatOptions().sendExtraMessageFields?.(),
-            useChatOptions().fetch?.(),
-            useChatOptions().keepLastMessageOnError?.() ?? false,
-          ),
-        experimental_onFunctionCall:
-          useChatOptions().experimental_onFunctionCall?.(),
-        updateChatRequest(newChatRequest) {
-          chatRequest = newChatRequest;
+      const streamProtocol = useChatOptions().streamProtocol?.() ?? 'data';
+
+      const onFinish = useChatOptions().onFinish?.();
+      const onResponse = useChatOptions().onResponse?.();
+      const onToolCall = useChatOptions().onToolCall?.();
+
+      const sendExtraMessageFields =
+        useChatOptions().sendExtraMessageFields?.();
+
+      const keepLastMessageOnError =
+        useChatOptions().keepLastMessageOnError?.() ?? true;
+
+      const experimental_prepareRequestBody =
+        useChatOptions().experimental_prepareRequestBody?.();
+
+      // Do an optimistic update to the chat state to show the updated messages
+      // immediately.
+      const previousMessages = messagesRef;
+      const chatMessages = fillMessageParts(chatRequest.messages);
+
+      mutate(chatMessages);
+
+      const existingStreamData = streamData() ?? [];
+
+      const constructedMessagesPayload = sendExtraMessageFields
+        ? chatMessages
+        : chatMessages.map(
+            ({
+              role,
+              content,
+              experimental_attachments,
+              data,
+              annotations,
+              toolInvocations,
+              parts,
+            }) => ({
+              role,
+              content,
+              ...(experimental_attachments !== undefined && {
+                experimental_attachments,
+              }),
+              ...(data !== undefined && { data }),
+              ...(annotations !== undefined && { annotations }),
+              ...(toolInvocations !== undefined && { toolInvocations }),
+              ...(parts !== undefined && { parts }),
+            }),
+          );
+
+      await callChatApi({
+        api: api(),
+        body: experimental_prepareRequestBody?.({
+          id: chatId(),
+          messages: chatMessages,
+          requestData: chatRequest.data,
+          requestBody: chatRequest.body,
+        }) ?? {
+          id: chatId(),
+          messages: constructedMessagesPayload,
+          data: chatRequest.data,
+          ...extraMetadata.body,
+          ...chatRequest.body,
         },
-        getCurrentMessages: () => messagesRef,
+        streamProtocol,
+        credentials: extraMetadata.credentials,
+        headers: {
+          ...extraMetadata.headers,
+          ...chatRequest.headers,
+        },
+        abortController: () => abortController,
+        restoreMessagesOnFailure() {
+          if (!keepLastMessageOnError) {
+            mutate(previousMessages);
+          }
+        },
+        onResponse,
+        onUpdate({ message, data, replaceLastMessage }) {
+          setStatus('streaming');
+
+          mutate([
+            ...(replaceLastMessage
+              ? chatMessages.slice(0, chatMessages.length - 1)
+              : chatMessages),
+            message,
+          ]);
+
+          if (data?.length) {
+            setStreamData([...existingStreamData, ...data]);
+          }
+        },
+        onToolCall,
+        onFinish,
+        generateId: generateId(),
+        fetch: useChatOptions().fetch?.(),
+        lastMessage: chatMessages[chatMessages.length - 1],
       });
 
       abortController = null;
+      setStatus('ready');
     } catch (err) {
       // Ignore abort errors as they are expected.
       if ((err as any).name === 'AbortError') {
         abortController = null;
+        setStatus('ready');
         return null;
       }
 
@@ -310,27 +351,20 @@ export function useChat(
       }
 
       setError(err as Error);
-    } finally {
-      setIsLoading(false);
+      setStatus('error');
     }
 
-    const maxSteps =
-      useChatOptions().maxSteps?.() ??
-      (useChatOptions().maxToolRoundtrips?.() ?? 0) + 1;
+    const maxSteps = useChatOptions().maxSteps?.() ?? 1;
+
     // auto-submit when all tool calls in the last assistant message have results:
     const messages = messagesRef;
-    const lastMessage = messages[messages.length - 1];
     if (
-      // ensure we actually have new messages (to prevent infinite loops in case of errors):
-      messages.length > messageCount &&
-      // ensure there is a last message:
-      lastMessage != null &&
-      // check if the feature is enabled:
-      maxSteps > 1 &&
-      // check that next step is possible:
-      isAssistantMessageWithCompletedToolCalls(lastMessage) &&
-      // limit the number of automatic steps:
-      countTrailingAssistantMessages(messages) < maxSteps
+      shouldResubmitMessages({
+        originalMaxToolInvocationStep: maxStep,
+        originalMessageCount: messageCount,
+        maxSteps,
+        messages,
+      })
     ) {
       await triggerRequest({ messages });
     }
@@ -338,64 +372,49 @@ export function useChat(
 
   const append: UseChatHelpers['append'] = async (
     message,
-    { options, data, headers, body } = {},
+    { data, headers, body, experimental_attachments } = {},
   ) => {
-    if (!message.id) {
-      message.id = generateId()();
-    }
+    const attachmentsForRequest = await prepareAttachmentsForRequest(
+      experimental_attachments,
+    );
 
-    const requestOptions = {
-      headers: headers ?? options?.headers,
-      body: body ?? options?.body,
-    };
+    const messages = messagesRef.concat({
+      ...message,
+      id: message.id ?? generateId()(),
+      createdAt: message.createdAt ?? new Date(),
+      experimental_attachments:
+        attachmentsForRequest.length > 0 ? attachmentsForRequest : undefined,
+      parts: getMessageParts(message),
+    });
 
-    const chatRequest: ChatRequest = {
-      messages: messagesRef.concat(message as Message),
-      options: requestOptions,
-      headers: requestOptions.headers,
-      body: requestOptions.body,
+    return triggerRequest({
+      messages,
+      headers,
+      body,
       data,
-    };
-
-    return triggerRequest(chatRequest);
+    });
   };
 
   const reload: UseChatHelpers['reload'] = async ({
-    options,
     data,
     headers,
     body,
   } = {}) => {
-    if (messagesRef.length === 0) return null;
-
-    const requestOptions = {
-      headers: headers ?? options?.headers,
-      body: body ?? options?.body,
-    };
+    if (messagesRef.length === 0) {
+      return null;
+    }
 
     // Remove last assistant message and retry last user message.
     const lastMessage = messagesRef[messagesRef.length - 1];
-    if (lastMessage.role === 'assistant') {
-      const chatRequest: ChatRequest = {
-        messages: messagesRef.slice(0, -1),
-        options: requestOptions,
-        headers: requestOptions.headers,
-        body: requestOptions.body,
-        data,
-      };
-
-      return triggerRequest(chatRequest);
-    }
-
-    const chatRequest: ChatRequest = {
-      messages: messagesRef,
-      options: requestOptions,
-      headers: requestOptions.headers,
-      body: requestOptions.body,
+    return triggerRequest({
+      messages:
+        lastMessage.role === 'assistant'
+          ? messagesRef.slice(0, -1)
+          : messagesRef,
+      headers,
+      body,
       data,
-    };
-
-    return triggerRequest(chatRequest);
+    });
   };
 
   const stop = () => {
@@ -412,8 +431,9 @@ export function useChat(
       messagesArg = messagesArg(messagesRef);
     }
 
-    mutate(messagesArg);
-    messagesRef = messagesArg;
+    const messagesWithParts = fillMessageParts(messagesArg);
+    mutate(messagesWithParts);
+    messagesRef = messagesWithParts;
   };
 
   const setData = (
@@ -433,7 +453,7 @@ export function useChat(
     useChatOptions().initialInput?.() || '',
   );
 
-  const handleSubmit: UseChatHelpers['handleSubmit'] = (
+  const handleSubmit: UseChatHelpers['handleSubmit'] = async (
     event,
     options = {},
     metadata?: Object,
@@ -443,6 +463,10 @@ export function useChat(
 
     if (!inputValue && !options.allowEmptySubmit) return;
 
+    const attachmentsForRequest = await prepareAttachmentsForRequest(
+      options.experimental_attachments,
+    );
+
     if (metadata) {
       extraMetadata = {
         ...extraMetadata,
@@ -450,28 +474,20 @@ export function useChat(
       };
     }
 
-    const requestOptions = {
-      headers: options.headers ?? options.options?.headers,
-      body: options.body ?? options.options?.body,
-    };
-
-    const chatRequest: ChatRequest = {
-      messages:
-        !inputValue && options.allowEmptySubmit
-          ? messagesRef
-          : messagesRef.concat({
-              id: generateId()(),
-              role: 'user',
-              content: inputValue,
-              createdAt: new Date(),
-            }),
-      options: requestOptions,
-      body: requestOptions.body,
-      headers: requestOptions.headers,
+    triggerRequest({
+      messages: messagesRef.concat({
+        id: generateId()(),
+        role: 'user',
+        content: inputValue,
+        createdAt: new Date(),
+        experimental_attachments:
+          attachmentsForRequest.length > 0 ? attachmentsForRequest : undefined,
+        parts: [{ type: 'text', text: inputValue }],
+      }),
+      headers: options.headers,
+      body: options.body,
       data: options.data,
-    };
-
-    triggerRequest(chatRequest);
+    });
 
     setInput('');
   };
@@ -487,35 +503,31 @@ export function useChat(
     toolCallId: string;
     result: any;
   }) => {
-    const messagesSnapshot = messages() ?? [];
+    const currentMessages = messagesRef ?? [];
 
-    const updatedMessages = messagesSnapshot.map((message, index, arr) =>
-      // update the tool calls in the last assistant message:
-      index === arr.length - 1 &&
-      message.role === 'assistant' &&
-      message.toolInvocations
-        ? {
-            ...message,
-            toolInvocations: message.toolInvocations.map(toolInvocation =>
-              toolInvocation.toolCallId === toolCallId
-                ? { ...toolInvocation, result }
-                : toolInvocation,
-            ),
-          }
-        : message,
-    );
+    updateToolCallResult({
+      messages: currentMessages,
+      toolCallId,
+      toolResult: result,
+    });
 
-    mutate(updatedMessages);
+    mutate(currentMessages);
 
     // auto-submit when all tool calls in the last assistant message have results:
-    const lastMessage = updatedMessages[updatedMessages.length - 1];
+    const lastMessage = currentMessages[currentMessages.length - 1];
     if (isAssistantMessageWithCompletedToolCalls(lastMessage)) {
-      triggerRequest({ messages: updatedMessages });
+      triggerRequest({ messages: currentMessages });
     }
   };
 
+  const isLoading = createMemo(
+    () => status() === 'submitted' || status() === 'streaming',
+  );
+
   return {
-    messages,
+    // TODO next major release: replace with direct message store access (breaking change)
+    messages: () => messagesStore,
+    id: chatId(),
     append,
     error,
     reload,
@@ -526,58 +538,9 @@ export function useChat(
     handleInputChange,
     handleSubmit,
     isLoading,
+    status,
     data: streamData,
     setData,
     addToolResult,
   };
-}
-
-/**
-Check if the message is an assistant message with completed tool calls.
-The message must have at least one tool invocation and all tool invocations
-must have a result.
- */
-function isAssistantMessageWithCompletedToolCalls(message: Message) {
-  return (
-    message.role === 'assistant' &&
-    message.toolInvocations &&
-    message.toolInvocations.length > 0 &&
-    message.toolInvocations.every(toolInvocation => 'result' in toolInvocation)
-  );
-}
-
-/**
-Returns the number of trailing assistant messages in the array.
- */
-function countTrailingAssistantMessages(messages: Message[]) {
-  let count = 0;
-  for (let i = messages.length - 1; i >= 0; i--) {
-    if (messages[i].role === 'assistant') {
-      count++;
-    } else {
-      break;
-    }
-  }
-  return count;
-}
-
-/**
- * Handle reactive and non-reactive useChatOptions
- */
-function convertToAccessorOptions(
-  options: UseChatOptions | Accessor<UseChatOptions>,
-) {
-  const resolvedOptions = typeof options === 'function' ? options() : options;
-
-  return Object.entries(resolvedOptions).reduce(
-    (reactiveOptions, [key, value]) => {
-      reactiveOptions[key as keyof UseChatOptions] = createMemo(
-        () => value,
-      ) as any;
-      return reactiveOptions;
-    },
-    {} as {
-      [K in keyof UseChatOptions]: Accessor<UseChatOptions[K]>;
-    },
-  );
 }

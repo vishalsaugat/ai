@@ -1,19 +1,13 @@
 /* eslint-disable @next/next/no-img-element */
 import { withTestServer } from '@ai-sdk/provider-utils/test';
 import {
-  formatStreamPart,
+  formatDataStreamPart,
   generateId,
   getTextFromDataUrl,
   Message,
 } from '@ai-sdk/ui-utils';
 import '@testing-library/jest-dom/vitest';
-import {
-  cleanup,
-  findByText,
-  render,
-  screen,
-  waitFor,
-} from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import React, { useRef, useState } from 'react';
 import { useChat } from './use-chat';
@@ -33,7 +27,15 @@ describe('data protocol stream', () => {
 
   const TestComponent = ({ id: idParam }: { id: string }) => {
     const [id, setId] = React.useState<string>(idParam);
-    const { messages, append, error, data, isLoading, setData } = useChat({
+    const {
+      messages,
+      append,
+      error,
+      data,
+      status,
+      setData,
+      id: idKey,
+    } = useChat({
       id,
       onFinish: (message, options) => {
         onFinishCalls.push({ message, options });
@@ -42,7 +44,8 @@ describe('data protocol stream', () => {
 
     return (
       <div>
-        <div data-testid="loading">{isLoading.toString()}</div>
+        <div data-testid="id">{idKey}</div>
+        <div data-testid="status">{status.toString()}</div>
         {error && <div data-testid="error">{error.toString()}</div>}
         <div data-testid="data">{data != null ? JSON.stringify(data) : ''}</div>
         {messages.map((m, idx) => (
@@ -198,36 +201,43 @@ describe('data protocol stream', () => {
     ),
   );
 
-  describe('loading state', () => {
+  describe('status', () => {
     it(
-      'should show loading state',
+      'should show status',
       withTestServer(
         { url: '/api/chat', type: 'controlled-stream' },
         async ({ streamController }) => {
-          streamController.enqueue('0:"Hello"\n');
-
           await userEvent.click(screen.getByTestId('do-append'));
 
-          await screen.findByTestId('loading');
-          expect(screen.getByTestId('loading')).toHaveTextContent('true');
+          await waitFor(() => {
+            expect(screen.getByTestId('status')).toHaveTextContent('submitted');
+          });
+
+          streamController.enqueue('0:"Hello"\n');
+
+          await waitFor(() => {
+            expect(screen.getByTestId('status')).toHaveTextContent('streaming');
+          });
 
           streamController.close();
 
-          await findByText(await screen.findByTestId('loading'), 'false');
-          expect(screen.getByTestId('loading')).toHaveTextContent('false');
+          await waitFor(() => {
+            expect(screen.getByTestId('status')).toHaveTextContent('ready');
+          });
         },
       ),
     );
 
     it(
-      'should reset loading state on error',
+      'should set status to error when there is a server error',
       withTestServer(
         { type: 'error', url: '/api/chat', status: 404, content: 'Not found' },
         async () => {
           await userEvent.click(screen.getByTestId('do-append'));
 
-          await screen.findByTestId('loading');
-          expect(screen.getByTestId('loading')).toHaveTextContent('false');
+          await waitFor(() => {
+            expect(screen.getByTestId('status')).toHaveTextContent('error');
+          });
         },
       ),
     );
@@ -240,11 +250,11 @@ describe('data protocol stream', () => {
         url: '/api/chat',
         type: 'stream-values',
         content: [
-          formatStreamPart('text', 'Hello'),
-          formatStreamPart('text', ','),
-          formatStreamPart('text', ' world'),
-          formatStreamPart('text', '.'),
-          formatStreamPart('finish_message', {
+          formatDataStreamPart('text', 'Hello'),
+          formatDataStreamPart('text', ','),
+          formatDataStreamPart('text', ' world'),
+          formatDataStreamPart('text', '.'),
+          formatDataStreamPart('finish_message', {
             finishReason: 'stop',
             usage: { completionTokens: 1, promptTokens: 3 },
           }),
@@ -262,6 +272,7 @@ describe('data protocol stream', () => {
               createdAt: expect.any(Date),
               role: 'assistant',
               content: 'Hello, world.',
+              parts: [{ text: 'Hello, world.', type: 'text' }],
             },
             options: {
               finishReason: 'stop',
@@ -278,6 +289,31 @@ describe('data protocol stream', () => {
   );
 
   describe('id', () => {
+    it(
+      'send the id to the server',
+      withTestServer(
+        {
+          url: '/api/chat',
+          type: 'stream-values',
+          content: ['0:"Hello"\n', '0:","\n', '0:" world"\n', '0:"."\n'],
+        },
+        async ({ call }) => {
+          await userEvent.click(screen.getByTestId('do-append'));
+
+          expect(await call(0).getRequestBodyJson()).toStrictEqual({
+            id: screen.getByTestId('id').textContent,
+            messages: [
+              {
+                role: 'user',
+                content: 'hi',
+                parts: [{ text: 'hi', type: 'text' }],
+              },
+            ],
+          });
+        },
+      ),
+    );
+
     it(
       'should clear out messages when the id changes',
       withTestServer(
@@ -425,6 +461,7 @@ describe('text stream', () => {
               createdAt: expect.any(Date),
               role: 'assistant',
               content: 'Hello, world.',
+              parts: [{ text: 'Hello, world.', type: 'text' }],
             },
             options: {
               finishReason: 'unknown',
@@ -443,7 +480,7 @@ describe('text stream', () => {
 
 describe('form actions', () => {
   const TestComponent = () => {
-    const { messages, handleSubmit, handleInputChange, isLoading, input } =
+    const { messages, handleSubmit, handleInputChange, status, input } =
       useChat({ streamProtocol: 'text' });
 
     return (
@@ -460,7 +497,7 @@ describe('form actions', () => {
             value={input}
             placeholder="Send message..."
             onChange={handleInputChange}
-            disabled={isLoading}
+            disabled={status !== 'ready'}
             data-testid="do-input"
           />
         </form>
@@ -516,7 +553,7 @@ describe('form actions', () => {
 
 describe('form actions (with options)', () => {
   const TestComponent = () => {
-    const { messages, handleSubmit, handleInputChange, isLoading, input } =
+    const { messages, handleSubmit, handleInputChange, status, input } =
       useChat({ streamProtocol: 'text' });
 
     return (
@@ -539,7 +576,7 @@ describe('form actions (with options)', () => {
             value={input}
             placeholder="Send message..."
             onChange={handleInputChange}
-            disabled={isLoading}
+            disabled={status !== 'ready'}
             data-testid="do-input"
           />
         </form>
@@ -592,7 +629,10 @@ describe('form actions (with options)', () => {
         const secondInput = screen.getByTestId('do-input');
         await userEvent.type(secondInput, '{Enter}');
 
-        expect(screen.getByTestId('message-2')).toHaveTextContent(
+        await screen.findByTestId('message-2');
+        expect(screen.getByTestId('message-2')).toHaveTextContent('User:');
+
+        expect(screen.getByTestId('message-3')).toHaveTextContent(
           'AI: How can I help you?',
         );
 
@@ -600,12 +640,12 @@ describe('form actions (with options)', () => {
         await userEvent.type(thirdInput, 'what color is the sky?');
         await userEvent.type(thirdInput, '{Enter}');
 
-        expect(screen.getByTestId('message-3')).toHaveTextContent(
+        expect(screen.getByTestId('message-4')).toHaveTextContent(
           'User: what color is the sky?',
         );
 
-        await screen.findByTestId('message-4');
-        expect(screen.getByTestId('message-4')).toHaveTextContent(
+        await screen.findByTestId('message-5');
+        expect(screen.getByTestId('message-5')).toHaveTextContent(
           'AI: The sky is blue.',
         );
       },
@@ -617,7 +657,7 @@ describe('prepareRequestBody', () => {
   let bodyOptions: any;
 
   const TestComponent = () => {
-    const { messages, append, isLoading } = useChat({
+    const { messages, append, status } = useChat({
       experimental_prepareRequestBody(options) {
         bodyOptions = options;
         return 'test-request-body';
@@ -626,7 +666,7 @@ describe('prepareRequestBody', () => {
 
     return (
       <div>
-        <div data-testid="loading">{isLoading.toString()}</div>
+        <div data-testid="status">{status.toString()}</div>
         {messages.map((m, idx) => (
           <div data-testid={`message-${idx}`} key={m.id}>
             {m.role === 'user' ? 'User: ' : 'AI: '}
@@ -675,6 +715,7 @@ describe('prepareRequestBody', () => {
         expect(screen.getByTestId('message-0')).toHaveTextContent('User: hi');
 
         expect(bodyOptions).toStrictEqual({
+          id: expect.any(String),
           messages: [
             {
               role: 'user',
@@ -682,6 +723,7 @@ describe('prepareRequestBody', () => {
               id: expect.any(String),
               experimental_attachments: undefined,
               createdAt: expect.any(Date),
+              parts: [{ type: 'text', text: 'hi' }],
             },
           ],
           requestData: { 'test-data-key': 'test-data-value' },
@@ -700,9 +742,13 @@ describe('prepareRequestBody', () => {
 });
 
 describe('onToolCall', () => {
+  let resolve: () => void;
+  let toolCallPromise: Promise<void>;
+
   const TestComponent = () => {
     const { messages, append } = useChat({
       async onToolCall({ toolCall }) {
+        await toolCallPromise;
         return `test-tool-response: ${toolCall.toolName} ${
           toolCall.toolCallId
         } ${JSON.stringify(toolCall.args)}`;
@@ -713,13 +759,11 @@ describe('onToolCall', () => {
       <div>
         {messages.map((m, idx) => (
           <div data-testid={`message-${idx}`} key={m.id}>
-            {m.toolInvocations?.map((toolInvocation, toolIdx) =>
-              'result' in toolInvocation ? (
-                <div key={toolIdx} data-testid={`tool-invocation-${toolIdx}`}>
-                  {toolInvocation.result}
-                </div>
-              ) : null,
-            )}
+            {m.toolInvocations?.map((toolInvocation, toolIdx) => (
+              <div key={toolIdx} data-testid={`tool-invocation-${toolIdx}`}>
+                {JSON.stringify(toolInvocation)}
+              </div>
+            ))}
           </div>
         ))}
 
@@ -734,6 +778,10 @@ describe('onToolCall', () => {
   };
 
   beforeEach(() => {
+    toolCallPromise = new Promise(resolveArg => {
+      resolve = resolveArg;
+    });
+
     render(<TestComponent />);
   });
 
@@ -749,7 +797,7 @@ describe('onToolCall', () => {
         url: '/api/chat',
         type: 'stream-values',
         content: [
-          formatStreamPart('tool_call', {
+          formatDataStreamPart('tool_call', {
             toolCallId: 'tool-call-0',
             toolName: 'test-tool',
             args: { testArg: 'test-value' },
@@ -761,8 +809,16 @@ describe('onToolCall', () => {
 
         await screen.findByTestId('message-1');
         expect(screen.getByTestId('message-1')).toHaveTextContent(
-          'test-tool-response: test-tool tool-call-0 {"testArg":"test-value"}',
+          `{"state":"call","step":0,"toolCallId":"tool-call-0","toolName":"test-tool","args":{"testArg":"test-value"}}`,
         );
+
+        resolve();
+
+        await waitFor(() => {
+          expect(screen.getByTestId('message-1')).toHaveTextContent(
+            `{"state":"result","step":0,"toolCallId":"tool-call-0","toolName":"test-tool","args":{"testArg":"test-value"},"result":"test-tool-response: test-tool tool-call-0 {\\"testArg\\":\\"test-value\\"}"}`,
+          );
+        });
       },
     ),
   );
@@ -770,7 +826,7 @@ describe('onToolCall', () => {
 
 describe('tool invocations', () => {
   const TestComponent = () => {
-    const { messages, append } = useChat();
+    const { messages, append, addToolResult } = useChat();
 
     return (
       <div>
@@ -778,8 +834,21 @@ describe('tool invocations', () => {
           <div data-testid={`message-${idx}`} key={m.id}>
             {m.toolInvocations?.map((toolInvocation, toolIdx) => {
               return (
-                <div key={toolIdx} data-testid={`tool-invocation-${toolIdx}`}>
-                  {JSON.stringify(toolInvocation)}
+                <div key={toolIdx}>
+                  <div data-testid={`tool-invocation-${toolIdx}`}>
+                    {JSON.stringify(toolInvocation)}
+                  </div>
+                  {toolInvocation.state === 'call' && (
+                    <button
+                      data-testid={`add-result-${toolIdx}`}
+                      onClick={() => {
+                        addToolResult({
+                          toolCallId: toolInvocation.toolCallId,
+                          result: 'test-result',
+                        });
+                      }}
+                    />
+                  )}
                 </div>
               );
             })}
@@ -813,7 +882,7 @@ describe('tool invocations', () => {
         await userEvent.click(screen.getByTestId('do-append'));
 
         streamController.enqueue(
-          formatStreamPart('tool_call_streaming_start', {
+          formatDataStreamPart('tool_call_streaming_start', {
             toolCallId: 'tool-call-0',
             toolName: 'test-tool',
           }),
@@ -821,12 +890,12 @@ describe('tool invocations', () => {
 
         await waitFor(() => {
           expect(screen.getByTestId('message-1')).toHaveTextContent(
-            '{"state":"partial-call","toolCallId":"tool-call-0","toolName":"test-tool"}',
+            '{"state":"partial-call","step":0,"toolCallId":"tool-call-0","toolName":"test-tool"}',
           );
         });
 
         streamController.enqueue(
-          formatStreamPart('tool_call_delta', {
+          formatDataStreamPart('tool_call_delta', {
             toolCallId: 'tool-call-0',
             argsTextDelta: '{"testArg":"t',
           }),
@@ -834,12 +903,12 @@ describe('tool invocations', () => {
 
         await waitFor(() => {
           expect(screen.getByTestId('message-1')).toHaveTextContent(
-            '{"state":"partial-call","toolCallId":"tool-call-0","toolName":"test-tool","args":{"testArg":"t"}}',
+            '{"state":"partial-call","step":0,"toolCallId":"tool-call-0","toolName":"test-tool","args":{"testArg":"t"}}',
           );
         });
 
         streamController.enqueue(
-          formatStreamPart('tool_call_delta', {
+          formatDataStreamPart('tool_call_delta', {
             toolCallId: 'tool-call-0',
             argsTextDelta: 'est-value"}}',
           }),
@@ -847,12 +916,12 @@ describe('tool invocations', () => {
 
         await waitFor(() => {
           expect(screen.getByTestId('message-1')).toHaveTextContent(
-            '{"state":"partial-call","toolCallId":"tool-call-0","toolName":"test-tool","args":{"testArg":"test-value"}}',
+            '{"state":"partial-call","step":0,"toolCallId":"tool-call-0","toolName":"test-tool","args":{"testArg":"test-value"}}',
           );
         });
 
         streamController.enqueue(
-          formatStreamPart('tool_call', {
+          formatDataStreamPart('tool_call', {
             toolCallId: 'tool-call-0',
             toolName: 'test-tool',
             args: { testArg: 'test-value' },
@@ -861,12 +930,12 @@ describe('tool invocations', () => {
 
         await waitFor(() => {
           expect(screen.getByTestId('message-1')).toHaveTextContent(
-            '{"state":"call","toolCallId":"tool-call-0","toolName":"test-tool","args":{"testArg":"test-value"}}',
+            '{"state":"call","step":0,"toolCallId":"tool-call-0","toolName":"test-tool","args":{"testArg":"test-value"}}',
           );
         });
 
         streamController.enqueue(
-          formatStreamPart('tool_result', {
+          formatDataStreamPart('tool_result', {
             toolCallId: 'tool-call-0',
             result: 'test-result',
           }),
@@ -875,7 +944,7 @@ describe('tool invocations', () => {
 
         await waitFor(() => {
           expect(screen.getByTestId('message-1')).toHaveTextContent(
-            '{"state":"result","toolCallId":"tool-call-0","toolName":"test-tool","args":{"testArg":"test-value"},"result":"test-result"}',
+            '{"state":"result","step":0,"toolCallId":"tool-call-0","toolName":"test-tool","args":{"testArg":"test-value"},"result":"test-result"}',
           );
         });
       },
@@ -890,7 +959,7 @@ describe('tool invocations', () => {
         await userEvent.click(screen.getByTestId('do-append'));
 
         streamController.enqueue(
-          formatStreamPart('tool_call', {
+          formatDataStreamPart('tool_call', {
             toolCallId: 'tool-call-0',
             toolName: 'test-tool',
             args: { testArg: 'test-value' },
@@ -899,12 +968,12 @@ describe('tool invocations', () => {
 
         await waitFor(() => {
           expect(screen.getByTestId('message-1')).toHaveTextContent(
-            '{"state":"call","toolCallId":"tool-call-0","toolName":"test-tool","args":{"testArg":"test-value"}}',
+            '{"state":"call","step":0,"toolCallId":"tool-call-0","toolName":"test-tool","args":{"testArg":"test-value"}}',
           );
         });
 
         streamController.enqueue(
-          formatStreamPart('tool_result', {
+          formatDataStreamPart('tool_result', {
             toolCallId: 'tool-call-0',
             result: 'test-result',
           }),
@@ -913,7 +982,43 @@ describe('tool invocations', () => {
 
         await waitFor(() => {
           expect(screen.getByTestId('message-1')).toHaveTextContent(
-            '{"state":"result","toolCallId":"tool-call-0","toolName":"test-tool","args":{"testArg":"test-value"},"result":"test-result"}',
+            '{"state":"result","step":0,"toolCallId":"tool-call-0","toolName":"test-tool","args":{"testArg":"test-value"},"result":"test-result"}',
+          );
+        });
+      },
+    ),
+  );
+
+  it(
+    'should update tool call to result when addToolResult is called',
+    withTestServer(
+      [
+        {
+          url: '/api/chat',
+          type: 'stream-values',
+          content: [
+            formatDataStreamPart('tool_call', {
+              toolCallId: 'tool-call-0',
+              toolName: 'test-tool',
+              args: { testArg: 'test-value' },
+            }),
+          ],
+        },
+      ],
+      async () => {
+        await userEvent.click(screen.getByTestId('do-append'));
+
+        await waitFor(() => {
+          expect(screen.getByTestId('message-1')).toHaveTextContent(
+            '{"state":"call","step":0,"toolCallId":"tool-call-0","toolName":"test-tool","args":{"testArg":"test-value"}}',
+          );
+        });
+
+        await userEvent.click(screen.getByTestId('add-result-0'));
+
+        await waitFor(() => {
+          expect(screen.getByTestId('message-1')).toHaveTextContent(
+            '{"state":"result","step":0,"toolCallId":"tool-call-0","toolName":"test-tool","args":{"testArg":"test-value"},"result":"test-result"}',
           );
         });
       },
@@ -921,8 +1026,8 @@ describe('tool invocations', () => {
   );
 });
 
-describe('maxToolRoundtrips', () => {
-  describe('single automatic tool roundtrip', () => {
+describe('maxSteps', () => {
+  describe('two steps with automatic tool call', () => {
     let onToolCallInvoked = false;
 
     const TestComponent = () => {
@@ -934,7 +1039,7 @@ describe('maxToolRoundtrips', () => {
             toolCall.toolCallId
           } ${JSON.stringify(toolCall.args)}`;
         },
-        maxToolRoundtrips: 5,
+        maxSteps: 5,
       });
 
       return (
@@ -973,7 +1078,7 @@ describe('maxToolRoundtrips', () => {
             url: '/api/chat',
             type: 'stream-values',
             content: [
-              formatStreamPart('tool_call', {
+              formatDataStreamPart('tool_call', {
                 toolCallId: 'tool-call-0',
                 toolName: 'test-tool',
                 args: { testArg: 'test-value' },
@@ -983,7 +1088,7 @@ describe('maxToolRoundtrips', () => {
           {
             url: '/api/chat',
             type: 'stream-values',
-            content: [formatStreamPart('text', 'final result')],
+            content: [formatDataStreamPart('text', 'final result')],
           },
         ],
         async () => {
@@ -991,8 +1096,8 @@ describe('maxToolRoundtrips', () => {
 
           expect(onToolCallInvoked).toBe(true);
 
-          await screen.findByTestId('message-2');
-          expect(screen.getByTestId('message-2')).toHaveTextContent(
+          await screen.findByTestId('message-1');
+          expect(screen.getByTestId('message-1')).toHaveTextContent(
             'final result',
           );
         },
@@ -1000,7 +1105,7 @@ describe('maxToolRoundtrips', () => {
     );
   });
 
-  describe('single roundtrip with error response', () => {
+  describe('two steps with error response', () => {
     let onToolCallCounter = 0;
 
     const TestComponent = () => {
@@ -1011,7 +1116,7 @@ describe('maxToolRoundtrips', () => {
             toolCall.toolCallId
           } ${JSON.stringify(toolCall.args)}`;
         },
-        maxToolRoundtrips: 5,
+        maxSteps: 5,
       });
 
       return (
@@ -1058,7 +1163,7 @@ describe('maxToolRoundtrips', () => {
             url: '/api/chat',
             type: 'stream-values',
             content: [
-              formatStreamPart('tool_call', {
+              formatDataStreamPart('tool_call', {
                 toolCallId: 'tool-call-0',
                 toolName: 'test-tool',
                 args: { testArg: 'test-value' },
@@ -1089,7 +1194,7 @@ describe('maxToolRoundtrips', () => {
 
 describe('file attachments with data url', () => {
   const TestComponent = () => {
-    const { messages, handleSubmit, handleInputChange, isLoading, input } =
+    const { messages, handleSubmit, handleInputChange, status, input } =
       useChat();
 
     const [attachments, setAttachments] = useState<FileList | undefined>(
@@ -1150,7 +1255,7 @@ describe('file attachments with data url', () => {
           <input
             value={input}
             onChange={handleInputChange}
-            disabled={isLoading}
+            disabled={status !== 'ready'}
             data-testid="message-input"
           />
           <button type="submit" data-testid="submit-button">
@@ -1208,6 +1313,7 @@ describe('file attachments with data url', () => {
         );
 
         expect(await call(0).getRequestBodyJson()).toStrictEqual({
+          id: expect.any(String),
           messages: [
             {
               role: 'user',
@@ -1219,6 +1325,7 @@ describe('file attachments with data url', () => {
                   url: 'data:text/plain;base64,dGVzdCBmaWxlIGNvbnRlbnQ=',
                 },
               ],
+              parts: [{ text: 'Message with text attachment', type: 'text' }],
             },
           ],
         });
@@ -1265,6 +1372,7 @@ describe('file attachments with data url', () => {
         );
 
         expect(await call(0).getRequestBodyJson()).toStrictEqual({
+          id: expect.any(String),
           messages: [
             {
               role: 'user',
@@ -1276,6 +1384,7 @@ describe('file attachments with data url', () => {
                   url: 'data:image/png;base64,dGVzdCBpbWFnZSBjb250ZW50',
                 },
               ],
+              parts: [{ text: 'Message with image attachment', type: 'text' }],
             },
           ],
         });
@@ -1286,7 +1395,7 @@ describe('file attachments with data url', () => {
 
 describe('file attachments with url', () => {
   const TestComponent = () => {
-    const { messages, handleSubmit, handleInputChange, isLoading, input } =
+    const { messages, handleSubmit, handleInputChange, status, input } =
       useChat();
 
     return (
@@ -1336,7 +1445,7 @@ describe('file attachments with url', () => {
           <input
             value={input}
             onChange={handleInputChange}
-            disabled={isLoading}
+            disabled={status !== 'ready'}
             data-testid="message-input"
           />
           <button type="submit" data-testid="submit-button">
@@ -1388,6 +1497,7 @@ describe('file attachments with url', () => {
         );
 
         expect(await call(0).getRequestBodyJson()).toStrictEqual({
+          id: expect.any(String),
           messages: [
             {
               role: 'user',
@@ -1399,6 +1509,7 @@ describe('file attachments with url', () => {
                   url: 'https://example.com/image.png',
                 },
               ],
+              parts: [{ text: 'Message with image attachment', type: 'text' }],
             },
           ],
         });
@@ -1485,6 +1596,7 @@ describe('attachments with empty submit', () => {
         expect(screen.getByTestId('message-1')).toHaveTextContent('AI:');
 
         expect(await call(0).getRequestBodyJson()).toStrictEqual({
+          id: expect.any(String),
           messages: [
             {
               role: 'user',
@@ -1496,6 +1608,7 @@ describe('attachments with empty submit', () => {
                   url: 'https://example.com/image.png',
                 },
               ],
+              parts: [{ text: '', type: 'text' }],
             },
           ],
         });
@@ -1591,6 +1704,7 @@ describe('should append message with attachments', () => {
         expect(screen.getByTestId('message-1')).toHaveTextContent('AI:');
 
         expect(await call(0).getRequestBodyJson()).toStrictEqual({
+          id: expect.any(String),
           messages: [
             {
               role: 'user',
@@ -1602,6 +1716,7 @@ describe('should append message with attachments', () => {
                   url: 'https://example.com/image.png',
                 },
               ],
+              parts: [{ text: 'Message with image attachment', type: 'text' }],
             },
           ],
         });
@@ -1680,7 +1795,14 @@ describe('reload', () => {
         await userEvent.click(screen.getByTestId('do-reload'));
 
         expect(await call(1).getRequestBodyJson()).toStrictEqual({
-          messages: [{ content: 'hi', role: 'user' }],
+          id: expect.any(String),
+          messages: [
+            {
+              content: 'hi',
+              role: 'user',
+              parts: [{ text: 'hi', type: 'text' }],
+            },
+          ],
           data: { 'test-data-key': 'test-data-value' },
           'request-body-key': 'request-body-value',
         });
@@ -1752,11 +1874,13 @@ describe('test sending additional fields during message submission', () => {
         expect(screen.getByTestId('message-0')).toHaveTextContent('User: hi');
 
         expect(await call(0).getRequestBodyJson()).toStrictEqual({
+          id: expect.any(String),
           messages: [
             {
               role: 'user',
               content: 'hi',
               annotations: ['this is an annotation'],
+              parts: [{ text: 'hi', type: 'text' }],
             },
           ],
         });

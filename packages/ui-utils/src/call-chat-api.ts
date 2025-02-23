@@ -1,6 +1,6 @@
-import { createChunkDecoder } from './index';
-import { processDataProtocolResponse } from './process-data-protocol-response';
-import { IdGenerator, JSONValue, Message, UseChatOptions } from './types';
+import { processChatResponse } from './process-chat-response';
+import { processChatTextResponse } from './process-chat-text-response';
+import { IdGenerator, JSONValue, UIMessage, UseChatOptions } from './types';
 
 // use function to allow for mocking in tests:
 const getOriginalFetch = () => fetch;
@@ -19,6 +19,7 @@ export async function callChatApi({
   onToolCall,
   generateId,
   fetch = getOriginalFetch(),
+  lastMessage,
 }: {
   api: string;
   body: Record<string, any>;
@@ -28,11 +29,16 @@ export async function callChatApi({
   abortController: (() => AbortController | null) | undefined;
   restoreMessagesOnFailure: () => void;
   onResponse: ((response: Response) => void | Promise<void>) | undefined;
-  onUpdate: (newMessages: Message[], data: JSONValue[] | undefined) => void;
+  onUpdate: (options: {
+    message: UIMessage;
+    data: JSONValue[] | undefined;
+    replaceLastMessage: boolean;
+  }) => void;
   onFinish: UseChatOptions['onFinish'];
   onToolCall: UseChatOptions['onToolCall'];
   generateId: IdGenerator;
   fetch: ReturnType<typeof getOriginalFetch> | undefined;
+  lastMessage: UIMessage | undefined;
 }) {
   const response = await fetch(api, {
     method: 'POST',
@@ -67,55 +73,22 @@ export async function callChatApi({
     throw new Error('The response body is empty.');
   }
 
-  const reader = response.body.getReader();
-
   switch (streamProtocol) {
     case 'text': {
-      const decoder = createChunkDecoder();
-
-      const resultMessage = {
-        id: generateId(),
-        createdAt: new Date(),
-        role: 'assistant' as const,
-        content: '',
-      };
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) {
-          break;
-        }
-
-        resultMessage.content += decoder(value);
-
-        // note: creating a new message object is required for Solid.js streaming
-        onUpdate([{ ...resultMessage }], []);
-
-        // The request has been aborted, stop reading the stream.
-        if (abortController?.() === null) {
-          reader.cancel();
-          break;
-        }
-      }
-
-      // in text mode, we don't have usage information or finish reason:
-      onFinish?.(resultMessage, {
-        usage: { completionTokens: NaN, promptTokens: NaN, totalTokens: NaN },
-        finishReason: 'unknown',
+      await processChatTextResponse({
+        stream: response.body,
+        update: onUpdate,
+        onFinish,
+        generateId,
       });
-
-      return {
-        messages: [resultMessage],
-        data: [],
-      };
+      return;
     }
 
     case 'data': {
-      return await processDataProtocolResponse({
-        reader,
-        abortControllerRef:
-          abortController != null ? { current: abortController() } : undefined,
+      await processChatResponse({
+        stream: response.body,
         update: onUpdate,
+        lastMessage,
         onToolCall,
         onFinish({ message, finishReason, usage }) {
           if (onFinish && message != null) {
@@ -124,6 +97,7 @@ export async function callChatApi({
         },
         generateId,
       });
+      return;
     }
 
     default: {

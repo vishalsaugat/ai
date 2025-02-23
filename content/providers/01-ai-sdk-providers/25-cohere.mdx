@@ -47,11 +47,11 @@ You can use the following optional settings to customize the Cohere provider ins
 - **baseURL** _string_
 
   Use a different URL prefix for API calls, e.g. to use proxy servers.
-  The default prefix is `https://api.cohere.com/v1`.
+  The default prefix is `https://api.cohere.com/v2`.
 
 - **apiKey** _string_
 
-  API key that is being send using the `Authorization` header.
+  API key that is being sent using the `Authorization` header.
   It defaults to the `COHERE_API_KEY` environment variable.
 
 - **headers** _Record&lt;string,string&gt;_
@@ -67,7 +67,7 @@ You can use the following optional settings to customize the Cohere provider ins
 
 ## Language Models
 
-You can create models that call the [Cohere chat API](https://docs.cohere.ai/api/#operation/createChatCompletion) using a provider instance.
+You can create models that call the [Cohere chat API](https://docs.cohere.com/v2/docs/chat-api) using a provider instance.
 The first argument is the model id, e.g. `command-r-plus`.
 Some Cohere chat models support tool calls.
 
@@ -98,18 +98,15 @@ Cohere language models can also be used in the `streamText` function (see [AI SD
 | `command-r-plus` | <Cross size={18} /> | <Cross size={18} /> | <Check size={18} /> | <Check size={18} /> |
 
 <Note>
-  Parameter definitions for tool use is currently limited to primitive types -
-  numbers, strings, and booleans.
-</Note>
-
-<Note>
-  The table above lists popular models. You can also pass any available provider
-  model ID as a string if needed.
+  The table above lists popular models. Please see the [Cohere
+  docs](https://docs.cohere.com/v2/docs/models#command) for a full list of
+  available models. You can also pass any available provider model ID as a
+  string if needed.
 </Note>
 
 ## Embedding Models
 
-You can create models that call the [Cohere embed API](https://docs.cohere.com/reference/embed)
+You can create models that call the [Cohere embed API](https://docs.cohere.com/v2/reference/embed)
 using the `.embedding()` factory method.
 
 ```ts

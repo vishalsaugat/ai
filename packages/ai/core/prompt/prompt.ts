@@ -1,3 +1,4 @@
+import { Message } from '@ai-sdk/ui-utils';
 import { CoreMessage } from './message';
 
 /**
@@ -18,5 +19,5 @@ A simple text prompt. You can either use `prompt` or `messages` but not both.
   /**
 A list of messages. You can either use `prompt` or `messages` but not both.
    */
-  messages?: Array<CoreMessage>;
+  messages?: Array<CoreMessage> | Array<Omit<Message, 'id'>>;
 };

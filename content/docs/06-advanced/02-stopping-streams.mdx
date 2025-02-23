@@ -23,7 +23,7 @@ import { streamText } from 'ai';
 export async function POST(req: Request) {
   const { prompt } = await req.json();
 
-  const result = await streamText({
+  const result = streamText({
     model: openai('gpt-4-turbo'),
     prompt,
     // forward the abort signal:
@@ -42,21 +42,15 @@ This will cancel the stream from the client side to the server.
 ```tsx file="app/page.tsx" highlight="9,18-20"
 'use client';
 
-import { useCompletion } from 'ai/react';
+import { useCompletion } from '@ai-sdk/react';
 
 export default function Chat() {
-  const {
-    input,
-    completion,
-    stop,
-    isLoading,
-    handleSubmit,
-    handleInputChange,
-  } = useCompletion();
+  const { input, completion, stop, status, handleSubmit, handleInputChange } =
+    useCompletion();
 
   return (
     <div>
-      {isLoading && (
+      {(status === 'submitted' || status === 'streaming') && (
         <button type="button" onClick={() => stop()}>
           Stop
         </button>

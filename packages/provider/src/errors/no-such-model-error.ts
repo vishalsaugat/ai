@@ -8,7 +8,7 @@ export class NoSuchModelError extends AISDKError {
   private readonly [symbol] = true; // used in isInstance
 
   readonly modelId: string;
-  readonly modelType: 'languageModel' | 'textEmbeddingModel';
+  readonly modelType: 'languageModel' | 'textEmbeddingModel' | 'imageModel';
 
   constructor({
     errorName = name,
@@ -18,7 +18,7 @@ export class NoSuchModelError extends AISDKError {
   }: {
     errorName?: string;
     modelId: string;
-    modelType: 'languageModel' | 'textEmbeddingModel';
+    modelType: 'languageModel' | 'textEmbeddingModel' | 'imageModel';
     message?: string;
   }) {
     super({ name: errorName, message });
@@ -29,31 +29,5 @@ export class NoSuchModelError extends AISDKError {
 
   static isInstance(error: unknown): error is NoSuchModelError {
     return AISDKError.hasMarker(error, marker);
-  }
-
-  /**
-   * @deprecated use `isInstance` instead
-   */
-  static isNoSuchModelError(error: unknown): error is NoSuchModelError {
-    return (
-      error instanceof Error &&
-      error.name === name &&
-      typeof (error as NoSuchModelError).modelId === 'string' &&
-      typeof (error as NoSuchModelError).modelType === 'string'
-    );
-  }
-
-  /**
-   * @deprecated Do not use this method. It will be removed in the next major version.
-   */
-  toJSON() {
-    return {
-      name: this.name,
-      message: this.message,
-      stack: this.stack,
-
-      modelId: this.modelId,
-      modelType: this.modelType,
-    };
   }
 }

@@ -10,10 +10,12 @@ import {
 import {
   FetchFunction,
   ParseResult,
+  Resolvable,
   combineHeaders,
   createEventSourceResponseHandler,
   createJsonResponseHandler,
   postJsonToApi,
+  resolve,
 } from '@ai-sdk/provider-utils';
 import { GoogleAuthOptions, GoogleAuth } from 'google-auth-library';
 import { z } from 'zod';
@@ -29,9 +31,10 @@ import { prepareTools } from './anthropic-prepare-tools';
 type AnthropicMessagesConfig = {
   provider: string;
   baseURL: string;
-  headers: () => Record<string, string | undefined | any>;
+  headers: Resolvable<Record<string, string | undefined>>;
   fetch?: FetchFunction;
-  googleAuthOptions?: GoogleAuthOptions;
+  buildRequestUrl?: (baseURL: string, isStreaming: boolean) => string;
+  transformRequestBody?: (args: Record<string, any>) => Record<string, any>;
 };
 
 export class AnthropicMessagesLanguageModel implements LanguageModelV1 {
@@ -104,22 +107,20 @@ export class AnthropicMessagesLanguageModel implements LanguageModelV1 {
       });
     }
 
-    const messagesPrompt = convertToAnthropicMessagesPrompt({
-      prompt,
-      cacheControl: this.settings.cacheControl ?? false,
-    });
+    const { prompt: messagesPrompt, betas: messagesBetas } =
+      convertToAnthropicMessagesPrompt({
+        prompt,
+      });
 
     const baseArgs = {
       "anthropic_version": "vertex-2023-10-16",
       // model id:
       // model: this.modelId,
 
-      // model specific settings:
-      top_k: topK ?? this.settings.topK,
-
       // standardized settings:
-      max_tokens: maxTokens ?? 4096, // 4096: max model output tokens
+      max_tokens: maxTokens ?? 4096, // 4096: max model output tokens TODO remove
       temperature,
+      top_k: topK,
       top_p: topP,
       stop_sequences: stopSequences,
 
@@ -130,11 +131,17 @@ export class AnthropicMessagesLanguageModel implements LanguageModelV1 {
 
     switch (type) {
       case 'regular': {
-        const { tools, tool_choice, toolWarnings } = prepareTools(mode);
+        const {
+          tools,
+          tool_choice,
+          toolWarnings,
+          betas: toolsBetas,
+        } = prepareTools(mode);
 
         return {
           args: { ...baseArgs, tools, tool_choice },
           warnings: [...warnings, ...toolWarnings],
+          betas: new Set([...messagesBetas, ...toolsBetas]),
         };
       }
 
@@ -154,6 +161,7 @@ export class AnthropicMessagesLanguageModel implements LanguageModelV1 {
             tool_choice: { type: 'tool', name },
           },
           warnings,
+          betas: messagesBetas,
         };
       }
 
@@ -164,22 +172,35 @@ export class AnthropicMessagesLanguageModel implements LanguageModelV1 {
     }
   }
 
-  private getHeaders(
-    optionHeaders: Record<string, string | undefined> | undefined,
-  ) {
+  private async getHeaders({
+    betas,
+    headers,
+  }: {
+    betas: Set<string>;
+    headers: Record<string, string | undefined> | undefined;
+  }) {
     return combineHeaders(
-      this.config.headers(),
-      this.settings.cacheControl
-        ? { 'anthropic-beta': 'prompt-caching-2024-07-31' }
-        : {},
-      optionHeaders,
+      await resolve(this.config.headers),
+      betas.size > 0 ? { 'anthropic-beta': Array.from(betas).join(',') } : {},
+      headers,
     );
+  }
+
+  private buildRequestUrl(isStreaming: boolean): string {
+    return (
+      this.config.buildRequestUrl?.(this.config.baseURL, isStreaming) ??
+      `${this.config.baseURL}/messages`
+    );
+  }
+
+  private transformRequestBody(args: Record<string, any>): Record<string, any> {
+    return this.config.transformRequestBody?.(args) ?? args;
   }
 
   async doGenerate(
     options: Parameters<LanguageModelV1['doGenerate']>[0],
   ): Promise<Awaited<ReturnType<LanguageModelV1['doGenerate']>>> {
-    const { args, warnings } = await this.getArgs(options);
+    const { args, warnings, betas } = await this.getArgs(options);
 
     let { ...otherHeaders } = this.config.headers();
     const { googleAuthOptions } = this.config;
@@ -194,9 +215,9 @@ export class AnthropicMessagesLanguageModel implements LanguageModelV1 {
     }
 
     const { responseHeaders, value: response } = await postJsonToApi({
-      url: `${this.config.baseURL}`,
-      headers: otherHeaders,
-      body: args,
+      url: this.buildRequestUrl(false),
+      headers: await this.getHeaders({ betas, headers: options.headers }),
+      body: this.transformRequestBody(args),
       failedResponseHandler: anthropicFailedResponseHandler,
       successfulResponseHandler: createJsonResponseHandler(
         anthropicMessagesResponseSchema,
@@ -246,42 +267,27 @@ export class AnthropicMessagesLanguageModel implements LanguageModelV1 {
         modelId: response.model ?? undefined,
       },
       warnings,
-      providerMetadata:
-        this.settings.cacheControl === true
-          ? {
-              anthropic: {
-                cacheCreationInputTokens:
-                  response.usage.cache_creation_input_tokens ?? null,
-                cacheReadInputTokens:
-                  response.usage.cache_read_input_tokens ?? null,
-              },
-            }
-          : undefined,
-      // request: { body: JSON.stringify(args) },
+      providerMetadata: {
+        anthropic: {
+          cacheCreationInputTokens:
+            response.usage.cache_creation_input_tokens ?? null,
+          cacheReadInputTokens: response.usage.cache_read_input_tokens ?? null,
+        },
+      },
+      request: { body: JSON.stringify(args) },
     };
   }
 
   async doStream(
     options: Parameters<LanguageModelV1['doStream']>[0],
   ): Promise<Awaited<ReturnType<LanguageModelV1['doStream']>>> {
-    const { args, warnings } = await this.getArgs(options);
-
-    let { ...otherHeaders } = this.config.headers();
-    const { googleAuthOptions } = this.config;
-    if (googleAuthOptions) {
-      const googleAuth = new GoogleAuth({
-        scopes: 'https://www.googleapis.com/auth/cloud-platform',
-        credentials: googleAuthOptions.credentials,
-      });
-      const client = await googleAuth.getClient();
-      const { token } = await client.getAccessToken();
-      otherHeaders['Authorization'] = `Bearer ${token}`;
-    }
+    const { args, warnings, betas } = await this.getArgs(options);
+    const body = { ...args, stream: true };
 
     const { responseHeaders, value: response } = await postJsonToApi({
-      url: `${this.config.baseURL}`,
-      headers: otherHeaders,
-      body: { ...args, stream: true },
+      url: this.buildRequestUrl(true),
+      headers: await this.getHeaders({ betas, headers: options.headers }),
+      body: this.transformRequestBody(body),
       failedResponseHandler: anthropicFailedResponseHandler,
       successfulResponseHandler: createEventSourceResponseHandler(
         anthropicMessagesChunkSchema,
@@ -416,16 +422,14 @@ export class AnthropicMessagesLanguageModel implements LanguageModelV1 {
                 usage.promptTokens = value.message.usage.input_tokens;
                 usage.completionTokens = value.message.usage.output_tokens;
 
-                if (self.settings.cacheControl === true) {
-                  providerMetadata = {
-                    anthropic: {
-                      cacheCreationInputTokens:
-                        value.message.usage.cache_creation_input_tokens ?? null,
-                      cacheReadInputTokens:
-                        value.message.usage.cache_read_input_tokens ?? null,
-                    },
-                  };
-                }
+                providerMetadata = {
+                  anthropic: {
+                    cacheCreationInputTokens:
+                      value.message.usage.cache_creation_input_tokens ?? null,
+                    cacheReadInputTokens:
+                      value.message.usage.cache_read_input_tokens ?? null,
+                  },
+                };
 
                 controller.enqueue({
                   type: 'response-metadata',

@@ -1,5 +1,5 @@
-import { ToolInvocation, convertToCoreMessages, streamText } from 'ai';
 import { openai } from '@ai-sdk/openai';
+import { ToolInvocation, streamText } from 'ai';
 import { z } from 'zod';
 
 interface Message {
@@ -15,11 +15,10 @@ function getWeather({ city, unit }: { city: string; unit: string }) {
 export async function POST(req: Request) {
   const { messages }: { messages: Message[] } = await req.json();
 
-  const result = await streamText({
+  const result = streamText({
     model: openai('gpt-4o'),
     system: 'You are a helpful assistant.',
-    // @ts-ignore
-    messages: convertToCoreMessages(messages),
+    messages,
     tools: {
       getWeather: {
         description: 'Get the weather for a location',

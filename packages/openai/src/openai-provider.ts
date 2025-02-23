@@ -1,5 +1,6 @@
 import {
   EmbeddingModelV1,
+  ImageModelV1,
   LanguageModelV1,
   ProviderV1,
 } from '@ai-sdk/provider';
@@ -20,6 +21,11 @@ import {
   OpenAIEmbeddingModelId,
   OpenAIEmbeddingSettings,
 } from './openai-embedding-settings';
+import { OpenAIImageModel } from './openai-image-model';
+import {
+  OpenAIImageModelId,
+  OpenAIImageSettings,
+} from './openai-image-settings';
 
 export interface OpenAIProvider extends ProviderV1 {
   (
@@ -81,6 +87,22 @@ Creates a model for text embeddings.
     modelId: OpenAIEmbeddingModelId,
     settings?: OpenAIEmbeddingSettings,
   ): EmbeddingModelV1<string>;
+
+  /**
+Creates a model for image generation.
+   */
+  image(
+    modelId: OpenAIImageModelId,
+    settings?: OpenAIImageSettings,
+  ): ImageModelV1;
+
+  /**
+Creates a model for image generation.
+   */
+  imageModel(
+    modelId: OpenAIImageModelId,
+    settings?: OpenAIImageSettings,
+  ): ImageModelV1;
 }
 
 export interface OpenAIProviderSettings {
@@ -88,26 +110,6 @@ export interface OpenAIProviderSettings {
 Base URL for the OpenAI API calls.
      */
   baseURL?: string;
-
-  /**
-Query string to append to the base URL.
-   */
-  queryString?: string;
-
-  /**
-Environment variable name for the API key.
-   */
-  environmentVariableName?: string;
-
-  /**
-Key for the Authorization header.
-   */
-  authHeaderKey?: string;
-
-  /**
-@deprecated Use `baseURL` instead.
-     */
-  baseUrl?: string;
 
   /**
 API key for authenticating requests.
@@ -155,8 +157,7 @@ export function createOpenAI(
   options: OpenAIProviderSettings = {},
 ): OpenAIProvider {
   const baseURL =
-    (withoutTrailingSlash(options.baseURL ?? options.baseUrl) ??
-    'https://api.openai.com/v1');
+    withoutTrailingSlash(options.baseURL) ?? 'https://api.openai.com/v1';
 
   // we default to compatible, because strict breaks providers like Groq:
   const compatibility = options.compatibility ?? 'compatible';
@@ -209,6 +210,17 @@ export function createOpenAI(
       fetch: options.fetch,
     });
 
+  const createImageModel = (
+    modelId: OpenAIImageModelId,
+    settings: OpenAIImageSettings = {},
+  ) =>
+    new OpenAIImageModel(modelId, settings, {
+      provider: `${providerName}.image`,
+      url: ({ path }) => `${baseURL}${path}`,
+      headers: getHeaders,
+      fetch: options.fetch,
+    });
+
   const createLanguageModel = (
     modelId: OpenAIChatModelId | OpenAICompletionModelId,
     settings?: OpenAIChatSettings | OpenAICompletionSettings,
@@ -242,6 +254,9 @@ export function createOpenAI(
   provider.embedding = createEmbeddingModel;
   provider.textEmbedding = createEmbeddingModel;
   provider.textEmbeddingModel = createEmbeddingModel;
+
+  provider.image = createImageModel;
+  provider.imageModel = createImageModel;
 
   return provider as OpenAIProvider;
 }

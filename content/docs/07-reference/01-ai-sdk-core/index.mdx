@@ -1,6 +1,7 @@
 ---
 title: AI SDK Core
 description: Reference documentation for the AI SDK Core
+collapsed: true
 ---
 
 # AI SDK Core
@@ -45,6 +46,12 @@ AI SDK Core contains the following main functions:
         'Generate embeddings for several values using an embedding model (batch embedding).',
       href: '/docs/reference/ai-sdk-core/embed-many',
     },
+    {
+      title: 'generateImage()',
+      description:
+        'Generate images based on a given prompt using an image model.',
+      href: '/docs/reference/ai-sdk-core/generate-image',
+    },
   ]}
 />
 
@@ -63,6 +70,11 @@ It also contains the following helper functions:
       href: '/docs/reference/ai-sdk-core/json-schema',
     },
     {
+      title: 'zodSchema()',
+      description: 'Creates AI SDK compatible Zod schema objects.',
+      href: '/docs/reference/ai-sdk-core/zod-schema',
+    },
+    {
       title: 'createProviderRegistry()',
       description:
         'Creates a registry for using models from multiple providers.',
@@ -73,6 +85,38 @@ It also contains the following helper functions:
       description:
         'Calculates the cosine similarity between two vectors, e.g. embeddings.',
       href: '/docs/reference/ai-sdk-core/cosine-similarity',
+    },
+    {
+      title: 'simulateReadableStream()',
+      description:
+        'Creates a ReadableStream that emits values with configurable delays.',
+      href: '/docs/reference/ai-sdk-core/simulate-readable-stream',
+    },
+    {
+      title: 'wrapLanguageModel()',
+      description: 'Wraps a language model with middleware.',
+      href: '/docs/reference/ai-sdk-core/wrap-language-model',
+    },
+    {
+      title: 'extractReasoningMiddleware()',
+      description:
+        'Extracts reasoning from the generated text and exposes it as a `reasoning` property on the result.',
+      href: '/docs/reference/ai-sdk-core/extract-reasoning-middleware',
+    },
+    {
+      title: 'smoothStream()',
+      description: 'Smooths text streaming output.',
+      href: '/docs/reference/ai-sdk-core/smooth-stream',
+    },
+    {
+      title: 'generateId()',
+      description: 'Helper function for generating unique IDs',
+      href: '/docs/reference/ai-sdk-core/generate-id',
+    },
+    {
+      title: 'createIdGenerator()',
+      description: 'Creates an ID generator',
+      href: '/docs/reference/ai-sdk-core/create-id-generator',
     },
   ]}
 />

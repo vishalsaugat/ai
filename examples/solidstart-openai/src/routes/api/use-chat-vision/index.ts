@@ -1,6 +1,6 @@
 import { openai } from '@ai-sdk/openai';
 import { APIEvent } from '@solidjs/start/server';
-import { convertToCoreMessages, streamText } from 'ai';
+import { streamText } from 'ai';
 
 export const POST = async (event: APIEvent) => {
   // 'data' contains the additional data that you have sent:
@@ -9,10 +9,10 @@ export const POST = async (event: APIEvent) => {
   const initialMessages = messages.slice(0, -1);
   const currentMessage = messages[messages.length - 1];
 
-  const result = await streamText({
-    model: openai('gpt-4o'),
+  const result = streamText({
+    model: openai('gpt-4o-mini'),
     messages: [
-      ...convertToCoreMessages(initialMessages),
+      ...initialMessages,
       {
         ...currentMessage,
         content: [

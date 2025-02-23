@@ -54,8 +54,13 @@ You can use the following optional settings to customize the OpenAI provider ins
 
 - **apiKey** _string_
 
-  API key that is being send using the `api-key` header.
+  API key that is being sent using the `api-key` header.
   It defaults to the `AZURE_API_KEY` environment variable.
+
+- **apiVersion** _string_
+
+  Sets a custom [api version](https://learn.microsoft.com/en-us/azure/ai-services/openai/api-version-deprecation).
+  Defaults to `2024-10-01-preview`.
 
 - **baseURL** _string_
 
@@ -87,6 +92,23 @@ const model = azure('your-deployment-name');
 
 You need to pass your deployment name as the first argument.
 
+### Reasoning Models
+
+Azure exposes the thinking of `DeepSeek-R1` in the generated text using the `<think>` tag.
+You can use the `extractReasoningMiddleware` to extract this reasoning and expose it as a `reasoning` property on the result:
+
+```ts
+import { azure } from '@ai-sdk/azure';
+import { wrapLanguageModel, extractReasoningMiddleware } from 'ai';
+
+const enhancedModel = wrapLanguageModel({
+  model: azure('your-deepseek-r1-deployment-name'),
+  middleware: extractReasoningMiddleware({ tagName: 'think' }),
+});
+```
+
+You can then use that enhanced model in functions like `generateText` and `streamText`.
+
 ### Example
 
 You can use OpenAI language models to generate text with the `generateText` function:
@@ -114,7 +136,7 @@ OpenAI language models can also be used in the `streamText`, `generateObject`, `
 
 <Note>
   The URL for calling Azure chat models will be constructed as follows:
-  `https://RESOURCE_NAME.openai.azure.com/openai/deployments/DEPLOYMENT_NAME/chat/completions?api-version=2024-08-01-preview`
+  `https://RESOURCE_NAME.openai.azure.com/openai/deployments/DEPLOYMENT_NAME/chat/completions?api-version=API_VERSION`
 </Note>
 
 Azure OpenAI chat models support also some model specific settings that are not part of the [standard call settings](/docs/ai-sdk-core/settings).
@@ -146,7 +168,7 @@ The following optional settings are available for OpenAI chat models:
 
   As an example, you can pass `{"50256": -100}` to prevent the token from being generated.
 
-- **logProbs** _boolean | number_
+- **logprobs** _boolean | number_
 
   Return the log probabilities of the tokens. Including logprobs will increase
   the response size and can slow down response times. However, it can
@@ -213,7 +235,7 @@ The following optional settings are available for Azure OpenAI completion models
   As an example, you can pass `{"50256": -100}` to prevent the &lt;|endoftext|&gt;
   token from being generated.
 
-- **logProbs** _boolean | number_
+- **logprobs** _boolean | number_
 
   Return the log probabilities of the tokens. Including logprobs will increase
   the response size and can slow down response times. However, it can

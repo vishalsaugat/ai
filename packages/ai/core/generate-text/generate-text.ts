@@ -1,11 +1,13 @@
-import { createIdGenerator } from '@ai-sdk/provider-utils';
+import { createIdGenerator, IDGenerator } from '@ai-sdk/provider-utils';
 import { Tracer } from '@opentelemetry/api';
-import { InvalidArgumentError } from '../../errors';
-import { retryWithExponentialBackoff } from '../../util/retry-with-exponential-backoff';
-import { CoreAssistantMessage, CoreToolMessage } from '../prompt';
+import { InvalidArgumentError } from '../../errors/invalid-argument-error';
+import { NoOutputSpecifiedError } from '../../errors/no-output-specified-error';
+import { ToolExecutionError } from '../../errors/tool-execution-error';
+import { CoreAssistantMessage, CoreMessage } from '../prompt';
 import { CallSettings } from '../prompt/call-settings';
 import { convertToLanguageModelPrompt } from '../prompt/convert-to-language-model-prompt';
 import { prepareCallSettings } from '../prompt/prepare-call-settings';
+import { prepareRetries } from '../prompt/prepare-retries';
 import { prepareToolsAndToolChoice } from '../prompt/prepare-tools-and-tool-choice';
 import { Prompt } from '../prompt/prompt';
 import { standardizePrompt } from '../prompt/standardize-prompt';
@@ -15,21 +17,42 @@ import { getTracer } from '../telemetry/get-tracer';
 import { recordSpan } from '../telemetry/record-span';
 import { selectTelemetryAttributes } from '../telemetry/select-telemetry-attributes';
 import { TelemetrySettings } from '../telemetry/telemetry-settings';
-import { CoreTool } from '../tool/tool';
-import { CoreToolChoice, LanguageModel, ProviderMetadata } from '../types';
+import { LanguageModel, ToolChoice } from '../types';
+import { ProviderMetadata, ProviderOptions } from '../types/provider-metadata';
 import {
-  LanguageModelUsage,
+  addLanguageModelUsage,
   calculateLanguageModelUsage,
+  LanguageModelUsage,
 } from '../types/usage';
 import { removeTextAfterLastWhitespace } from '../util/remove-text-after-last-whitespace';
 import { GenerateTextResult } from './generate-text-result';
+import { Output } from './output';
 import { parseToolCall } from './parse-tool-call';
-import { StepResult } from './step-result';
+import { ResponseMessage, StepResult } from './step-result';
 import { toResponseMessages } from './to-response-messages';
 import { ToolCallArray } from './tool-call';
+import { ToolCallRepairFunction } from './tool-call-repair';
 import { ToolResultArray } from './tool-result';
+import { ToolSet } from './tool-set';
 
-const originalGenerateId = createIdGenerator({ prefix: 'aitxt', size: 24 });
+const originalGenerateId = createIdGenerator({
+  prefix: 'aitxt',
+  size: 24,
+});
+
+const originalGenerateMessageId = createIdGenerator({
+  prefix: 'msg',
+  size: 24,
+});
+
+/**
+Callback that is set using the `onStepFinish` option.
+
+@param stepResult - The result of the step.
+ */
+export type GenerateTextOnStepFinishCallback<TOOLS extends ToolSet> = (
+  stepResult: StepResult<TOOLS>,
+) => Promise<void> | void;
 
 /**
 Generate a text and call tools for a given prompt using a language model.
@@ -71,31 +94,36 @@ If set and supported by the model, calls will generate deterministic results.
 @param headers - Additional HTTP headers to be sent with the request. Only applicable for HTTP-based providers.
 
 @param maxSteps - Maximum number of sequential LLM calls (steps), e.g. when you use tool calls.
+@param experimental_generateMessageId - Generate a unique ID for each message.
 
 @param onStepFinish - Callback that is called when each step (LLM call) is finished, including intermediate steps.
 
 @returns
 A result object that contains the generated text, the results of the tool calls, and additional information.
  */
-export async function generateText<TOOLS extends Record<string, CoreTool>>({
+export async function generateText<
+  TOOLS extends ToolSet,
+  OUTPUT = never,
+  OUTPUT_PARTIAL = never,
+>({
   model,
   tools,
   toolChoice,
   system,
   prompt,
   messages,
-  maxRetries,
+  maxRetries: maxRetriesArg,
   abortSignal,
   headers,
-  maxAutomaticRoundtrips = 0,
-  maxToolRoundtrips = maxAutomaticRoundtrips,
-  maxSteps = maxToolRoundtrips != null ? maxToolRoundtrips + 1 : 1,
-  experimental_continuationSteps,
-  experimental_continueSteps: continueSteps = experimental_continuationSteps ??
-    false,
+  maxSteps = 1,
+  experimental_generateMessageId: generateMessageId = originalGenerateMessageId,
+  experimental_output: output,
+  experimental_continueSteps: continueSteps = false,
   experimental_telemetry: telemetry,
-  experimental_providerMetadata: providerMetadata,
+  experimental_providerMetadata,
+  providerOptions = experimental_providerMetadata,
   experimental_activeTools: activeTools,
+  experimental_repairToolCall: repairToolCall,
   _internal: {
     generateId = originalGenerateId,
     currentDate = () => new Date(),
@@ -117,28 +145,7 @@ The tools that the model can call. The model needs to support calling tools.
     /**
 The tool choice strategy. Default: 'auto'.
      */
-    toolChoice?: CoreToolChoice<TOOLS>;
-
-    /**
-@deprecated Use `maxToolRoundtrips` instead.
-     */
-    maxAutomaticRoundtrips?: number;
-
-    /**
-Maximum number of automatic roundtrips for tool calls.
-
-An automatic tool call roundtrip is another LLM call with the
-tool call results when all tool calls of the last assistant
-message have results.
-
-A maximum number is required to prevent infinite loops in the
-case of misconfigured tools.
-
-By default, it's set to 0, which will disable the feature.
-
-@deprecated Use `maxSteps` instead (which is `maxToolRoundtrips` + 1).
-     */
-    maxToolRoundtrips?: number;
+    toolChoice?: ToolChoice<TOOLS>;
 
     /**
 Maximum number of sequential LLM calls (steps), e.g. when you use tool calls. Must be at least 1.
@@ -150,9 +157,9 @@ By default, it's set to 1, which means that only a single LLM call is made.
     maxSteps?: number;
 
     /**
-@deprecated Use `experimental_continueSteps` instead.
+Generate a unique ID for each message.
      */
-    experimental_continuationSteps?: boolean;
+    experimental_generateMessageId?: IDGenerator;
 
     /**
 When enabled, the model will perform additional steps if the finish reason is "length" (experimental).
@@ -167,10 +174,15 @@ Optional telemetry configuration (experimental).
     experimental_telemetry?: TelemetrySettings;
 
     /**
-Additional provider-specific metadata. They are passed through
+Additional provider-specific options. They are passed through
 to the provider from the AI SDK and enable provider-specific
 functionality that can be fully encapsulated in the provider.
  */
+    providerOptions?: ProviderOptions;
+
+    /**
+@deprecated Use `providerOptions` instead.
+     */
     experimental_providerMetadata?: ProviderMetadata;
 
     /**
@@ -180,18 +192,28 @@ changing the tool call and result types in the result.
     experimental_activeTools?: Array<keyof TOOLS>;
 
     /**
+Optional specification for parsing structured outputs from the LLM response.
+     */
+    experimental_output?: Output<OUTPUT, OUTPUT_PARTIAL>;
+
+    /**
+A function that attempts to repair a tool call that failed to parse.
+     */
+    experimental_repairToolCall?: ToolCallRepairFunction<TOOLS>;
+
+    /**
     Callback that is called when each step (LLM call) is finished, including intermediate steps.
     */
-    onStepFinish?: (event: StepResult<TOOLS>) => Promise<void> | void;
+    onStepFinish?: GenerateTextOnStepFinishCallback<TOOLS>;
 
     /**
      * Internal. For test use only. May change without notice.
      */
     _internal?: {
-      generateId?: () => string;
+      generateId?: IDGenerator;
       currentDate?: () => Date;
     };
-  }): Promise<GenerateTextResult<TOOLS>> {
+  }): Promise<GenerateTextResult<TOOLS, OUTPUT>> {
   if (maxSteps < 1) {
     throw new InvalidArgumentError({
       parameter: 'maxSteps',
@@ -200,6 +222,8 @@ changing the tool call and result types in the result.
     });
   }
 
+  const { maxRetries, retry } = prepareRetries({ maxRetries: maxRetriesArg });
+
   const baseTelemetryAttributes = getBaseTelemetryAttributes({
     model,
     telemetry,
@@ -207,7 +231,14 @@ changing the tool call and result types in the result.
     settings: { ...settings, maxRetries },
   });
 
-  const initialPrompt = standardizePrompt({ system, prompt, messages });
+  const initialPrompt = standardizePrompt({
+    prompt: {
+      system: output?.injectIntoSystemPrompt({ system, model }) ?? system,
+      prompt,
+      messages,
+    },
+    tools,
+  });
 
   const tracer = getTracer(telemetry);
 
@@ -230,8 +261,6 @@ changing the tool call and result types in the result.
     }),
     tracer,
     fn: async span => {
-      const retry = retryWithExponentialBackoff({ maxRetries });
-
       const mode = {
         type: 'regular' as const,
         ...prepareToolsAndToolChoice({ tools, toolChoice, activeTools }),
@@ -245,11 +274,11 @@ changing the tool call and result types in the result.
       let currentToolCalls: ToolCallArray<TOOLS> = [];
       let currentToolResults: ToolResultArray<TOOLS> = [];
       let stepCount = 0;
-      const responseMessages: Array<CoreAssistantMessage | CoreToolMessage> =
-        [];
+      const responseMessages: Array<ResponseMessage> = [];
       let text = '';
-      const steps: GenerateTextResult<TOOLS>['steps'] = [];
-      const usage: LanguageModelUsage = {
+      const sources: GenerateTextResult<TOOLS, OUTPUT>['sources'] = [];
+      const steps: GenerateTextResult<TOOLS, OUTPUT>['steps'] = [];
+      let usage: LanguageModelUsage = {
         completionTokens: 0,
         promptTokens: 0,
         totalTokens: 0,
@@ -258,21 +287,22 @@ changing the tool call and result types in the result.
       let stepType: 'initial' | 'tool-result' | 'continue' | 'done' = 'initial';
 
       do {
-        if (stepCount === 1) {
-          initialPrompt.type = 'messages';
-        }
-
         // after the 1st step, we need to switch to messages format:
         const promptFormat = stepCount === 0 ? initialPrompt.type : 'messages';
+
+        const stepInputMessages = [
+          ...initialPrompt.messages,
+          ...responseMessages,
+        ];
 
         const promptMessages = await convertToLanguageModelPrompt({
           prompt: {
             type: promptFormat,
             system: initialPrompt.system,
-            messages: [...initialPrompt.messages, ...responseMessages],
+            messages: stepInputMessages,
           },
           modelSupportsImageUrls: model.supportsImageUrls,
-          modelSupportsUrl: model.supportsUrl,
+          modelSupportsUrl: model.supportsUrl?.bind(model), // support 'this' context
         });
 
         currentModelResponse = await retry(() =>
@@ -289,6 +319,16 @@ changing the tool call and result types in the result.
                 'ai.prompt.format': { input: () => promptFormat },
                 'ai.prompt.messages': {
                   input: () => JSON.stringify(promptMessages),
+                },
+                'ai.prompt.tools': {
+                  // convert the language model level tools:
+                  input: () => mode.tools?.map(tool => JSON.stringify(tool)),
+                },
+                'ai.prompt.toolChoice': {
+                  input: () =>
+                    mode.toolChoice != null
+                      ? JSON.stringify(mode.toolChoice)
+                      : undefined,
                 },
 
                 // standardized gen-ai llm span attributes:
@@ -309,8 +349,9 @@ changing the tool call and result types in the result.
                 mode,
                 ...callSettings,
                 inputFormat: promptFormat,
+                responseFormat: output?.responseFormat({ model }),
                 prompt: promptMessages,
-                providerMetadata,
+                providerMetadata: providerOptions,
                 abortSignal,
                 headers,
               });
@@ -342,15 +383,6 @@ changing the tool call and result types in the result.
                     'ai.usage.promptTokens': result.usage.promptTokens,
                     'ai.usage.completionTokens': result.usage.completionTokens,
 
-                    // deprecated:
-                    'ai.finishReason': result.finishReason,
-                    'ai.result.text': {
-                      output: () => result.text,
-                    },
-                    'ai.result.toolCalls': {
-                      output: () => JSON.stringify(result.toolCalls),
-                    },
-
                     // standardized gen-ai llm span attributes:
                     'gen_ai.response.finish_reasons': [result.finishReason],
                     'gen_ai.response.id': responseData.id,
@@ -367,8 +399,16 @@ changing the tool call and result types in the result.
         );
 
         // parse tool calls:
-        currentToolCalls = (currentModelResponse.toolCalls ?? []).map(
-          modelToolCall => parseToolCall({ toolCall: modelToolCall, tools }),
+        currentToolCalls = await Promise.all(
+          (currentModelResponse.toolCalls ?? []).map(toolCall =>
+            parseToolCall({
+              toolCall,
+              tools,
+              repairToolCall,
+              system,
+              messages: stepInputMessages,
+            }),
+          ),
         );
 
         // execute tools:
@@ -380,6 +420,7 @@ changing the tool call and result types in the result.
                 tools,
                 tracer,
                 telemetry,
+                messages: stepInputMessages,
                 abortSignal,
               });
 
@@ -387,9 +428,7 @@ changing the tool call and result types in the result.
         const currentUsage = calculateLanguageModelUsage(
           currentModelResponse.usage,
         );
-        usage.completionTokens += currentUsage.completionTokens;
-        usage.promptTokens += currentUsage.promptTokens;
-        usage.totalTokens += currentUsage.totalTokens;
+        usage = addLanguageModelUsage(usage, currentUsage);
 
         // check if another step is needed:
         let nextStepType: 'done' | 'continue' | 'tool-result' = 'done';
@@ -412,16 +451,24 @@ changing the tool call and result types in the result.
         }
 
         // text:
+        const originalText = currentModelResponse.text ?? '';
+        const stepTextLeadingWhitespaceTrimmed =
+          stepType === 'continue' && // only for continue steps
+          text.trimEnd() !== text // only trim when there is preceding whitespace
+            ? originalText.trimStart()
+            : originalText;
         const stepText =
           nextStepType === 'continue'
-            ? removeTextAfterLastWhitespace(currentModelResponse.text ?? '')
-            : currentModelResponse.text ?? '';
+            ? removeTextAfterLastWhitespace(stepTextLeadingWhitespaceTrimmed)
+            : stepTextLeadingWhitespaceTrimmed;
 
-        // text updates
         text =
           nextStepType === 'continue' || stepType === 'continue'
             ? text + stepText
             : stepText;
+
+        // sources:
+        sources.push(...(currentModelResponse.sources ?? []));
 
         // append to messages for potential next step:
         if (stepType === 'continue') {
@@ -433,7 +480,7 @@ changing the tool call and result types in the result.
           ] as CoreAssistantMessage;
 
           if (typeof lastMessage.content === 'string') {
-            lastMessage.content = text;
+            lastMessage.content += stepText;
           } else {
             lastMessage.content.push({
               text: stepText,
@@ -447,6 +494,8 @@ changing the tool call and result types in the result.
               tools: tools ?? ({} as TOOLS),
               toolCalls: currentToolCalls,
               toolResults: currentToolResults,
+              messageId: generateMessageId(),
+              generateMessageId,
             }),
           );
         }
@@ -455,6 +504,8 @@ changing the tool call and result types in the result.
         const currentStepResult: StepResult<TOOLS> = {
           stepType,
           text: stepText,
+          reasoning: currentModelResponse.reasoning,
+          sources: currentModelResponse.sources ?? [],
           toolCalls: currentToolCalls,
           toolResults: currentToolResults,
           finishReason: currentModelResponse.finishReason,
@@ -467,8 +518,9 @@ changing the tool call and result types in the result.
             headers: currentModelResponse.rawResponse?.headers,
 
             // deep clone msgs to avoid mutating past messages in multi-step:
-            messages: JSON.parse(JSON.stringify(responseMessages)),
+            messages: structuredClone(responseMessages),
           },
+          providerMetadata: currentModelResponse.providerMetadata,
           experimental_providerMetadata: currentModelResponse.providerMetadata,
           isContinued: nextStepType === 'continue',
         };
@@ -494,21 +546,24 @@ changing the tool call and result types in the result.
             'ai.usage.promptTokens': currentModelResponse.usage.promptTokens,
             'ai.usage.completionTokens':
               currentModelResponse.usage.completionTokens,
-
-            // deprecated:
-            'ai.finishReason': currentModelResponse.finishReason,
-            'ai.result.text': {
-              output: () => currentModelResponse.text,
-            },
-            'ai.result.toolCalls': {
-              output: () => JSON.stringify(currentModelResponse.toolCalls),
-            },
           },
         }),
       );
 
       return new DefaultGenerateTextResult({
         text,
+        reasoning: currentModelResponse.reasoning,
+        sources,
+        outputResolver: () => {
+          if (output == null) {
+            throw new NoOutputSpecifiedError();
+          }
+
+          return output.parseOutput(
+            { text },
+            { response: currentModelResponse.response, usage },
+          );
+        },
         toolCalls: currentToolCalls,
         toolResults: currentToolResults,
         finishReason: currentModelResponse.finishReason,
@@ -521,7 +576,6 @@ changing the tool call and result types in the result.
           messages: responseMessages,
         },
         logprobs: currentModelResponse.logprobs,
-        responseMessages,
         steps,
         providerMetadata: currentModelResponse.providerMetadata,
       });
@@ -529,22 +583,24 @@ changing the tool call and result types in the result.
   });
 }
 
-async function executeTools<TOOLS extends Record<string, CoreTool>>({
+async function executeTools<TOOLS extends ToolSet>({
   toolCalls,
   tools,
   tracer,
   telemetry,
+  messages,
   abortSignal,
 }: {
   toolCalls: ToolCallArray<TOOLS>;
   tools: TOOLS;
   tracer: Tracer;
   telemetry: TelemetrySettings | undefined;
+  messages: CoreMessage[];
   abortSignal: AbortSignal | undefined;
 }): Promise<ToolResultArray<TOOLS>> {
   const toolResults = await Promise.all(
-    toolCalls.map(async toolCall => {
-      const tool = tools[toolCall.toolName];
+    toolCalls.map(async ({ toolCallId, toolName, args }) => {
+      const tool = tools[toolName];
 
       if (tool?.execute == null) {
         return undefined;
@@ -559,43 +615,57 @@ async function executeTools<TOOLS extends Record<string, CoreTool>>({
               operationId: 'ai.toolCall',
               telemetry,
             }),
-            'ai.toolCall.name': toolCall.toolName,
-            'ai.toolCall.id': toolCall.toolCallId,
+            'ai.toolCall.name': toolName,
+            'ai.toolCall.id': toolCallId,
             'ai.toolCall.args': {
-              output: () => JSON.stringify(toolCall.args),
+              output: () => JSON.stringify(args),
             },
           },
         }),
         tracer,
         fn: async span => {
-          const result = await tool.execute!(toolCall.args, { abortSignal });
-
           try {
-            span.setAttributes(
-              selectTelemetryAttributes({
-                telemetry,
-                attributes: {
-                  'ai.toolCall.result': {
-                    output: () => JSON.stringify(result),
-                  },
-                },
-              }),
-            );
-          } catch (ignored) {
-            // JSON stringify might fail if the result is not serializable,
-            // in which case we just ignore it. In the future we might want to
-            // add an optional serialize method to the tool interface and warn
-            // if the result is not serializable.
-          }
+            const result = await tool.execute!(args, {
+              toolCallId,
+              messages,
+              abortSignal,
+            });
 
-          return result;
+            try {
+              span.setAttributes(
+                selectTelemetryAttributes({
+                  telemetry,
+                  attributes: {
+                    'ai.toolCall.result': {
+                      output: () => JSON.stringify(result),
+                    },
+                  },
+                }),
+              );
+            } catch (ignored) {
+              // JSON stringify might fail if the result is not serializable,
+              // in which case we just ignore it. In the future we might want to
+              // add an optional serialize method to the tool interface and warn
+              // if the result is not serializable.
+            }
+
+            return result;
+          } catch (error) {
+            throw new ToolExecutionError({
+              toolCallId,
+              toolName,
+              toolArgs: args,
+              cause: error,
+            });
+          }
         },
       });
 
       return {
-        toolCallId: toolCall.toolCallId,
-        toolName: toolCall.toolName,
-        args: toolCall.args,
+        type: 'tool-result',
+        toolCallId,
+        toolName,
+        args,
         result,
       } as ToolResultArray<TOOLS>[number];
     }),
@@ -606,38 +676,56 @@ async function executeTools<TOOLS extends Record<string, CoreTool>>({
   );
 }
 
-class DefaultGenerateTextResult<TOOLS extends Record<string, CoreTool>>
-  implements GenerateTextResult<TOOLS>
+class DefaultGenerateTextResult<TOOLS extends ToolSet, OUTPUT>
+  implements GenerateTextResult<TOOLS, OUTPUT>
 {
-  readonly text: GenerateTextResult<TOOLS>['text'];
-  readonly toolCalls: GenerateTextResult<TOOLS>['toolCalls'];
-  readonly toolResults: GenerateTextResult<TOOLS>['toolResults'];
-  readonly finishReason: GenerateTextResult<TOOLS>['finishReason'];
-  readonly usage: GenerateTextResult<TOOLS>['usage'];
-  readonly warnings: GenerateTextResult<TOOLS>['warnings'];
-  readonly responseMessages: GenerateTextResult<TOOLS>['responseMessages'];
-  readonly roundtrips: GenerateTextResult<TOOLS>['roundtrips'];
-  readonly steps: GenerateTextResult<TOOLS>['steps'];
-  readonly rawResponse: GenerateTextResult<TOOLS>['rawResponse'];
-  readonly logprobs: GenerateTextResult<TOOLS>['logprobs'];
-  readonly experimental_providerMetadata: GenerateTextResult<TOOLS>['experimental_providerMetadata'];
-  readonly response: GenerateTextResult<TOOLS>['response'];
-  readonly request: GenerateTextResult<TOOLS>['request'];
+  readonly text: GenerateTextResult<TOOLS, OUTPUT>['text'];
+  readonly reasoning: GenerateTextResult<TOOLS, OUTPUT>['reasoning'];
+  readonly toolCalls: GenerateTextResult<TOOLS, OUTPUT>['toolCalls'];
+  readonly toolResults: GenerateTextResult<TOOLS, OUTPUT>['toolResults'];
+  readonly finishReason: GenerateTextResult<TOOLS, OUTPUT>['finishReason'];
+  readonly usage: GenerateTextResult<TOOLS, OUTPUT>['usage'];
+  readonly warnings: GenerateTextResult<TOOLS, OUTPUT>['warnings'];
+  readonly steps: GenerateTextResult<TOOLS, OUTPUT>['steps'];
+  readonly logprobs: GenerateTextResult<TOOLS, OUTPUT>['logprobs'];
+  readonly experimental_providerMetadata: GenerateTextResult<
+    TOOLS,
+    OUTPUT
+  >['experimental_providerMetadata'];
+  readonly providerMetadata: GenerateTextResult<
+    TOOLS,
+    OUTPUT
+  >['providerMetadata'];
+  readonly response: GenerateTextResult<TOOLS, OUTPUT>['response'];
+  readonly request: GenerateTextResult<TOOLS, OUTPUT>['request'];
+  readonly sources: GenerateTextResult<TOOLS, OUTPUT>['sources'];
+
+  private readonly outputResolver: () => GenerateTextResult<
+    TOOLS,
+    OUTPUT
+  >['experimental_output'];
+
   constructor(options: {
-    text: GenerateTextResult<TOOLS>['text'];
-    toolCalls: GenerateTextResult<TOOLS>['toolCalls'];
-    toolResults: GenerateTextResult<TOOLS>['toolResults'];
-    finishReason: GenerateTextResult<TOOLS>['finishReason'];
-    usage: GenerateTextResult<TOOLS>['usage'];
-    warnings: GenerateTextResult<TOOLS>['warnings'];
-    logprobs: GenerateTextResult<TOOLS>['logprobs'];
-    responseMessages: GenerateTextResult<TOOLS>['responseMessages'];
-    steps: GenerateTextResult<TOOLS>['steps'];
-    providerMetadata: GenerateTextResult<TOOLS>['experimental_providerMetadata'];
-    response: GenerateTextResult<TOOLS>['response'];
-    request: GenerateTextResult<TOOLS>['request'];
+    text: GenerateTextResult<TOOLS, OUTPUT>['text'];
+    reasoning: GenerateTextResult<TOOLS, OUTPUT>['reasoning'];
+    toolCalls: GenerateTextResult<TOOLS, OUTPUT>['toolCalls'];
+    toolResults: GenerateTextResult<TOOLS, OUTPUT>['toolResults'];
+    finishReason: GenerateTextResult<TOOLS, OUTPUT>['finishReason'];
+    usage: GenerateTextResult<TOOLS, OUTPUT>['usage'];
+    warnings: GenerateTextResult<TOOLS, OUTPUT>['warnings'];
+    logprobs: GenerateTextResult<TOOLS, OUTPUT>['logprobs'];
+    steps: GenerateTextResult<TOOLS, OUTPUT>['steps'];
+    providerMetadata: GenerateTextResult<TOOLS, OUTPUT>['providerMetadata'];
+    response: GenerateTextResult<TOOLS, OUTPUT>['response'];
+    request: GenerateTextResult<TOOLS, OUTPUT>['request'];
+    outputResolver: () => GenerateTextResult<
+      TOOLS,
+      OUTPUT
+    >['experimental_output'];
+    sources: GenerateTextResult<TOOLS, OUTPUT>['sources'];
   }) {
     this.text = options.text;
+    this.reasoning = options.reasoning;
     this.toolCalls = options.toolCalls;
     this.toolResults = options.toolResults;
     this.finishReason = options.finishReason;
@@ -645,20 +733,15 @@ class DefaultGenerateTextResult<TOOLS extends Record<string, CoreTool>>
     this.warnings = options.warnings;
     this.request = options.request;
     this.response = options.response;
-    this.responseMessages = options.responseMessages;
-    this.roundtrips = options.steps;
     this.steps = options.steps;
     this.experimental_providerMetadata = options.providerMetadata;
-
-    // deprecated:
-    this.rawResponse = {
-      headers: options.response.headers,
-    };
+    this.providerMetadata = options.providerMetadata;
     this.logprobs = options.logprobs;
+    this.outputResolver = options.outputResolver;
+    this.sources = options.sources;
+  }
+
+  get experimental_output() {
+    return this.outputResolver();
   }
 }
-
-/**
- * @deprecated Use `generateText` instead.
- */
-export const experimental_generateText = generateText;

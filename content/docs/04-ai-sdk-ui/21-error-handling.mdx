@@ -5,13 +5,6 @@ description: Learn how to handle errors in the AI SDK UI
 
 # Error Handling
 
-### useChat: Keep Last Message on Error
-
-`useChat` has a `keepLastMessageOnError` option that defaults to `false`.
-This option can be enabled to keep the last message on error.
-We will make this the default behavior in the next major release,
-and recommend enabling it.
-
 ### Error Helper Object
 
 Each AI SDK UI hook also returns an [error](/docs/reference/ai-sdk-ui/use-chat#error) object that you can use to render the error in your UI.
@@ -26,11 +19,11 @@ You can use the error object to show an error message, disable the submit button
 ```tsx file="app/page.tsx" highlight="7,17-24,30"
 'use client';
 
-import { useChat } from 'ai/react';
+import { useChat } from '@ai-sdk/react';
 
 export default function Chat() {
   const { messages, input, handleInputChange, handleSubmit, error, reload } =
-    useChat({ keepLastMessageOnError: true });
+    useChat({});
 
   return (
     <div>
@@ -68,7 +61,7 @@ Alternatively you can write a custom submit handler that replaces the last messa
 ```tsx file="app/page.tsx" highlight="15-21,33"
 'use client';
 
-import { useChat } from 'ai/react';
+import { useChat } from '@ai-sdk/react';
 
 export default function Chat() {
   const {
@@ -77,8 +70,8 @@ export default function Chat() {
     error,
     input,
     messages,
-    setMesages,
-  } = useChat({ keepLastMessageOnError: true });
+    setMessages,
+  } = useChat({});
 
   function customSubmit(event: React.FormEvent<HTMLFormElement>) {
     if (error != null) {
@@ -112,13 +105,12 @@ Errors can be processed by passing an [`onError`](/docs/reference/ai-sdk-ui/use-
 The callback function receives an error object as an argument.
 
 ```tsx file="app/page.tsx" highlight="8-11"
-import { useChat } from 'ai/react';
+import { useChat } from '@ai-sdk/react';
 
 export default function Page() {
   const {
     /* ... */
   } = useChat({
-    keepLastMessageOnError: true,
     // handle error:
     onError: error => {
       console.error(error);

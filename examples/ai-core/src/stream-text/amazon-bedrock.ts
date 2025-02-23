@@ -3,7 +3,7 @@ import { streamText } from 'ai';
 import 'dotenv/config';
 
 async function main() {
-  const result = await streamText({
+  const result = streamText({
     model: bedrock('anthropic.claude-3-haiku-20240307-v1:0'),
     prompt: 'Invent a new holiday and describe its traditions.',
   });
@@ -15,6 +15,7 @@ async function main() {
   console.log();
   console.log('Token usage:', await result.usage);
   console.log('Finish reason:', await result.finishReason);
+  console.log('Response headers:', (await result.response).headers);
 }
 
 main().catch(console.error);

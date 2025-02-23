@@ -66,7 +66,8 @@ export function convertToLanguageModelMessage(
       return {
         role: 'system',
         content: message.content,
-        providerMetadata: message.experimental_providerMetadata,
+        providerMetadata:
+          message.providerOptions ?? message.experimental_providerMetadata,
       };
     }
 
@@ -75,7 +76,8 @@ export function convertToLanguageModelMessage(
         return {
           role: 'user',
           content: [{ type: 'text', text: message.content }],
-          providerMetadata: message.experimental_providerMetadata,
+          providerMetadata:
+            message.providerOptions ?? message.experimental_providerMetadata,
         };
       }
 
@@ -85,7 +87,8 @@ export function convertToLanguageModelMessage(
           .map(part => convertPartToLanguageModelPart(part, downloadedAssets))
           // remove empty text parts:
           .filter(part => part.type !== 'text' || part.text !== ''),
-        providerMetadata: message.experimental_providerMetadata,
+        providerMetadata:
+          message.providerOptions ?? message.experimental_providerMetadata,
       };
     }
 
@@ -94,7 +97,8 @@ export function convertToLanguageModelMessage(
         return {
           role: 'assistant',
           content: [{ type: 'text', text: message.content }],
-          providerMetadata: message.experimental_providerMetadata,
+          providerMetadata:
+            message.providerOptions ?? message.experimental_providerMetadata,
         };
       }
 
@@ -106,13 +110,16 @@ export function convertToLanguageModelMessage(
             part => part.type !== 'text' || part.text !== '',
           )
           .map(part => {
-            const { experimental_providerMetadata, ...rest } = part;
+            const { experimental_providerMetadata, providerOptions, ...rest } =
+              part;
             return {
               ...rest,
-              providerMetadata: experimental_providerMetadata,
+              providerMetadata:
+                providerOptions ?? experimental_providerMetadata,
             };
           }),
-        providerMetadata: message.experimental_providerMetadata,
+        providerMetadata:
+          message.providerOptions ?? message.experimental_providerMetadata,
       };
     }
 
@@ -126,9 +133,11 @@ export function convertToLanguageModelMessage(
           result: part.result,
           content: part.experimental_content,
           isError: part.isError,
-          providerMetadata: part.experimental_providerMetadata,
+          providerMetadata:
+            part.providerOptions ?? part.experimental_providerMetadata,
         })),
-        providerMetadata: message.experimental_providerMetadata,
+        providerMetadata:
+          message.providerOptions ?? message.experimental_providerMetadata,
       };
     }
 
@@ -276,28 +285,31 @@ function convertPartToLanguageModelPart(
       }
     }
   } else {
-    // Since we know know the content is not a URL, we can attempt to normalize the data
-    // assuming it is some sort of data.
+    // Since we know now the content is not a URL, we can attempt to normalize
+    // the data assuming it is some sort of data.
     normalizedData = convertDataContentToUint8Array(content);
   }
 
   // Now that we have the normalized data either as a URL or a Uint8Array,
   // we can create the LanguageModelV1Part.
   switch (type) {
-    case 'image':
-      // We give a best effort to detect the mime type if it is not provided.
-      // otherwise, we use the provided mime type.
-      if (mimeType == null && normalizedData instanceof Uint8Array) {
-        mimeType = detectImageMimeType(normalizedData);
-      }
+    case 'image': {
+      // When possible, try to detect the mimetype automatically
+      // to deal with incorrect mimetype inputs.
+      // When detection fails, use provided mimetype.
 
+      if (normalizedData instanceof Uint8Array) {
+        mimeType = detectImageMimeType(normalizedData) ?? mimeType;
+      }
       return {
         type: 'image',
         image: normalizedData,
         mimeType,
         providerMetadata: part.experimental_providerMetadata,
       };
-    case 'file':
+    }
+
+    case 'file': {
       // We should have a mimeType at this point, if not, throw an error.
       if (mimeType == null) {
         throw new Error(`Mime type is missing for file part`);
@@ -312,5 +324,6 @@ function convertPartToLanguageModelPart(
         mimeType,
         providerMetadata: part.experimental_providerMetadata,
       };
+    }
   }
 }

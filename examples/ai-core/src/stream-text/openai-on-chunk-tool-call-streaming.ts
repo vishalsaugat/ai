@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { weatherTool } from '../tools/weather-tool';
 
 async function main() {
-  const result = await streamText({
+  const result = streamText({
     model: openai('gpt-3.5-turbo'),
     tools: {
       weather: weatherTool,
@@ -13,7 +13,7 @@ async function main() {
         parameters: z.object({ city: z.string() }),
       },
     },
-    experimental_toolCallStreaming: true,
+    toolCallStreaming: true,
     onChunk(chunk) {
       console.log('onChunk', chunk);
     },

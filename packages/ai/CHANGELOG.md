@@ -1,5 +1,962 @@
 # ai
 
+## 4.1.45
+
+### Patch Changes
+
+- 93bd5a0: feat (ai/ui): add writeSource to createDataStream
+
+## 4.1.44
+
+### Patch Changes
+
+- f8e7df2: fix (ai/core): add `startWithReasoning` option to `extractReasoningMiddleware`
+
+## 4.1.43
+
+### Patch Changes
+
+- ef2e23b: feat (ai/core): add experimental repairText function to generateObject
+
+## 4.1.42
+
+### Patch Changes
+
+- Updated dependencies [2761f06]
+  - @ai-sdk/provider@1.0.8
+  - @ai-sdk/provider-utils@2.1.9
+  - @ai-sdk/ui-utils@1.1.15
+  - @ai-sdk/react@1.1.17
+
+## 4.1.41
+
+### Patch Changes
+
+- Updated dependencies [60c3220]
+  - @ai-sdk/react@1.1.16
+
+## 4.1.40
+
+### Patch Changes
+
+- Updated dependencies [c43df41]
+  - @ai-sdk/react@1.1.15
+
+## 4.1.39
+
+### Patch Changes
+
+- 075a9a9: fix (ai): improve tsdoc on custom provider
+
+## 4.1.38
+
+### Patch Changes
+
+- 4c9c194: chore (ai): add description to provider-defined tools for better accessibility
+- 2e898b4: chore (ai): move mockId test helper into provider utils
+- Updated dependencies [2e898b4]
+  - @ai-sdk/provider-utils@2.1.8
+  - @ai-sdk/react@1.1.14
+  - @ai-sdk/ui-utils@1.1.14
+
+## 4.1.37
+
+### Patch Changes
+
+- c1e10d1: chore: export UIMessage type
+
+## 4.1.36
+
+### Patch Changes
+
+- Updated dependencies [3ff4ef8]
+  - @ai-sdk/provider-utils@2.1.7
+  - @ai-sdk/react@1.1.13
+  - @ai-sdk/ui-utils@1.1.13
+
+## 4.1.35
+
+### Patch Changes
+
+- 166e09e: feat (ai/ui): forward source parts to useChat
+- Updated dependencies [166e09e]
+  - @ai-sdk/ui-utils@1.1.12
+  - @ai-sdk/react@1.1.12
+
+## 4.1.34
+
+### Patch Changes
+
+- dc49119: chore: deprecate ai/react
+
+## 4.1.33
+
+### Patch Changes
+
+- 74f0f0e: chore (ai/core): move providerMetadata to stable
+
+## 4.1.32
+
+### Patch Changes
+
+- c128ca5: fix (ai/core): fix streamText onFinish messages with structured output
+
+## 4.1.31
+
+### Patch Changes
+
+- b30b1cc: feat (ai/core): add onError callback to streamObject
+
+## 4.1.30
+
+### Patch Changes
+
+- 4ee5b6f: fix (core): remove invalid providerOptions from streamObject onFinish callback
+
+## 4.1.29
+
+### Patch Changes
+
+- 605de49: feat (ai/core): export callback types
+
+## 4.1.28
+
+### Patch Changes
+
+- 6eb7fc4: feat (ai/core): url source support
+
+## 4.1.27
+
+### Patch Changes
+
+- Updated dependencies [318b351]
+  - @ai-sdk/ui-utils@1.1.11
+  - @ai-sdk/react@1.1.11
+
+## 4.1.26
+
+### Patch Changes
+
+- 34983d4: fix (ai/core): bind supportsUrl when creating wrapper
+
+## 4.1.25
+
+### Patch Changes
+
+- 5a21310: fix (ai/core): use ai types on custom provider to prevent ts error
+
+## 4.1.24
+
+### Patch Changes
+
+- 38142b8: feat (ai/core): introduce streamText consumeStream
+
+## 4.1.23
+
+### Patch Changes
+
+- b08f7c1: fix (ai/core): suppress errors in textStream
+
+## 4.1.22
+
+### Patch Changes
+
+- 2bec72a: feat (ai/core): add onError callback to streamText
+
+## 4.1.21
+
+### Patch Changes
+
+- d387989: feat (ai/core): re-export zodSchema
+
+## 4.1.20
+
+### Patch Changes
+
+- bcc61d4: feat (ui): introduce message parts for useChat
+- Updated dependencies [bcc61d4]
+  - @ai-sdk/ui-utils@1.1.10
+  - @ai-sdk/react@1.1.10
+
+## 4.1.19
+
+### Patch Changes
+
+- Updated dependencies [6b8cc14]
+  - @ai-sdk/ui-utils@1.1.9
+  - @ai-sdk/react@1.1.9
+
+## 4.1.18
+
+### Patch Changes
+
+- 6a1acfe: fix (ai/core): revert '@internal' tag on function definitions due to build impacts
+
+## 4.1.17
+
+### Patch Changes
+
+- 5af8cdb: fix (ai/core): support this reference in model.supportsUrl implementations
+
+## 4.1.16
+
+### Patch Changes
+
+- 7e299a4: feat (ai/core): wrapLanguageModel can apply multiple middlewares
+
+## 4.1.15
+
+### Patch Changes
+
+- d89c3b9: feat (provider): add image model support to provider specification
+- d89c3b9: feat (core): type ahead for model ids with custom provider
+- 08f54fc: chore (ai/core): move custom provider to stable
+- Updated dependencies [d89c3b9]
+  - @ai-sdk/provider@1.0.7
+  - @ai-sdk/provider-utils@2.1.6
+  - @ai-sdk/ui-utils@1.1.8
+  - @ai-sdk/react@1.1.8
+
+## 4.1.14
+
+### Patch Changes
+
+- ca89615: fix (ai/core): only append assistant response at the end when there is a final user message
+
+## 4.1.13
+
+### Patch Changes
+
+- 999085e: feat (ai/core): add write function to DataStreamWriter
+
+## 4.1.12
+
+### Patch Changes
+
+- 0d2d9bf: fix (ui): single assistant message with multiple tool steps
+- Updated dependencies [0d2d9bf]
+- Updated dependencies [0d2d9bf]
+  - @ai-sdk/react@1.1.7
+  - @ai-sdk/ui-utils@1.1.7
+
+## 4.1.11
+
+### Patch Changes
+
+- 4c58da5: chore (core): move providerOptions to stable
+
+## 4.1.10
+
+### Patch Changes
+
+- bf2c9c6: feat (core): move middleware to stable
+
+## 4.1.9
+
+### Patch Changes
+
+- 3a602ca: chore (core): rename CoreTool to Tool
+- Updated dependencies [3a602ca]
+  - @ai-sdk/provider-utils@2.1.5
+  - @ai-sdk/ui-utils@1.1.6
+  - @ai-sdk/react@1.1.6
+
+## 4.1.8
+
+### Patch Changes
+
+- 92f5f36: feat (core): add extractReasoningMiddleware
+
+## 4.1.7
+
+### Patch Changes
+
+- 066206e: feat (provider-utils): move delay to provider-utils from ai
+- Updated dependencies [066206e]
+  - @ai-sdk/provider-utils@2.1.4
+  - @ai-sdk/react@1.1.5
+  - @ai-sdk/ui-utils@1.1.5
+
+## 4.1.6
+
+### Patch Changes
+
+- Updated dependencies [39e5c1f]
+  - @ai-sdk/provider-utils@2.1.3
+  - @ai-sdk/react@1.1.4
+  - @ai-sdk/ui-utils@1.1.4
+
+## 4.1.5
+
+### Patch Changes
+
+- 9ce598c: feat (ai/ui): add reasoning support to useChat
+- Updated dependencies [9ce598c]
+  - @ai-sdk/ui-utils@1.1.3
+  - @ai-sdk/react@1.1.3
+
+## 4.1.4
+
+### Patch Changes
+
+- caaad11: feat (ai/core): re-export languagemodelv1 types for middleware implementations
+- caaad11: feat (ai/core): expose TelemetrySettings type
+
+## 4.1.3
+
+### Patch Changes
+
+- 7f30a77: feat (core): export core message schemas
+- 4298996: feat (core): add helper for merging single client message
+
+## 4.1.2
+
+### Patch Changes
+
+- 3c5fafa: chore (ai/core): move streamText toolCallStreaming option to stable
+- 3a58a2e: feat (ai/core): throw NoImageGeneratedError from generateImage when no predictions are returned.
+- Updated dependencies [ed012d2]
+- Updated dependencies [6f4d063]
+- Updated dependencies [3a58a2e]
+  - @ai-sdk/provider-utils@2.1.2
+  - @ai-sdk/react@1.1.2
+  - @ai-sdk/provider@1.0.6
+  - @ai-sdk/ui-utils@1.1.2
+
+## 4.1.1
+
+### Patch Changes
+
+- 0a699f1: feat: add reasoning token support
+- Updated dependencies [e7a9ec9]
+- Updated dependencies [0a699f1]
+  - @ai-sdk/ui-utils@1.1.1
+  - @ai-sdk/provider-utils@2.1.1
+  - @ai-sdk/provider@1.0.5
+  - @ai-sdk/react@1.1.1
+
+## 4.1.0
+
+### Minor Changes
+
+- 62ba5ad: release: AI SDK 4.1
+
+### Patch Changes
+
+- Updated dependencies [62ba5ad]
+  - @ai-sdk/provider-utils@2.1.0
+  - @ai-sdk/react@1.1.0
+  - @ai-sdk/ui-utils@1.1.0
+
+## 4.0.41
+
+### Patch Changes
+
+- Updated dependencies [44f04d5]
+  - @ai-sdk/react@1.0.14
+
+## 4.0.40
+
+### Patch Changes
+
+- 33592d2: fix (ai/core): switch to json schema 7 target for zod to json schema conversion
+- Updated dependencies [33592d2]
+  - @ai-sdk/ui-utils@1.0.12
+  - @ai-sdk/react@1.0.13
+
+## 4.0.39
+
+### Patch Changes
+
+- 00114c5: feat: expose IDGenerator and createIdGenerator
+- 00114c5: feat (ui): generate and forward message ids for response messages
+- Updated dependencies [00114c5]
+- Updated dependencies [00114c5]
+  - @ai-sdk/provider-utils@2.0.8
+  - @ai-sdk/ui-utils@1.0.11
+  - @ai-sdk/react@1.0.12
+
+## 4.0.38
+
+### Patch Changes
+
+- 0118fa7: fix (ai/core): handle empty tool invocation array in convertToCoreMessages
+
+## 4.0.37
+
+### Patch Changes
+
+- 8304ed8: feat (ai/core): Add option `throwErrorForEmptyVectors` to cosineSimilarity
+- ed28182: feat (ai/ui): add appendResponseMessages helper
+
+## 4.0.36
+
+### Patch Changes
+
+- Updated dependencies [37f4510]
+  - @ai-sdk/ui-utils@1.0.10
+  - @ai-sdk/react@1.0.11
+
+## 4.0.35
+
+### Patch Changes
+
+- 3491f78: feat (ai/core): support multiple stream text transforms
+
+## 4.0.34
+
+### Patch Changes
+
+- 2495973: feat (ai/core): use openai compatible mode for json schema conversion
+- 2495973: fix (ai/core): duplicate instead of using reference in json schema
+- Updated dependencies [2495973]
+- Updated dependencies [2495973]
+  - @ai-sdk/ui-utils@1.0.9
+  - @ai-sdk/react@1.0.10
+
+## 4.0.33
+
+### Patch Changes
+
+- 5510ee7: feat (ai/core): add stopStream option to streamText transforms
+
+## 4.0.32
+
+### Patch Changes
+
+- de66619: feat (ai/core): add tool call id to ToolExecution error
+
+## 4.0.31
+
+### Patch Changes
+
+- Updated dependencies [90fb95a]
+- Updated dependencies [e6dfef4]
+- Updated dependencies [6636db6]
+  - @ai-sdk/provider-utils@2.0.7
+  - @ai-sdk/react@1.0.9
+  - @ai-sdk/ui-utils@1.0.8
+
+## 4.0.30
+
+### Patch Changes
+
+- e4ce80c: fix (ai/core): prevent onFinish from masking stream errors
+
+## 4.0.29
+
+### Patch Changes
+
+- a92f5f6: feat (ai/core): generate many images with parallel model calls
+
+## 4.0.28
+
+### Patch Changes
+
+- 19a2ce7: feat (ai/core): add aspectRatio and seed options to generateImage
+- 6337688: feat: change image generation errors to warnings
+- 8b422ea: feat (ai/core): add caching to generated images
+- Updated dependencies [19a2ce7]
+- Updated dependencies [19a2ce7]
+- Updated dependencies [6337688]
+  - @ai-sdk/provider@1.0.4
+  - @ai-sdk/provider-utils@2.0.6
+  - @ai-sdk/ui-utils@1.0.7
+  - @ai-sdk/react@1.0.8
+
+## 4.0.27
+
+### Patch Changes
+
+- a56734f: feat (ai/core): export simulateReadableStream in ai package
+- 9589601: feat (ai/core): support null delay in smoothStream
+- e3cc23a: feat (ai/core): support regexp chunking pattern in smoothStream
+- e463e73: feat (ai/core): support skipping delays in simulateReadableStream
+
+## 4.0.26
+
+### Patch Changes
+
+- a8f3242: feat (ai/core): add line chunking mode to smoothStream
+
+## 4.0.25
+
+### Patch Changes
+
+- 0823899: fix (ai/core): throw error when accessing output when no output is defined in generateText (breaking/experimental)
+
+## 4.0.24
+
+### Patch Changes
+
+- ae0485b: feat (ai/core): add experimental output setting to streamText
+
+## 4.0.23
+
+### Patch Changes
+
+- bc4cd19: feat (ai/core): consolidate whitespace in smooth stream
+
+## 4.0.22
+
+### Patch Changes
+
+- Updated dependencies [5ed5e45]
+  - @ai-sdk/provider-utils@2.0.5
+  - @ai-sdk/provider@1.0.3
+  - @ai-sdk/react@1.0.7
+  - @ai-sdk/ui-utils@1.0.6
+
+## 4.0.21
+
+### Patch Changes
+
+- a8669a2: fix (ai/core): prefer auto-detected image mimetype
+- 6fb3e91: fix (ai/core): include type in generateText toolResults result property.
+
+## 4.0.20
+
+### Patch Changes
+
+- da9d240: fix (ai/core): suppress errors caused by writing to closed stream
+- 6f1bfde: fix (ai/core): invoke streamText tool call repair when tool cannot be found
+
+## 4.0.19
+
+### Patch Changes
+
+- c3a6065: fix (ai/core): apply transform before callbacks and resolvables
+
+## 4.0.18
+
+### Patch Changes
+
+- 304e6d3: feat (ai/core): standardize generateObject, streamObject, and output errors to NoObjectGeneratedError
+- 304e6d3: feat (ai/core): add additional information to NoObjectGeneratedError
+
+## 4.0.17
+
+### Patch Changes
+
+- 54bbf21: fix (ai/core): change streamText.experimental_transform signature to support tool type inference
+
+## 4.0.16
+
+### Patch Changes
+
+- e3fac3f: fix (ai/core): change smoothStream default delay to 10ms
+
+## 4.0.15
+
+### Patch Changes
+
+- cc16a83: feat (ai/core): add smoothStream helper
+- cc16a83: feat (ai/core): add experimental transform option to streamText
+
+## 4.0.14
+
+### Patch Changes
+
+- 09a9cab: feat (ai/core): add experimental generateImage function
+- Updated dependencies [09a9cab]
+  - @ai-sdk/provider@1.0.2
+  - @ai-sdk/provider-utils@2.0.4
+  - @ai-sdk/ui-utils@1.0.5
+  - @ai-sdk/react@1.0.6
+
+## 4.0.13
+
+### Patch Changes
+
+- 9f32213: feat (ai/core): add experimental tool call repair
+
+## 4.0.12
+
+### Patch Changes
+
+- 5167bec: fix (ai/core): forward streamText errors as error parts
+- 0984f0b: feat (ai/core): add ToolExecutionError type
+- Updated dependencies [0984f0b]
+  - @ai-sdk/provider-utils@2.0.3
+  - @ai-sdk/react@1.0.5
+  - @ai-sdk/ui-utils@1.0.4
+
+## 4.0.11
+
+### Patch Changes
+
+- Updated dependencies [953469c]
+- Updated dependencies [a3dd2ed]
+  - @ai-sdk/ui-utils@1.0.3
+  - @ai-sdk/react@1.0.4
+
+## 4.0.10
+
+### Patch Changes
+
+- 913872d: fix (ai/core): track promise from async createDataStream.execute
+
+## 4.0.9
+
+### Patch Changes
+
+- fda9695: feat (ai/core): reworked data stream management
+
+## 4.0.8
+
+### Patch Changes
+
+- a803d76: feat (ai/core): pass toolCallId option into tool execute function
+
+## 4.0.7
+
+### Patch Changes
+
+- 5b4f07b: fix (ai/core): change default error message for data streams to "An error occurred."
+
+## 4.0.6
+
+### Patch Changes
+
+- fc18132: feat (ai/core): experimental output for generateText
+- 2779f6d: fix (ai/core): do not send maxRetries into providers
+
+## 4.0.5
+
+### Patch Changes
+
+- Updated dependencies [630ac31]
+  - @ai-sdk/react@1.0.3
+
+## 4.0.4
+
+### Patch Changes
+
+- 6ff6689: fix (ai): trigger onFinal when stream adapter finishes
+- 6ff6689: chore (ai): deprecate onCompletion (stream callbacks)
+
+## 4.0.3
+
+### Patch Changes
+
+- Updated dependencies [88b364b]
+- Updated dependencies [b446ae5]
+  - @ai-sdk/ui-utils@1.0.2
+  - @ai-sdk/provider@1.0.1
+  - @ai-sdk/react@1.0.2
+  - @ai-sdk/provider-utils@2.0.2
+
+## 4.0.2
+
+### Patch Changes
+
+- Updated dependencies [c3ab5de]
+  - @ai-sdk/provider-utils@2.0.1
+  - @ai-sdk/react@1.0.1
+  - @ai-sdk/ui-utils@1.0.1
+
+## 4.0.1
+
+### Patch Changes
+
+- b117255: feat (ai/core): add messages to tool call options
+
+## 4.0.0
+
+### Major Changes
+
+- 4e38b38: chore (ai): remove LanguageModelResponseMetadataWithHeaders type
+- 8bf5756: chore: remove legacy function/tool calling
+- f0cb69d: chore (ai/core): remove experimental function exports
+- da8c609: chore (ai): remove Tokens RSC helper
+- cbab571: chore (ai): remove ExperimentalXXXMessage types
+- b469a7e: chore: remove isXXXError methods
+- 54cb888: chore (ai): remove experimental_StreamData export
+- 4d61295: chore (ai): remove streamToResponse and streamingTextResponse
+- 9a3d741: chore (ai): remove ExperimentalTool export
+- 064257d: chore (ai/core): rename simulateReadableStream values parameter to chunks
+- 60e69ed: chore (ai/core): remove ai-stream related methods from streamText
+- a4f8ce9: chore (ai): AssistantResponse cleanups
+- d3ae4f6: chore (ui/react): remove useObject setInput helper
+- 7264b0a: chore (ai): remove responseMessages property from streamText/generateText result
+- b801982: chore (ai/core): remove init option from streamText result methods
+- f68d7b1: chore (ai/core): streamObject returns result immediately (no Promise)
+- 6090cea: chore (ai): remove rawResponse from generate/stream result objects
+- 073f282: chore (ai): remove AIStream and related exports
+- 1c58337: chore (ai): remove 2.x prompt helpers
+- a40a93d: chore (ai/ui): remove vue, svelte, solid re-export and dependency
+- a7ad35a: chore: remove legacy providers & rsc render
+- c0ddc24: chore (ai): remove toJSON method from AI SDK errors
+- 007cb81: chore (ai): change `streamText` warnings result to Promise
+- effbce3: chore (ai): remove responseMessage from streamText onFinish callback
+- 545d133: chore (ai): remove deprecated roundtrip settings from streamText / generateText
+- 7e89ccb: chore: remove nanoid export
+- f967199: chore (ai/core): streamText returns result immediately (no Promise)
+- 62d08fd: chore (ai): remove TokenUsage, CompletionTokenUsage, and EmbeddingTokenUsage types
+- e5d2ce8: chore (ai): remove deprecated provider registry exports
+- 70ce742: chore (ai): remove experimental_continuationSteps option
+- 2f09717: chore (ai): remove deprecated telemetry data
+- 0827bf9: chore (ai): remove LangChain adapter `toAIStream` method
+
+### Patch Changes
+
+- dce4158: chore (dependencies): update eventsource-parser to 3.0.0
+- f0ec721: chore (ai): remove openai peer dependency
+- f9bb30c: chore (ai): remove unnecessary dev dependencies
+- b053413: chore (ui): refactorings & README update
+- Updated dependencies [e117b54]
+- Updated dependencies [8bf5756]
+- Updated dependencies [b469a7e]
+- Updated dependencies [79c6dd9]
+- Updated dependencies [9f81e66]
+- Updated dependencies [70f28f6]
+- Updated dependencies [dce4158]
+- Updated dependencies [d3ae4f6]
+- Updated dependencies [68d30e9]
+- Updated dependencies [7814c4b]
+- Updated dependencies [ca3e586]
+- Updated dependencies [c0ddc24]
+- Updated dependencies [fe4f109]
+- Updated dependencies [84edae5]
+- Updated dependencies [b1da952]
+- Updated dependencies [04d3747]
+- Updated dependencies [dce4158]
+- Updated dependencies [7e89ccb]
+- Updated dependencies [8426f55]
+- Updated dependencies [db46ce5]
+- Updated dependencies [b053413]
+  - @ai-sdk/react@1.0.0
+  - @ai-sdk/ui-utils@1.0.0
+  - @ai-sdk/provider-utils@2.0.0
+  - @ai-sdk/provider@1.0.0
+
+## 4.0.0-canary.13
+
+### Major Changes
+
+- 064257d: chore (ai/core): rename simulateReadableStream values parameter to chunks
+
+### Patch Changes
+
+- Updated dependencies [79c6dd9]
+- Updated dependencies [04d3747]
+  - @ai-sdk/react@1.0.0-canary.9
+  - @ai-sdk/ui-utils@1.0.0-canary.9
+
+## 4.0.0-canary.12
+
+### Patch Changes
+
+- b053413: chore (ui): refactorings & README update
+- Updated dependencies [b053413]
+  - @ai-sdk/ui-utils@1.0.0-canary.8
+  - @ai-sdk/react@1.0.0-canary.8
+
+## 4.0.0-canary.11
+
+### Major Changes
+
+- f68d7b1: chore (ai/core): streamObject returns result immediately (no Promise)
+- f967199: chore (ai/core): streamText returns result immediately (no Promise)
+
+## 4.0.0-canary.10
+
+### Major Changes
+
+- effbce3: chore (ai): remove responseMessage from streamText onFinish callback
+
+### Patch Changes
+
+- Updated dependencies [fe4f109]
+  - @ai-sdk/ui-utils@1.0.0-canary.7
+  - @ai-sdk/react@1.0.0-canary.7
+
+## 4.0.0-canary.9
+
+### Patch Changes
+
+- f0ec721: chore (ai): remove openai peer dependency
+
+## 4.0.0-canary.8
+
+### Major Changes
+
+- 007cb81: chore (ai): change `streamText` warnings result to Promise
+
+### Patch Changes
+
+- Updated dependencies [70f28f6]
+  - @ai-sdk/ui-utils@1.0.0-canary.6
+  - @ai-sdk/react@1.0.0-canary.6
+
+## 4.0.0-canary.7
+
+### Major Changes
+
+- 4e38b38: chore (ai): remove LanguageModelResponseMetadataWithHeaders type
+- 54cb888: chore (ai): remove experimental_StreamData export
+- 9a3d741: chore (ai): remove ExperimentalTool export
+- a4f8ce9: chore (ai): AssistantResponse cleanups
+- 7264b0a: chore (ai): remove responseMessages property from streamText/generateText result
+- 62d08fd: chore (ai): remove TokenUsage, CompletionTokenUsage, and EmbeddingTokenUsage types
+- e5d2ce8: chore (ai): remove deprecated provider registry exports
+- 70ce742: chore (ai): remove experimental_continuationSteps option
+- 0827bf9: chore (ai): remove LangChain adapter `toAIStream` method
+
+## 4.0.0-canary.6
+
+### Major Changes
+
+- b801982: chore (ai/core): remove init option from streamText result methods
+
+### Patch Changes
+
+- f9bb30c: chore (ai): remove unnecessary dev dependencies
+
+## 4.0.0-canary.5
+
+### Major Changes
+
+- 4d61295: chore (ai): remove streamToResponse and streamingTextResponse
+- d3ae4f6: chore (ui/react): remove useObject setInput helper
+- 6090cea: chore (ai): remove rawResponse from generate/stream result objects
+- 2f09717: chore (ai): remove deprecated telemetry data
+
+### Patch Changes
+
+- Updated dependencies [9f81e66]
+- Updated dependencies [d3ae4f6]
+- Updated dependencies [8426f55]
+  - @ai-sdk/ui-utils@1.0.0-canary.5
+  - @ai-sdk/react@1.0.0-canary.5
+  - @ai-sdk/provider-utils@2.0.0-canary.3
+
+## 4.0.0-canary.4
+
+### Major Changes
+
+- f0cb69d: chore (ai/core): remove experimental function exports
+- da8c609: chore (ai): remove Tokens RSC helper
+- cbab571: chore (ai): remove ExperimentalXXXMessage types
+- 60e69ed: chore (ai/core): remove ai-stream related methods from streamText
+- 073f282: chore (ai): remove AIStream and related exports
+- 545d133: chore (ai): remove deprecated roundtrip settings from streamText / generateText
+
+### Patch Changes
+
+- dce4158: chore (dependencies): update eventsource-parser to 3.0.0
+- Updated dependencies [dce4158]
+- Updated dependencies [ca3e586]
+- Updated dependencies [dce4158]
+  - @ai-sdk/provider-utils@2.0.0-canary.2
+  - @ai-sdk/react@1.0.0-canary.4
+  - @ai-sdk/ui-utils@1.0.0-canary.4
+
+## 4.0.0-canary.3
+
+### Patch Changes
+
+- Updated dependencies [68d30e9]
+- Updated dependencies [b1da952]
+  - @ai-sdk/react@1.0.0-canary.3
+  - @ai-sdk/provider-utils@2.0.0-canary.1
+  - @ai-sdk/ui-utils@1.0.0-canary.3
+
+## 4.0.0-canary.2
+
+### Major Changes
+
+- b469a7e: chore: remove isXXXError methods
+- c0ddc24: chore (ai): remove toJSON method from AI SDK errors
+
+### Patch Changes
+
+- Updated dependencies [e117b54]
+- Updated dependencies [b469a7e]
+- Updated dependencies [7814c4b]
+- Updated dependencies [c0ddc24]
+- Updated dependencies [db46ce5]
+  - @ai-sdk/react@1.0.0-canary.2
+  - @ai-sdk/provider-utils@2.0.0-canary.0
+  - @ai-sdk/provider@1.0.0-canary.0
+  - @ai-sdk/ui-utils@1.0.0-canary.2
+
+## 4.0.0-canary.1
+
+### Major Changes
+
+- 8bf5756: chore: remove legacy function/tool calling
+
+### Patch Changes
+
+- 1c58337: chore (ai): remove 2.x prompt helpers
+- Updated dependencies [8bf5756]
+  - @ai-sdk/ui-utils@1.0.0-canary.1
+  - @ai-sdk/react@1.0.0-canary.1
+
+## 4.0.0-canary.0
+
+### Major Changes
+
+- a40a93d: chore (ai/ui): remove vue, svelte, solid re-export and dependency
+
+### Patch Changes
+
+- a7ad35a: chore: remove legacy providers & rsc render
+- 7e89ccb: chore: remove nanoid export
+- Updated dependencies [84edae5]
+- Updated dependencies [7e89ccb]
+  - @ai-sdk/react@1.0.0-canary.0
+  - @ai-sdk/ui-utils@1.0.0-canary.0
+
+## 3.4.33
+
+### Patch Changes
+
+- ac380e3: fix (provider/anthropic): continuation mode with 3+ steps
+
+## 3.4.32
+
+### Patch Changes
+
+- 6bb9e51: fix (ai/core): expose response.messages in streamText
+
+## 3.4.31
+
+### Patch Changes
+
+- Updated dependencies [2dfb93e]
+  - @ai-sdk/react@0.0.70
+
+## 3.4.30
+
+### Patch Changes
+
+- Updated dependencies [a85c965]
+  - @ai-sdk/ui-utils@0.0.50
+  - @ai-sdk/react@0.0.69
+  - @ai-sdk/solid@0.0.54
+  - @ai-sdk/svelte@0.0.57
+  - @ai-sdk/vue@0.0.59
+
+## 3.4.29
+
+### Patch Changes
+
+- 54b56f7: feat (ai/core): send tool and tool choice telemetry data
+
+## 3.4.28
+
+### Patch Changes
+
+- 29f1390: feat (ai/test): add simulateReadableStream helper
+
+## 3.4.27
+
+### Patch Changes
+
+- fa772ae: feat (ai/core): automatically convert ui messages to core messages
+
 ## 3.4.26
 
 ### Patch Changes

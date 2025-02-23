@@ -1,5 +1,5 @@
 import { openai } from '@ai-sdk/openai';
-import { convertToCoreMessages, streamText } from 'ai';
+import { streamText } from 'ai';
 import { z } from 'zod';
 
 // Allow streaming responses up to 30 seconds
@@ -8,10 +8,10 @@ export const maxDuration = 30;
 export async function POST(req: Request) {
   const { messages } = await req.json();
 
-  const result = await streamText({
+  const result = streamText({
     model: openai('gpt-4-turbo'),
-    messages: convertToCoreMessages(messages),
-    experimental_toolCallStreaming: true,
+    messages,
+    toolCallStreaming: true,
     system:
       'You are a helpful assistant that answers questions about the weather in a given city.' +
       'You use the showWeatherInformation tool to show the weather information to the user instead of talking about it.',

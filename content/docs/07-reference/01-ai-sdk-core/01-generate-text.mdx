@@ -51,8 +51,9 @@ To see `generateText` in action, check out [these examples](#examples).
     },
     {
       name: 'messages',
-      type: 'Array<CoreSystemMessage | CoreUserMessage | CoreAssistantMessage | CoreToolMessage>',
-      description: 'A list of messages that represent a conversation.',
+      type: 'Array<CoreSystemMessage | CoreUserMessage | CoreAssistantMessage | CoreToolMessage> | Array<UIMessage>',
+      description:
+        'A list of messages that represent a conversation. Automatically converts UI messages from the useChat hook.',
       properties: [
         {
           type: 'CoreSystemMessage',
@@ -259,12 +260,12 @@ To see `generateText` in action, check out [these examples](#examples).
     },
     {
       name: 'tools',
-      type: 'Record<string, CoreTool>',
+      type: 'ToolSet',
       description:
         'Tools that are accessible to and can be called by the model. The model needs to support calling tools.',
       properties: [
         {
-          type: 'CoreTool',
+          type: 'Tool',
           parameters: [
             {
               name: 'description',
@@ -282,9 +283,34 @@ To see `generateText` in action, check out [these examples](#examples).
             {
               name: 'execute',
               isOptional: true,
-              type: 'async (parameters: T, options: { abortSignal: AbortSignal }) => JSONValue',
+              type: 'async (parameters: T, options: ToolExecutionOptions) => RESULT',
               description:
                 'An async function that is called with the arguments from the tool call and produces a result. If not provided, the tool will not be executed automatically.',
+              properties: [
+                {
+                  type: 'ToolExecutionOptions',
+                  parameters: [
+                    {
+                      name: 'toolCallId',
+                      type: 'string',
+                      description:
+                        'The ID of the tool call. You can use it e.g. when sending tool-call related information with stream data.',
+                    },
+                    {
+                      name: 'messages',
+                      type: 'CoreMessage[]',
+                      description:
+                        'Messages that were sent to the language model to initiate the response that contained the tool call. The messages do not include the system prompt nor the assistant response that contained the tool call.',
+                    },
+                    {
+                      name: 'abortSignal',
+                      type: 'AbortSignal',
+                      description:
+                        'An optional abort signal that indicates that the overall operation should be aborted.',
+                    },
+                  ],
+                },
+              ],
             },
           ],
         },
@@ -381,6 +407,13 @@ To see `generateText` in action, check out [these examples](#examples).
         'Maximum number of sequential LLM calls (steps), e.g. when you use tool calls. A maximum number is required to prevent infinite loops in the case of misconfigured tools. By default, it is set to 1.',
     },
     {
+      name: 'experimental_generateMessageId',
+      type: '() => string',
+      isOptional: true,
+      description:
+        'Function used to generate a unique ID for each message. This is an experimental feature.',
+    },
+    {
       name: 'experimental_continueSteps',
       type: 'boolean',
       isOptional: true,
@@ -435,11 +468,11 @@ To see `generateText` in action, check out [these examples](#examples).
       ],
     },
     {
-      name: 'experimental_providerMetadata',
+      name: 'providerOptions',
       type: 'Record<string,Record<string,JSONValue>> | undefined',
       isOptional: true,
       description:
-        'Optional metadata from the provider. The outer key is the provider name. The inner values are the metadata. Details depend on the provider.',
+        'Provider-specific options. The outer key is the provider name. The inner values are the metadata. Details depend on the provider.',
     },
     {
       name: 'experimental_activeTools',
@@ -449,13 +482,94 @@ To see `generateText` in action, check out [these examples](#examples).
         'The tools that are currently active. All tools are active by default.',
     },
     {
+      name: 'experimental_repairToolCall',
+      type: '(options: ToolCallRepairOptions) => Promise<LanguageModelV1FunctionToolCall | null>',
+      isOptional: true,
+      description:
+        'A function that attempts to repair a tool call that failed to parse. Return either a repaired tool call or null if the tool call cannot be repaired.',
+      properties: [
+        {
+          type: 'ToolCallRepairOptions',
+          parameters: [
+            {
+              name: 'system',
+              type: 'string | undefined',
+              description: 'The system prompt.',
+            },
+            {
+              name: 'messages',
+              type: 'CoreMessage[]',
+              description: 'The messages in the current generation step.',
+            },
+            {
+              name: 'toolCall',
+              type: 'LanguageModelV1FunctionToolCall',
+              description: 'The tool call that failed to parse.',
+            },
+            {
+              name: 'tools',
+              type: 'TOOLS',
+              description: 'The tools that are available.',
+            },
+            {
+              name: 'parameterSchema',
+              type: '(options: { toolName: string }) => JSONSchema7',
+              description:
+                'A function that returns the JSON Schema for a tool.',
+            },
+            {
+              name: 'error',
+              type: 'NoSuchToolError | InvalidToolArgumentsError',
+              description:
+                'The error that occurred while parsing the tool call.',
+            },
+          ],
+        },
+      ],
+    },
+    {
+      name: 'experimental_output',
+      type: 'Output',
+      isOptional: true,
+      description: 'Experimental setting for generating structured outputs.',
+      properties: [
+        {
+          type: 'Output',
+          parameters: [
+            {
+              name: 'Output.text()',
+              type: 'Output',
+              description: 'Forward text output.',
+            },
+            {
+              name: 'Output.object()',
+              type: 'Output',
+              description: 'Generate a JSON object of type OBJECT.',
+              properties: [
+                {
+                  type: 'Options',
+                  parameters: [
+                    {
+                      name: 'schema',
+                      type: 'Schema<OBJECT>',
+                      description: 'The schema of the JSON object to generate.',
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+    {
       name: 'onStepFinish',
-      type: '(result: onStepFinishResult) => Promise<void> | void',
+      type: '(result: OnStepFinishResult) => Promise<void> | void',
       isOptional: true,
       description: 'Callback that is called when a step is finished.',
       properties: [
         {
-          type: 'onStepFinishResult',
+          type: 'OnStepFinishResult',
           parameters: [
             {
               name: 'stepType',
@@ -562,7 +676,7 @@ To see `generateText` in action, check out [these examples](#examples).
                 'True when there will be a continuation step with a continuation text.',
             },
             {
-              name: 'experimental_providerMetadata',
+              name: 'providerMetadata',
               type: 'Record<string,Record<string,JSONValue>> | undefined',
               isOptional: true,
               description:
@@ -583,6 +697,53 @@ To see `generateText` in action, check out [these examples](#examples).
       name: 'text',
       type: 'string',
       description: 'The generated text by the model.',
+    },
+    {
+      name: 'reasoning',
+      type: 'string | undefined',
+      description:
+        'The reasoning text of the model (only available for some models).',
+    },
+    {
+      name: 'sources',
+      type: 'Array<Source>',
+      description:
+        'Sources that have been used as input to generate the response. For multi-step generation, the sources are accumulated from all steps.',
+      properties: [
+        {
+          type: 'Source',
+          parameters: [
+            {
+              name: 'sourceType',
+              type: "'url'",
+              description:
+                'A URL source. This is return by web search RAG models.',
+            },
+            {
+              name: 'id',
+              type: 'string',
+              description: 'The ID of the source.',
+            },
+            {
+              name: 'url',
+              type: 'string',
+              description: 'The URL of the source.',
+            },
+            {
+              name: 'title',
+              type: 'string',
+              isOptional: true,
+              description: 'The title of the source.',
+            },
+            {
+              name: 'providerMetadata',
+              type: 'LanguageModelV1ProviderMetadata',
+              isOptional: true,
+              description: 'Additional provider metadata for the source.',
+            },
+          ],
+        },
+      ],
     },
     {
       name: 'toolCalls',
@@ -681,7 +842,7 @@ To see `generateText` in action, check out [these examples](#examples).
             },
             {
               name: 'messages',
-              type: 'Array<CoreAssistantMessage | CoreToolMessage>',
+              type: 'Array<ResponseMessage>',
               description:
                 'The response messages that were generated during the call. It consists of an assistant message, potentially containing tool calls.  When there are tool results, there is an additional tool message with the tool results that are available. If there are tools that do not have execute functions, they are not included in the tool results and need to be added separately.',
             },
@@ -696,10 +857,16 @@ To see `generateText` in action, check out [these examples](#examples).
         'Warnings from the model provider (e.g. unsupported settings).',
     },
     {
-      name: 'experimental_providerMetadata',
+      name: 'providerMetadata',
       type: 'Record<string,Record<string,JSONValue>> | undefined',
       description:
         'Optional metadata from the provider. The outer key is the provider name. The inner values are the metadata. Details depend on the provider.',
+    },
+    {
+      name: 'experimental_output',
+      type: 'Output',
+      isOptional: true,
+      description: 'Experimental setting for generating structured outputs.',
     },
     {
       name: 'steps',
@@ -720,6 +887,54 @@ To see `generateText` in action, check out [these examples](#examples).
               name: 'text',
               type: 'string',
               description: 'The generated text by the model.',
+            },
+            {
+              name: 'reasoning',
+              type: 'string | undefined',
+              description:
+                'The reasoning text of the model (only available for some models).',
+            },
+            {
+              name: 'sources',
+              type: 'Array<Source>',
+              description:
+                'Sources that have been used as input to generate the response. For multi-step generation, the sources are accumulated from all steps.',
+              properties: [
+                {
+                  type: 'Source',
+                  parameters: [
+                    {
+                      name: 'sourceType',
+                      type: "'url'",
+                      description:
+                        'A URL source. This is return by web search RAG models.',
+                    },
+                    {
+                      name: 'id',
+                      type: 'string',
+                      description: 'The ID of the source.',
+                    },
+                    {
+                      name: 'url',
+                      type: 'string',
+                      description: 'The URL of the source.',
+                    },
+                    {
+                      name: 'title',
+                      type: 'string',
+                      isOptional: true,
+                      description: 'The title of the source.',
+                    },
+                    {
+                      name: 'providerMetadata',
+                      type: 'LanguageModelV1ProviderMetadata',
+                      isOptional: true,
+                      description:
+                        'Additional provider metadata for the source.',
+                    },
+                  ],
+                },
+              ],
             },
             {
               name: 'toolCalls',
@@ -819,7 +1034,7 @@ To see `generateText` in action, check out [these examples](#examples).
                     },
                     {
                       name: 'messages',
-                      type: 'Array<CoreAssistantMessage | CoreToolMessage>',
+                      type: 'Array<ResponseMessage>',
                       description:
                         'The response messages that were generated during the call. It consists of an assistant message, potentially containing tool calls.  When there are tool results, there is an additional tool message with the tool results that are available. If there are tools that do not have execute functions, they are not included in the tool results and need to be added separately.',
                     },
@@ -840,7 +1055,7 @@ To see `generateText` in action, check out [these examples](#examples).
                 'True when there will be a continuation step with a continuation text.',
             },
             {
-              name: 'experimental_providerMetadata',
+              name: 'providerMetadata',
               type: 'Record<string,Record<string,JSONValue>> | undefined',
               isOptional: true,
               description:

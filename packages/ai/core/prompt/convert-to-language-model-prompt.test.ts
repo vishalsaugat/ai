@@ -460,7 +460,7 @@ describe('convertToLanguageModelPrompt', () => {
                     text: 'hello, world!',
                   },
                 ],
-                experimental_providerMetadata: {
+                providerOptions: {
                   'test-provider': {
                     'key-a': 'test-value-1',
                     'key-b': 'test-value-2',
@@ -560,7 +560,7 @@ describe('convertToLanguageModelMessage', () => {
             content: [
               {
                 type: 'image',
-                image: 'data:image/jpg;base64,dGVzdA==',
+                image: 'data:image/jpg;base64,/9j/3Q==',
               },
             ],
           },
@@ -572,8 +572,35 @@ describe('convertToLanguageModelMessage', () => {
           content: [
             {
               type: 'image',
-              image: new Uint8Array([116, 101, 115, 116]),
-              mimeType: 'image/jpg',
+              image: new Uint8Array([255, 216, 255, 221]),
+              mimeType: 'image/jpeg',
+            },
+          ],
+        });
+      });
+
+      it('should prefer detected mimetype', async () => {
+        const result = convertToLanguageModelMessage(
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'image',
+                // incorrect mimetype:
+                image: 'data:image/png;base64,/9j/3Q==',
+              },
+            ],
+          },
+          {},
+        );
+
+        expect(result).toEqual({
+          role: 'user',
+          content: [
+            {
+              type: 'image',
+              image: new Uint8Array([255, 216, 255, 221]),
+              mimeType: 'image/jpeg',
             },
           ],
         });
@@ -684,7 +711,7 @@ describe('convertToLanguageModelMessage', () => {
                 toolName: 'toolName',
                 toolCallId: 'toolCallId',
                 args: {},
-                experimental_providerMetadata: {
+                providerOptions: {
                   'test-provider': {
                     'key-a': 'test-value-1',
                     'key-b': 'test-value-2',
@@ -757,7 +784,7 @@ describe('convertToLanguageModelMessage', () => {
               toolName: 'toolName',
               toolCallId: 'toolCallId',
               result: { some: 'result' },
-              experimental_providerMetadata: {
+              providerOptions: {
                 'test-provider': {
                   'key-a': 'test-value-1',
                   'key-b': 'test-value-2',

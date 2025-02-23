@@ -16,7 +16,7 @@ import { openai } from '@ai-sdk/openai';
 import { streamObject } from 'ai';
 import { z } from 'zod';
 
-const { partialObjectStream } = await streamObject({
+const { partialObjectStream } = streamObject({
   model: openai('gpt-4-turbo'),
   schema: z.object({
     recipe: z.object({
@@ -44,7 +44,7 @@ import { openai } from '@ai-sdk/openai';
 import { streamObject } from 'ai';
 import { z } from 'zod';
 
-const { elementStream } = await streamObject({
+const { elementStream } = streamObject({
   model: openai('gpt-4-turbo'),
   output: 'array',
   schema: z.object({
@@ -68,7 +68,7 @@ for await (const hero of elementStream) {
 import { openai } from '@ai-sdk/openai';
 import { streamObject } from 'ai';
 
-const { partialObjectStream } = await streamObject({
+const { partialObjectStream } = streamObject({
   model: openai('gpt-4-turbo'),
   output: 'no-schema',
   prompt: 'Generate a lasagna recipe.',
@@ -149,8 +149,9 @@ To see `streamObject` in action, check out the [additional examples](#more-examp
     },
     {
       name: 'messages',
-      type: 'Array<CoreSystemMessage | CoreUserMessage | CoreAssistantMessage | CoreToolMessage>',
-      description: 'A list of messages that represent a conversation.',
+      type: 'Array<CoreSystemMessage | CoreUserMessage | CoreAssistantMessage | CoreToolMessage> | Array<UIMessage>',
+      description:
+        'A list of messages that represent a conversation. Automatically converts UI messages from the useChat hook.',
       properties: [
         {
           type: 'CoreSystemMessage',
@@ -473,11 +474,30 @@ To see `streamObject` in action, check out the [additional examples](#more-examp
       ],
     },
     {
-      name: 'experimental_providerMetadata',
+      name: 'providerOptions',
       type: 'Record<string,Record<string,JSONValue>> | undefined',
       isOptional: true,
       description:
-        'Optional metadata from the provider. The outer key is the provider name. The inner values are the metadata. Details depend on the provider.',
+        'Provider-specific options. The outer key is the provider name. The inner values are the metadata. Details depend on the provider.',
+    },
+    {
+      name: 'onError',
+      type: '(event: OnErrorResult) => Promise<void> |void',
+      isOptional: true,
+      description:
+        'Callback that is called when an error occurs during streaming. You can use it to log errors.',
+      properties: [
+        {
+          type: 'OnErrorResult',
+          parameters: [
+            {
+              name: 'error',
+              type: 'unknown',
+              description: 'The error that occurred.',
+            },
+          ],
+        },
+      ],
     },
     {
       name: 'onFinish',
@@ -518,7 +538,7 @@ To see `streamObject` in action, check out the [additional examples](#more-examp
               ],
             },
             {
-              name: 'experimental_providerMetadata',
+              name: 'providerMetadata',
               type: 'Record<string,Record<string,JSONValue>> | undefined',
               description:
                 'Optional metadata from the provider. The outer key is the provider name. The inner values are the metadata. Details depend on the provider.',
@@ -618,7 +638,7 @@ To see `streamObject` in action, check out the [additional examples](#more-examp
       ],
     },
     {
-      name: 'experimental_providerMetadata',
+      name: 'providerMetadata',
       type: 'Promise<Record<string,Record<string,JSONValue>> | undefined>',
       description:
         'Optional metadata from the provider. Resolved whe the response is finished. The outer key is the provider name. The inner values are the metadata. Details depend on the provider.',

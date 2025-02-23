@@ -1,16 +1,17 @@
-import { LanguageModelV1, LanguageModelV1CallWarning } from '@ai-sdk/provider';
 import {
-  Tool,
-  ToolConfiguration,
-  ToolInputSchema,
-} from '@aws-sdk/client-bedrock-runtime';
+  JSONObject,
+  LanguageModelV1,
+  LanguageModelV1CallWarning,
+  UnsupportedFunctionalityError,
+} from '@ai-sdk/provider';
+import { BedrockTool, BedrockToolConfiguration } from './bedrock-api-types';
 
 export function prepareTools(
   mode: Parameters<LanguageModelV1['doGenerate']>[0]['mode'] & {
     type: 'regular';
   },
 ): {
-  toolConfiguration: ToolConfiguration;
+  toolConfig: BedrockToolConfiguration; // note: do not rename, name required by Bedrock
   toolWarnings: LanguageModelV1CallWarning[];
 } {
   // when the tools array is empty, change it to undefined to prevent errors:
@@ -18,13 +19,13 @@ export function prepareTools(
 
   if (tools == null) {
     return {
-      toolConfiguration: { tools: undefined, toolChoice: undefined },
+      toolConfig: { tools: undefined, toolChoice: undefined },
       toolWarnings: [],
     };
   }
 
   const toolWarnings: LanguageModelV1CallWarning[] = [];
-  const bedrockTools: Tool[] = [];
+  const bedrockTools: BedrockTool[] = [];
 
   for (const tool of tools) {
     if (tool.type === 'provider-defined') {
@@ -35,8 +36,8 @@ export function prepareTools(
           name: tool.name,
           description: tool.description,
           inputSchema: {
-            json: tool.parameters,
-          } as ToolInputSchema,
+            json: tool.parameters as JSONObject,
+          },
         },
       });
     }
@@ -46,7 +47,7 @@ export function prepareTools(
 
   if (toolChoice == null) {
     return {
-      toolConfiguration: { tools: bedrockTools, toolChoice: undefined },
+      toolConfig: { tools: bedrockTools, toolChoice: undefined },
       toolWarnings,
     };
   }
@@ -56,23 +57,23 @@ export function prepareTools(
   switch (type) {
     case 'auto':
       return {
-        toolConfiguration: { tools: bedrockTools, toolChoice: { auto: {} } },
+        toolConfig: { tools: bedrockTools, toolChoice: { auto: {} } },
         toolWarnings,
       };
     case 'required':
       return {
-        toolConfiguration: { tools: bedrockTools, toolChoice: { any: {} } },
+        toolConfig: { tools: bedrockTools, toolChoice: { any: {} } },
         toolWarnings,
       };
     case 'none':
       // Bedrock does not support 'none' tool choice, so we remove the tools:
       return {
-        toolConfiguration: { tools: undefined, toolChoice: undefined },
+        toolConfig: { tools: undefined, toolChoice: undefined },
         toolWarnings,
       };
     case 'tool':
       return {
-        toolConfiguration: {
+        toolConfig: {
           tools: bedrockTools,
           toolChoice: { tool: { name: toolChoice.toolName } },
         },
@@ -80,7 +81,9 @@ export function prepareTools(
       };
     default: {
       const _exhaustiveCheck: never = type;
-      throw new Error(`Unsupported tool choice type: ${_exhaustiveCheck}`);
+      throw new UnsupportedFunctionalityError({
+        functionality: `Unsupported tool choice type: ${_exhaustiveCheck}`,
+      });
     }
   }
 }

@@ -1,11 +1,16 @@
-import { JSONValue } from '@ai-sdk/provider';
+import {
+  JSONParseError,
+  JSONValue,
+  TypeValidationError,
+} from '@ai-sdk/provider';
 import { createIdGenerator, safeParseJSON } from '@ai-sdk/provider-utils';
 import { Schema } from '@ai-sdk/ui-utils';
 import { z } from 'zod';
-import { retryWithExponentialBackoff } from '../../util/retry-with-exponential-backoff';
+import { NoObjectGeneratedError } from '../../errors/no-object-generated-error';
 import { CallSettings } from '../prompt/call-settings';
 import { convertToLanguageModelPrompt } from '../prompt/convert-to-language-model-prompt';
 import { prepareCallSettings } from '../prompt/prepare-call-settings';
+import { prepareRetries } from '../prompt/prepare-retries';
 import { Prompt } from '../prompt/prompt';
 import { standardizePrompt } from '../prompt/standardize-prompt';
 import { assembleOperationName } from '../telemetry/assemble-operation-name';
@@ -23,15 +28,26 @@ import {
 } from '../types';
 import { LanguageModelRequestMetadata } from '../types/language-model-request-metadata';
 import { LanguageModelResponseMetadata } from '../types/language-model-response-metadata';
+import { ProviderOptions } from '../types/provider-metadata';
 import { calculateLanguageModelUsage } from '../types/usage';
 import { prepareResponseHeaders } from '../util/prepare-response-headers';
 import { GenerateObjectResult } from './generate-object-result';
 import { injectJsonInstruction } from './inject-json-instruction';
-import { NoObjectGeneratedError } from './no-object-generated-error';
 import { getOutputStrategy } from './output-strategy';
 import { validateObjectGenerationInput } from './validate-object-generation-input';
 
 const originalGenerateId = createIdGenerator({ prefix: 'aiobj', size: 24 });
+
+/**
+A function that attempts to repair the raw output of the mode
+to enable JSON parsing.
+
+Should return the repaired text or null if the text cannot be repaired.
+     */
+export type RepairTextFunction = (options: {
+  text: string;
+  error: JSONParseError | TypeValidationError;
+}) => Promise<string | null>;
 
 /**
 Generate a structured, typed object for a given prompt and schema using a language model.
@@ -86,16 +102,27 @@ Default and recommended: 'auto' (best mode for the model).
       mode?: 'auto' | 'json' | 'tool';
 
       /**
+A function that attempts to repair the raw output of the mode
+to enable JSON parsing.
+     */
+      experimental_repairText?: RepairTextFunction;
+
+      /**
 Optional telemetry configuration (experimental).
        */
 
       experimental_telemetry?: TelemetrySettings;
 
       /**
-Additional provider-specific metadata. They are passed through
+Additional provider-specific options. They are passed through
 to the provider from the AI SDK and enable provider-specific
 functionality that can be fully encapsulated in the provider.
  */
+      providerOptions?: ProviderOptions;
+
+      /**
+@deprecated Use `providerOptions` instead.
+*/
       experimental_providerMetadata?: ProviderMetadata;
 
       /**
@@ -160,15 +187,26 @@ Default and recommended: 'auto' (best mode for the model).
       mode?: 'auto' | 'json' | 'tool';
 
       /**
+A function that attempts to repair the raw output of the mode
+to enable JSON parsing.
+     */
+      experimental_repairText?: RepairTextFunction;
+
+      /**
 Optional telemetry configuration (experimental).
      */
       experimental_telemetry?: TelemetrySettings;
 
       /**
-Additional provider-specific metadata. They are passed through
+Additional provider-specific options. They are passed through
 to the provider from the AI SDK and enable provider-specific
 functionality that can be fully encapsulated in the provider.
  */
+      providerOptions?: ProviderOptions;
+
+      /**
+@deprecated Use `providerOptions` instead.
+*/
       experimental_providerMetadata?: ProviderMetadata;
 
       /**
@@ -219,15 +257,26 @@ Default and recommended: 'auto' (best mode for the model).
       mode?: 'auto' | 'json' | 'tool';
 
       /**
+A function that attempts to repair the raw output of the mode
+to enable JSON parsing.
+     */
+      experimental_repairText?: RepairTextFunction;
+
+      /**
 Optional telemetry configuration (experimental).
      */
       experimental_telemetry?: TelemetrySettings;
 
       /**
-Additional provider-specific metadata. They are passed through
+Additional provider-specific options. They are passed through
 to the provider from the AI SDK and enable provider-specific
 functionality that can be fully encapsulated in the provider.
  */
+      providerOptions?: ProviderOptions;
+
+      /**
+@deprecated Use `providerOptions` instead.
+*/
       experimental_providerMetadata?: ProviderMetadata;
 
       /**
@@ -263,15 +312,26 @@ The mode to use for object generation. Must be "json" for no-schema output.
       mode?: 'json';
 
       /**
+A function that attempts to repair the raw output of the mode
+to enable JSON parsing.
+     */
+      experimental_repairText?: RepairTextFunction;
+
+      /**
 Optional telemetry configuration (experimental).
        */
       experimental_telemetry?: TelemetrySettings;
 
       /**
-Additional provider-specific metadata. They are passed through
+Additional provider-specific options. They are passed through
 to the provider from the AI SDK and enable provider-specific
 functionality that can be fully encapsulated in the provider.
  */
+      providerOptions?: ProviderOptions;
+
+      /**
+@deprecated Use `providerOptions` instead.
+*/
       experimental_providerMetadata?: ProviderMetadata;
 
       /**
@@ -294,11 +354,13 @@ export async function generateObject<SCHEMA, RESULT>({
   system,
   prompt,
   messages,
-  maxRetries,
+  maxRetries: maxRetriesArg,
   abortSignal,
   headers,
+  experimental_repairText: repairText,
   experimental_telemetry: telemetry,
-  experimental_providerMetadata: providerMetadata,
+  experimental_providerMetadata,
+  providerOptions = experimental_providerMetadata,
   _internal: {
     generateId = originalGenerateId,
     currentDate = () => new Date(),
@@ -323,8 +385,10 @@ export async function generateObject<SCHEMA, RESULT>({
     schemaName?: string;
     schemaDescription?: string;
     mode?: 'auto' | 'json' | 'tool';
+    experimental_repairText?: RepairTextFunction;
     experimental_telemetry?: TelemetrySettings;
     experimental_providerMetadata?: ProviderMetadata;
+    providerOptions?: ProviderOptions;
 
     /**
      * Internal. For test use only. May change without notice.
@@ -342,6 +406,8 @@ export async function generateObject<SCHEMA, RESULT>({
     schemaDescription,
     enumValues,
   });
+
+  const { maxRetries, retry } = prepareRetries({ maxRetries: maxRetriesArg });
 
   const outputStrategy = getOutputStrategy({
     output,
@@ -389,8 +455,6 @@ export async function generateObject<SCHEMA, RESULT>({
     }),
     tracer,
     fn: async span => {
-      const retry = retryWithExponentialBackoff({ maxRetries });
-
       // use the default provider mode when the mode is set to 'auto' or unspecified
       if (mode === 'auto' || mode == null) {
         mode = model.defaultObjectGenerationMode;
@@ -408,24 +472,27 @@ export async function generateObject<SCHEMA, RESULT>({
 
       switch (mode) {
         case 'json': {
-          const standardPrompt = standardizePrompt({
-            system:
-              outputStrategy.jsonSchema == null
-                ? injectJsonInstruction({ prompt: system })
-                : model.supportsStructuredOutputs
-                ? system
-                : injectJsonInstruction({
-                    prompt: system,
-                    schema: outputStrategy.jsonSchema,
-                  }),
-            prompt,
-            messages,
+          const standardizedPrompt = standardizePrompt({
+            prompt: {
+              system:
+                outputStrategy.jsonSchema == null
+                  ? injectJsonInstruction({ prompt: system })
+                  : model.supportsStructuredOutputs
+                  ? system
+                  : injectJsonInstruction({
+                      prompt: system,
+                      schema: outputStrategy.jsonSchema,
+                    }),
+              prompt,
+              messages,
+            },
+            tools: undefined,
           });
 
           const promptMessages = await convertToLanguageModelPrompt({
-            prompt: standardPrompt,
+            prompt: standardizedPrompt,
             modelSupportsImageUrls: model.supportsImageUrls,
-            modelSupportsUrl: model.supportsUrl,
+            modelSupportsUrl: model.supportsUrl?.bind(model), // support 'this' context
           });
 
           const generateResult = await retry(() =>
@@ -440,7 +507,7 @@ export async function generateObject<SCHEMA, RESULT>({
                   }),
                   ...baseTelemetryAttributes,
                   'ai.prompt.format': {
-                    input: () => standardPrompt.type,
+                    input: () => standardizedPrompt.type,
                   },
                   'ai.prompt.messages': {
                     input: () => JSON.stringify(promptMessages),
@@ -468,22 +535,27 @@ export async function generateObject<SCHEMA, RESULT>({
                     description: schemaDescription,
                   },
                   ...prepareCallSettings(settings),
-                  inputFormat: standardPrompt.type,
+                  inputFormat: standardizedPrompt.type,
                   prompt: promptMessages,
-                  providerMetadata,
+                  providerMetadata: providerOptions,
                   abortSignal,
                   headers,
                 });
-
-                if (result.text === undefined) {
-                  throw new NoObjectGeneratedError();
-                }
 
                 const responseData = {
                   id: result.response?.id ?? generateId(),
                   timestamp: result.response?.timestamp ?? currentDate(),
                   modelId: result.response?.modelId ?? model.modelId,
                 };
+
+                if (result.text === undefined) {
+                  throw new NoObjectGeneratedError({
+                    message:
+                      'No object generated: the model did not return a response.',
+                    response: responseData,
+                    usage: calculateLanguageModelUsage(result.usage),
+                  });
+                }
 
                 // Add response information to the span:
                 span.setAttributes(
@@ -500,10 +572,6 @@ export async function generateObject<SCHEMA, RESULT>({
                       'ai.usage.promptTokens': result.usage.promptTokens,
                       'ai.usage.completionTokens':
                         result.usage.completionTokens,
-
-                      // deprecated:
-                      'ai.finishReason': result.finishReason,
-                      'ai.result.object': { output: () => result.text },
 
                       // standardized gen-ai llm span attributes:
                       'gen_ai.response.finish_reasons': [result.finishReason],
@@ -535,18 +603,17 @@ export async function generateObject<SCHEMA, RESULT>({
         }
 
         case 'tool': {
-          const validatedPrompt = standardizePrompt({
-            system,
-            prompt,
-            messages,
+          const standardizedPrompt = standardizePrompt({
+            prompt: { system, prompt, messages },
+            tools: undefined,
           });
 
           const promptMessages = await convertToLanguageModelPrompt({
-            prompt: validatedPrompt,
+            prompt: standardizedPrompt,
             modelSupportsImageUrls: model.supportsImageUrls,
-            modelSupportsUrl: model.supportsUrl,
+            modelSupportsUrl: model.supportsUrl?.bind(model), // support 'this' context,
           });
-          const inputFormat = validatedPrompt.type;
+          const inputFormat = standardizedPrompt.type;
 
           const generateResult = await retry(() =>
             recordSpan({
@@ -594,22 +661,26 @@ export async function generateObject<SCHEMA, RESULT>({
                   ...prepareCallSettings(settings),
                   inputFormat,
                   prompt: promptMessages,
-                  providerMetadata,
+                  providerMetadata: providerOptions,
                   abortSignal,
                   headers,
                 });
 
                 const objectText = result.toolCalls?.[0]?.args;
 
-                if (objectText === undefined) {
-                  throw new NoObjectGeneratedError();
-                }
-
                 const responseData = {
                   id: result.response?.id ?? generateId(),
                   timestamp: result.response?.timestamp ?? currentDate(),
                   modelId: result.response?.modelId ?? model.modelId,
                 };
+
+                if (objectText === undefined) {
+                  throw new NoObjectGeneratedError({
+                    message: 'No object generated: the tool was not called.',
+                    response: responseData,
+                    usage: calculateLanguageModelUsage(result.usage),
+                  });
+                }
 
                 // Add response information to the span:
                 span.setAttributes(
@@ -626,10 +697,6 @@ export async function generateObject<SCHEMA, RESULT>({
                       'ai.usage.promptTokens': result.usage.promptTokens,
                       'ai.usage.completionTokens':
                         result.usage.completionTokens,
-
-                      // deprecated:
-                      'ai.finishReason': result.finishReason,
-                      'ai.result.object': { output: () => objectText },
 
                       // standardized gen-ai llm span attributes:
                       'gen_ai.response.finish_reasons': [result.finishReason],
@@ -672,18 +739,64 @@ export async function generateObject<SCHEMA, RESULT>({
         }
       }
 
-      const parseResult = safeParseJSON({ text: result });
+      function processResult(result: string): RESULT {
+        const parseResult = safeParseJSON({ text: result });
 
-      if (!parseResult.success) {
-        throw parseResult.error;
+        if (!parseResult.success) {
+          throw new NoObjectGeneratedError({
+            message: 'No object generated: could not parse the response.',
+            cause: parseResult.error,
+            text: result,
+            response,
+            usage: calculateLanguageModelUsage(usage),
+          });
+        }
+
+        const validationResult = outputStrategy.validateFinalResult(
+          parseResult.value,
+          {
+            text: result,
+            response,
+            usage: calculateLanguageModelUsage(usage),
+          },
+        );
+
+        if (!validationResult.success) {
+          throw new NoObjectGeneratedError({
+            message: 'No object generated: response did not match schema.',
+            cause: validationResult.error,
+            text: result,
+            response,
+            usage: calculateLanguageModelUsage(usage),
+          });
+        }
+
+        return validationResult.value;
       }
 
-      const validationResult = outputStrategy.validateFinalResult(
-        parseResult.value,
-      );
+      let object: RESULT;
+      try {
+        object = processResult(result);
+      } catch (error) {
+        if (
+          repairText != null &&
+          NoObjectGeneratedError.isInstance(error) &&
+          (JSONParseError.isInstance(error.cause) ||
+            TypeValidationError.isInstance(error.cause))
+        ) {
+          const repairedText = await repairText({
+            text: result,
+            error: error.cause,
+          });
 
-      if (!validationResult.success) {
-        throw validationResult.error;
+          if (repairedText === null) {
+            throw error;
+          }
+
+          object = processResult(repairedText);
+        } else {
+          throw error;
+        }
       }
 
       // Add response information to the span:
@@ -693,23 +806,17 @@ export async function generateObject<SCHEMA, RESULT>({
           attributes: {
             'ai.response.finishReason': finishReason,
             'ai.response.object': {
-              output: () => JSON.stringify(validationResult.value),
+              output: () => JSON.stringify(object),
             },
 
             'ai.usage.promptTokens': usage.promptTokens,
             'ai.usage.completionTokens': usage.completionTokens,
-
-            // deprecated:
-            'ai.finishReason': finishReason,
-            'ai.result.object': {
-              output: () => JSON.stringify(validationResult.value),
-            },
           },
         }),
       );
 
       return new DefaultGenerateObjectResult({
-        object: validationResult.value,
+        object,
         finishReason,
         usage: calculateLanguageModelUsage(usage),
         warnings,
@@ -730,9 +837,9 @@ class DefaultGenerateObjectResult<T> implements GenerateObjectResult<T> {
   readonly finishReason: GenerateObjectResult<T>['finishReason'];
   readonly usage: GenerateObjectResult<T>['usage'];
   readonly warnings: GenerateObjectResult<T>['warnings'];
-  readonly rawResponse: GenerateObjectResult<T>['rawResponse'];
   readonly logprobs: GenerateObjectResult<T>['logprobs'];
   readonly experimental_providerMetadata: GenerateObjectResult<T>['experimental_providerMetadata'];
+  readonly providerMetadata: GenerateObjectResult<T>['providerMetadata'];
   readonly response: GenerateObjectResult<T>['response'];
   readonly request: GenerateObjectResult<T>['request'];
 
@@ -742,7 +849,7 @@ class DefaultGenerateObjectResult<T> implements GenerateObjectResult<T> {
     usage: GenerateObjectResult<T>['usage'];
     warnings: GenerateObjectResult<T>['warnings'];
     logprobs: GenerateObjectResult<T>['logprobs'];
-    providerMetadata: GenerateObjectResult<T>['experimental_providerMetadata'];
+    providerMetadata: GenerateObjectResult<T>['providerMetadata'];
     response: GenerateObjectResult<T>['response'];
     request: GenerateObjectResult<T>['request'];
   }) {
@@ -750,27 +857,19 @@ class DefaultGenerateObjectResult<T> implements GenerateObjectResult<T> {
     this.finishReason = options.finishReason;
     this.usage = options.usage;
     this.warnings = options.warnings;
+    this.providerMetadata = options.providerMetadata;
     this.experimental_providerMetadata = options.providerMetadata;
     this.response = options.response;
     this.request = options.request;
-    // deprecated:
-    this.rawResponse = {
-      headers: options.response.headers,
-    };
     this.logprobs = options.logprobs;
   }
 
   toJsonResponse(init?: ResponseInit): Response {
     return new Response(JSON.stringify(this.object), {
       status: init?.status ?? 200,
-      headers: prepareResponseHeaders(init, {
+      headers: prepareResponseHeaders(init?.headers, {
         contentType: 'application/json; charset=utf-8',
       }),
     });
   }
 }
-
-/**
- * @deprecated Use `generateObject` instead.
- */
-export const experimental_generateObject = generateObject;

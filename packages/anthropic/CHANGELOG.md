@@ -1,5 +1,245 @@
 # @ai-sdk/anthropic
 
+## 1.1.9
+
+### Patch Changes
+
+- Updated dependencies [2761f06]
+  - @ai-sdk/provider@1.0.8
+  - @ai-sdk/provider-utils@2.1.9
+
+## 1.1.8
+
+### Patch Changes
+
+- Updated dependencies [2e898b4]
+  - @ai-sdk/provider-utils@2.1.8
+
+## 1.1.7
+
+### Patch Changes
+
+- Updated dependencies [3ff4ef8]
+  - @ai-sdk/provider-utils@2.1.7
+
+## 1.1.6
+
+### Patch Changes
+
+- Updated dependencies [d89c3b9]
+  - @ai-sdk/provider@1.0.7
+  - @ai-sdk/provider-utils@2.1.6
+
+## 1.1.5
+
+### Patch Changes
+
+- Updated dependencies [3a602ca]
+  - @ai-sdk/provider-utils@2.1.5
+
+## 1.1.4
+
+### Patch Changes
+
+- Updated dependencies [066206e]
+  - @ai-sdk/provider-utils@2.1.4
+
+## 1.1.3
+
+### Patch Changes
+
+- Updated dependencies [39e5c1f]
+  - @ai-sdk/provider-utils@2.1.3
+
+## 1.1.2
+
+### Patch Changes
+
+- Updated dependencies [ed012d2]
+- Updated dependencies [3a58a2e]
+  - @ai-sdk/provider-utils@2.1.2
+  - @ai-sdk/provider@1.0.6
+
+## 1.1.1
+
+### Patch Changes
+
+- 858f934: feat (provider/anthropic): default cache-control on and mark model setting deprecated
+- b284e2c: feat (provider/google-vertex): support prompt caching for Anthropic Claude models
+- Updated dependencies [e7a9ec9]
+- Updated dependencies [0a699f1]
+  - @ai-sdk/provider-utils@2.1.1
+  - @ai-sdk/provider@1.0.5
+
+## 1.1.0
+
+### Minor Changes
+
+- 62ba5ad: release: AI SDK 4.1
+
+### Patch Changes
+
+- Updated dependencies [62ba5ad]
+  - @ai-sdk/provider-utils@2.1.0
+
+## 1.0.9
+
+### Patch Changes
+
+- Updated dependencies [00114c5]
+  - @ai-sdk/provider-utils@2.0.8
+
+## 1.0.8
+
+### Patch Changes
+
+- Updated dependencies [90fb95a]
+- Updated dependencies [e6dfef4]
+- Updated dependencies [6636db6]
+  - @ai-sdk/provider-utils@2.0.7
+
+## 1.0.7
+
+### Patch Changes
+
+- Updated dependencies [19a2ce7]
+- Updated dependencies [19a2ce7]
+- Updated dependencies [6337688]
+  - @ai-sdk/provider@1.0.4
+  - @ai-sdk/provider-utils@2.0.6
+
+## 1.0.6
+
+### Patch Changes
+
+- 5ed5e45: chore (config): Use ts-library.json tsconfig for no-UI libs.
+- Updated dependencies [5ed5e45]
+  - @ai-sdk/provider-utils@2.0.5
+  - @ai-sdk/provider@1.0.3
+
+## 1.0.5
+
+### Patch Changes
+
+- Updated dependencies [09a9cab]
+  - @ai-sdk/provider@1.0.2
+  - @ai-sdk/provider-utils@2.0.4
+
+## 1.0.4
+
+### Patch Changes
+
+- bcd892e: feat (provider/google-vertex): Add support for Anthropic models.
+
+## 1.0.3
+
+### Patch Changes
+
+- Updated dependencies [0984f0b]
+  - @ai-sdk/provider-utils@2.0.3
+
+## 1.0.2
+
+### Patch Changes
+
+- Updated dependencies [b446ae5]
+  - @ai-sdk/provider@1.0.1
+  - @ai-sdk/provider-utils@2.0.2
+
+## 1.0.1
+
+### Patch Changes
+
+- Updated dependencies [c3ab5de]
+  - @ai-sdk/provider-utils@2.0.1
+
+## 1.0.0
+
+### Major Changes
+
+- 66060f7: chore (release): bump major version to 4.0
+- 0d3d3f5: chore (providers): remove baseUrl option
+- 8ad0504: chore (provider/anthropic): remove Anthropic facade
+- 2f6e8c0: chore (provider/anthropic): remove topK model setting
+
+### Patch Changes
+
+- Updated dependencies [b469a7e]
+- Updated dependencies [dce4158]
+- Updated dependencies [c0ddc24]
+- Updated dependencies [b1da952]
+- Updated dependencies [dce4158]
+- Updated dependencies [8426f55]
+- Updated dependencies [db46ce5]
+  - @ai-sdk/provider-utils@2.0.0
+  - @ai-sdk/provider@1.0.0
+
+## 1.0.0-canary.4
+
+### Major Changes
+
+- 2f6e8c0: chore (provider/anthropic): remove topK model setting
+
+## 1.0.0-canary.3
+
+### Patch Changes
+
+- Updated dependencies [8426f55]
+  - @ai-sdk/provider-utils@2.0.0-canary.3
+
+## 1.0.0-canary.2
+
+### Patch Changes
+
+- Updated dependencies [dce4158]
+- Updated dependencies [dce4158]
+  - @ai-sdk/provider-utils@2.0.0-canary.2
+
+## 1.0.0-canary.1
+
+### Major Changes
+
+- 0d3d3f5: chore (providers): remove baseUrl option
+- 8ad0504: chore (provider/anthropic): remove Anthropic facade
+
+### Patch Changes
+
+- Updated dependencies [b1da952]
+  - @ai-sdk/provider-utils@2.0.0-canary.1
+
+## 1.0.0-canary.0
+
+### Major Changes
+
+- 66060f7: chore (release): bump major version to 4.0
+
+### Patch Changes
+
+- Updated dependencies [b469a7e]
+- Updated dependencies [c0ddc24]
+- Updated dependencies [db46ce5]
+  - @ai-sdk/provider-utils@2.0.0-canary.0
+  - @ai-sdk/provider@1.0.0-canary.0
+
+## 0.0.56
+
+### Patch Changes
+
+- e6042b1: feat (provider/anthropic): add haiku 3.5 model ids
+
+## 0.0.55
+
+### Patch Changes
+
+- ac380e3: fix (provider/anthropic): continuation mode with 3+ steps
+
+## 0.0.54
+
+### Patch Changes
+
+- 4d2e53b: feat (provider/anthropic): pdf support
+- c8afcb5: feat (provider/anthropic): allow using computer use and cache control at the same time
+
 ## 0.0.53
 
 ### Patch Changes

@@ -1,5 +1,397 @@
 # @ai-sdk/solid
 
+## 1.1.19
+
+### Patch Changes
+
+- @ai-sdk/provider-utils@2.1.9
+- @ai-sdk/ui-utils@1.1.15
+
+## 1.1.18
+
+### Patch Changes
+
+- 60c3220: fix (ui): set status to ready after stream was aborted
+
+## 1.1.17
+
+### Patch Changes
+
+- c43df41: feat (ui): add useChat status
+
+## 1.1.16
+
+### Patch Changes
+
+- Updated dependencies [2e898b4]
+  - @ai-sdk/provider-utils@2.1.8
+  - @ai-sdk/ui-utils@1.1.14
+
+## 1.1.15
+
+### Patch Changes
+
+- Updated dependencies [3ff4ef8]
+  - @ai-sdk/provider-utils@2.1.7
+  - @ai-sdk/ui-utils@1.1.13
+
+## 1.1.14
+
+### Patch Changes
+
+- Updated dependencies [166e09e]
+  - @ai-sdk/ui-utils@1.1.12
+
+## 1.1.13
+
+### Patch Changes
+
+- Updated dependencies [318b351]
+  - @ai-sdk/ui-utils@1.1.11
+
+## 1.1.12
+
+### Patch Changes
+
+- 244dd77: feat (ui/solid): add support for prepareRequestBody
+
+## 1.1.11
+
+### Patch Changes
+
+- bcc61d4: feat (ui): introduce message parts for useChat
+- Updated dependencies [bcc61d4]
+  - @ai-sdk/ui-utils@1.1.10
+
+## 1.1.10
+
+### Patch Changes
+
+- Updated dependencies [6b8cc14]
+  - @ai-sdk/ui-utils@1.1.9
+
+## 1.1.9
+
+### Patch Changes
+
+- @ai-sdk/provider-utils@2.1.6
+- @ai-sdk/ui-utils@1.1.8
+
+## 1.1.8
+
+### Patch Changes
+
+- 0d2d9bf: fix (ui): empty submits (with allowEmptySubmit) create user messages
+- 0d2d9bf: fix (ui): single assistant message with multiple tool steps
+- Updated dependencies [0d2d9bf]
+  - @ai-sdk/ui-utils@1.1.7
+
+## 1.1.7
+
+### Patch Changes
+
+- c73423e: feat (ui/solid): experimental attachment support
+
+## 1.1.6
+
+### Patch Changes
+
+- Updated dependencies [3a602ca]
+  - @ai-sdk/provider-utils@2.1.5
+  - @ai-sdk/ui-utils@1.1.6
+
+## 1.1.5
+
+### Patch Changes
+
+- Updated dependencies [066206e]
+  - @ai-sdk/provider-utils@2.1.4
+  - @ai-sdk/ui-utils@1.1.5
+
+## 1.1.4
+
+### Patch Changes
+
+- Updated dependencies [39e5c1f]
+  - @ai-sdk/provider-utils@2.1.3
+  - @ai-sdk/ui-utils@1.1.4
+
+## 1.1.3
+
+### Patch Changes
+
+- Updated dependencies [9ce598c]
+  - @ai-sdk/ui-utils@1.1.3
+
+## 1.1.2
+
+### Patch Changes
+
+- Updated dependencies [ed012d2]
+  - @ai-sdk/provider-utils@2.1.2
+  - @ai-sdk/ui-utils@1.1.2
+
+## 1.1.1
+
+### Patch Changes
+
+- Updated dependencies [e7a9ec9]
+- Updated dependencies [0a699f1]
+  - @ai-sdk/ui-utils@1.1.1
+  - @ai-sdk/provider-utils@2.1.1
+
+## 1.1.0
+
+### Minor Changes
+
+- 62ba5ad: release: AI SDK 4.1
+
+### Patch Changes
+
+- Updated dependencies [62ba5ad]
+  - @ai-sdk/provider-utils@2.1.0
+  - @ai-sdk/ui-utils@1.1.0
+
+## 1.0.13
+
+### Patch Changes
+
+- Updated dependencies [33592d2]
+  - @ai-sdk/ui-utils@1.0.12
+
+## 1.0.12
+
+### Patch Changes
+
+- Updated dependencies [00114c5]
+- Updated dependencies [00114c5]
+  - @ai-sdk/provider-utils@2.0.8
+  - @ai-sdk/ui-utils@1.0.11
+
+## 1.0.11
+
+### Patch Changes
+
+- 37f4510: feat (ui): expose useChat id and send it to the server
+- Updated dependencies [37f4510]
+  - @ai-sdk/ui-utils@1.0.10
+
+## 1.0.10
+
+### Patch Changes
+
+- Updated dependencies [2495973]
+- Updated dependencies [2495973]
+  - @ai-sdk/ui-utils@1.0.9
+
+## 1.0.9
+
+### Patch Changes
+
+- Updated dependencies [90fb95a]
+- Updated dependencies [e6dfef4]
+- Updated dependencies [6636db6]
+  - @ai-sdk/provider-utils@2.0.7
+  - @ai-sdk/ui-utils@1.0.8
+
+## 1.0.8
+
+### Patch Changes
+
+- Updated dependencies [19a2ce7]
+- Updated dependencies [6337688]
+  - @ai-sdk/provider-utils@2.0.6
+  - @ai-sdk/ui-utils@1.0.7
+
+## 1.0.7
+
+### Patch Changes
+
+- Updated dependencies [5ed5e45]
+  - @ai-sdk/provider-utils@2.0.5
+  - @ai-sdk/ui-utils@1.0.6
+
+## 1.0.6
+
+### Patch Changes
+
+- @ai-sdk/provider-utils@2.0.4
+- @ai-sdk/ui-utils@1.0.5
+
+## 1.0.5
+
+### Patch Changes
+
+- Updated dependencies [0984f0b]
+  - @ai-sdk/provider-utils@2.0.3
+  - @ai-sdk/ui-utils@1.0.4
+
+## 1.0.4
+
+### Patch Changes
+
+- Updated dependencies [953469c]
+- Updated dependencies [a3dd2ed]
+  - @ai-sdk/ui-utils@1.0.3
+
+## 1.0.3
+
+### Patch Changes
+
+- 630ac31: fix (ui): set tool invocation state to "result" when calling addToolResult
+
+## 1.0.2
+
+### Patch Changes
+
+- 88b364b: feat (ui/solid): add useObject
+- 88b364b: feat (ui/solid): add useAssistant
+- 88b364b: fix (ui/solid): fix useChat deep object updates
+- Updated dependencies [88b364b]
+  - @ai-sdk/ui-utils@1.0.2
+  - @ai-sdk/provider-utils@2.0.2
+
+## 1.0.1
+
+### Patch Changes
+
+- Updated dependencies [c3ab5de]
+  - @ai-sdk/provider-utils@2.0.1
+  - @ai-sdk/ui-utils@1.0.1
+
+## 1.0.0
+
+### Major Changes
+
+- e117b54: chore (ui): remove deprecated useChat roundtrip options
+- 8bf5756: chore: remove legacy function/tool calling
+- 7814c4b: chore (ui): remove streamMode setting from useChat & useCompletion
+- fe4f109: chore (ui): set default value of useChat keepLastMessageOnError to true
+- 84edae5: chore (release): bump ui package versions for 4.0 release
+
+### Patch Changes
+
+- 79c6dd9: fix (ui): remove unnecessary calls to mutateStreamData in useChat
+- Updated dependencies [8bf5756]
+- Updated dependencies [b469a7e]
+- Updated dependencies [9f81e66]
+- Updated dependencies [70f28f6]
+- Updated dependencies [dce4158]
+- Updated dependencies [7814c4b]
+- Updated dependencies [fe4f109]
+- Updated dependencies [b1da952]
+- Updated dependencies [04d3747]
+- Updated dependencies [dce4158]
+- Updated dependencies [7e89ccb]
+- Updated dependencies [8426f55]
+- Updated dependencies [db46ce5]
+- Updated dependencies [b053413]
+  - @ai-sdk/ui-utils@1.0.0
+  - @ai-sdk/provider-utils@2.0.0
+
+## 1.0.0-canary.9
+
+### Patch Changes
+
+- 79c6dd9: fix (ui): remove unnecessary calls to mutateStreamData in useChat
+- Updated dependencies [04d3747]
+  - @ai-sdk/ui-utils@1.0.0-canary.9
+
+## 1.0.0-canary.8
+
+### Patch Changes
+
+- Updated dependencies [b053413]
+  - @ai-sdk/ui-utils@1.0.0-canary.8
+
+## 1.0.0-canary.7
+
+### Major Changes
+
+- fe4f109: chore (ui): set default value of useChat keepLastMessageOnError to true
+
+### Patch Changes
+
+- Updated dependencies [fe4f109]
+  - @ai-sdk/ui-utils@1.0.0-canary.7
+
+## 1.0.0-canary.6
+
+### Patch Changes
+
+- Updated dependencies [70f28f6]
+  - @ai-sdk/ui-utils@1.0.0-canary.6
+
+## 1.0.0-canary.5
+
+### Patch Changes
+
+- Updated dependencies [9f81e66]
+- Updated dependencies [8426f55]
+  - @ai-sdk/ui-utils@1.0.0-canary.5
+  - @ai-sdk/provider-utils@2.0.0-canary.3
+
+## 1.0.0-canary.4
+
+### Patch Changes
+
+- Updated dependencies [dce4158]
+- Updated dependencies [dce4158]
+  - @ai-sdk/provider-utils@2.0.0-canary.2
+  - @ai-sdk/ui-utils@1.0.0-canary.4
+
+## 1.0.0-canary.3
+
+### Patch Changes
+
+- Updated dependencies [b1da952]
+  - @ai-sdk/provider-utils@2.0.0-canary.1
+  - @ai-sdk/ui-utils@1.0.0-canary.3
+
+## 1.0.0-canary.2
+
+### Major Changes
+
+- e117b54: chore (ui): remove deprecated useChat roundtrip options
+- 7814c4b: chore (ui): remove streamMode setting from useChat & useCompletion
+
+### Patch Changes
+
+- Updated dependencies [b469a7e]
+- Updated dependencies [7814c4b]
+- Updated dependencies [db46ce5]
+  - @ai-sdk/provider-utils@2.0.0-canary.0
+  - @ai-sdk/ui-utils@1.0.0-canary.2
+
+## 1.0.0-canary.1
+
+### Major Changes
+
+- 8bf5756: chore: remove legacy function/tool calling
+
+### Patch Changes
+
+- Updated dependencies [8bf5756]
+  - @ai-sdk/ui-utils@1.0.0-canary.1
+
+## 1.0.0-canary.0
+
+### Major Changes
+
+- 84edae5: chore (release): bump ui package versions for 4.0 release
+
+### Patch Changes
+
+- Updated dependencies [7e89ccb]
+  - @ai-sdk/ui-utils@1.0.0-canary.0
+
+## 0.0.54
+
+### Patch Changes
+
+- Updated dependencies [a85c965]
+  - @ai-sdk/ui-utils@0.0.50
+
 ## 0.0.53
 
 ### Patch Changes

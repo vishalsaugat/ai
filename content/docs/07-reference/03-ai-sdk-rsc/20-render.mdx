@@ -1,9 +1,11 @@
 ---
-title: render (Deprecated)
+title: render (Removed)
 description: Reference for the render function from the AI SDK RSC
 ---
 
-# `render` (Deprecated)
+# `render` (Removed)
+
+<Note type="warning">"render" has been removed in AI SDK 4.0.</Note>
 
 <Note type="warning">
   AI SDK RSC is currently experimental. We recommend using [AI SDK
@@ -160,7 +162,7 @@ A helper function to create a streamable UI from LLM providers. This function is
     },
     {
       name: 'functions',
-      type: 'Record<string, Tool>',
+      type: 'ToolSet',
       isOptional: true,
       description:
         'Tools that are accessible to and can be called by the model.',
@@ -194,7 +196,7 @@ A helper function to create a streamable UI from LLM providers. This function is
     },
     {
       name: 'tools',
-      type: 'Record<string, Tool>',
+      type: 'ToolSet',
       isOptional: true,
       description:
         'Tools that are accessible to and can be called by the model.',

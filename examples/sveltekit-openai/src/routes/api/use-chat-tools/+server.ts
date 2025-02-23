@@ -1,5 +1,5 @@
 import { createOpenAI } from '@ai-sdk/openai';
-import { convertToCoreMessages, streamText } from 'ai';
+import { streamText } from 'ai';
 import { z } from 'zod';
 
 import { env } from '$env/dynamic/private';
@@ -17,15 +17,20 @@ const openai = createOpenAI({
 export const POST = (async ({ request }) => {
   const { messages } = await request.json();
 
-  const result = await streamText({
-    model: openai('gpt-4-turbo'),
-    messages: convertToCoreMessages(messages),
+  const result = streamText({
+    model: openai('gpt-4o'),
+    messages,
+    toolCallStreaming: true,
+    maxSteps: 5, // multi-steps for server-side tools
     tools: {
       // server-side tool with execute function:
       getWeatherInformation: {
         description: 'show the weather in a given city to the user',
         parameters: z.object({ city: z.string() }),
         execute: async ({}: { city: string }) => {
+          // Add artificial delay of 2 seconds
+          await new Promise(resolve => setTimeout(resolve, 2000));
+
           const weatherOptions = ['sunny', 'cloudy', 'rainy', 'snowy', 'windy'];
           return weatherOptions[
             Math.floor(Math.random() * weatherOptions.length)

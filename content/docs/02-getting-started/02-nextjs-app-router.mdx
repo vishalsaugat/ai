@@ -38,7 +38,7 @@ Navigate to the newly created directory:
 
 ### Install dependencies
 
-Install `ai` and `@ai-sdk/openai`, the AI package and AI SDK's [ OpenAI provider ](/providers/ai-sdk-providers/openai) respectively.
+Install `ai`, `@ai-sdk/react`, and `@ai-sdk/openai`, the AI package, AI SDK's React hooks, and AI SDK's [ OpenAI provider ](/providers/ai-sdk-providers/openai) respectively.
 
 <Note>
   The AI SDK is designed to be a unified interface to interact with any large
@@ -90,7 +90,7 @@ Create a route handler, `app/api/chat/route.ts` and add the following code:
 
 ```tsx filename="app/api/chat/route.ts"
 import { openai } from '@ai-sdk/openai';
-import { streamText, convertToCoreMessages } from 'ai';
+import { streamText } from 'ai';
 
 // Allow streaming responses up to 30 seconds
 export const maxDuration = 30;
@@ -98,9 +98,9 @@ export const maxDuration = 30;
 export async function POST(req: Request) {
   const { messages } = await req.json();
 
-  const result = await streamText({
-    model: openai('gpt-4-turbo'),
-    messages: convertToCoreMessages(messages),
+  const result = streamText({
+    model: openai('gpt-4o'),
+    messages,
   });
 
   return result.toDataStreamResponse();
@@ -125,7 +125,7 @@ Update your root page (`app/page.tsx`) with the following code to show a list of
 ```tsx filename="app/page.tsx"
 'use client';
 
-import { useChat } from 'ai/react';
+import { useChat } from '@ai-sdk/react';
 
 export default function Chat() {
   const { messages, input, handleInputChange, handleSubmit } = useChat();
@@ -140,7 +140,7 @@ export default function Chat() {
 
       <form onSubmit={handleSubmit}>
         <input
-          className="fixed bottom-0 w-full max-w-md p-2 mb-8 border border-gray-300 rounded shadow-xl"
+          className="fixed dark:bg-zinc-900 bottom-0 w-full max-w-md p-2 mb-8 border border-zinc-300 dark:border-zinc-800 rounded shadow-xl"
           value={input}
           placeholder="Say something..."
           onChange={handleInputChange}
@@ -186,7 +186,7 @@ Modify your `app/api/chat/route.ts` file to include the new weather tool:
 
 ```tsx filename="app/api/chat/route.ts" highlight="2,13-27"
 import { openai } from '@ai-sdk/openai';
-import { streamText, convertToCoreMessages, tool } from 'ai';
+import { streamText, tool } from 'ai';
 import { z } from 'zod';
 
 export const maxDuration = 30;
@@ -194,12 +194,12 @@ export const maxDuration = 30;
 export async function POST(req: Request) {
   const { messages } = await req.json();
 
-  const result = await streamText({
-    model: openai('gpt-4-turbo'),
-    messages: convertToCoreMessages(messages),
+  const result = streamText({
+    model: openai('gpt-4o'),
+    messages,
     tools: {
       weather: tool({
-        description: 'Get the weather in a location (farenheit)',
+        description: 'Get the weather in a location (fahrenheit)',
         parameters: z.object({
           location: z.string().describe('The location to get the weather for'),
         }),
@@ -240,7 +240,7 @@ To display the tool invocations in your UI, update your `app/page.tsx` file:
 ```tsx filename="app/page.tsx" highlight="12-16"
 'use client';
 
-import { useChat } from 'ai/react';
+import { useChat } from '@ai-sdk/react';
 
 export default function Chat() {
   const { messages, input, handleInputChange, handleSubmit } = useChat();
@@ -259,7 +259,7 @@ export default function Chat() {
 
       <form onSubmit={handleSubmit}>
         <input
-          className="fixed bottom-0 w-full max-w-md p-2 mb-8 border border-gray-300 rounded shadow-xl"
+          className="fixed dark:bg-zinc-900 bottom-0 w-full max-w-md p-2 mb-8 border border-zinc-300 dark:border-zinc-800 rounded shadow-xl"
           value={input}
           placeholder="Say something..."
           onChange={handleInputChange}
@@ -287,7 +287,7 @@ Modify your `app/page.tsx` file to include the `maxSteps` option:
 ```tsx filename="app/page.tsx" highlight="7"
 'use client';
 
-import { useChat } from 'ai/react';
+import { useChat } from '@ai-sdk/react';
 
 export default function Chat() {
   const { messages, input, handleInputChange, handleSubmit } = useChat({
@@ -308,7 +308,7 @@ Update your `app/api/chat/route.ts` file to add a new tool to convert the temper
 
 ```tsx filename="app/api/chat/route.ts" highlight="27-40"
 import { openai } from '@ai-sdk/openai';
-import { streamText, convertToCoreMessages, tool } from 'ai';
+import { streamText, tool } from 'ai';
 import { z } from 'zod';
 
 export const maxDuration = 30;
@@ -316,12 +316,12 @@ export const maxDuration = 30;
 export async function POST(req: Request) {
   const { messages } = await req.json();
 
-  const result = await streamText({
-    model: openai('gpt-4-turbo'),
-    messages: convertToCoreMessages(messages),
+  const result = streamText({
+    model: openai('gpt-4o'),
+    messages,
     tools: {
       weather: tool({
-        description: 'Get the weather in a location (farenheit)',
+        description: 'Get the weather in a location (fahrenheit)',
         parameters: z.object({
           location: z.string().describe('The location to get the weather for'),
         }),
@@ -333,12 +333,12 @@ export async function POST(req: Request) {
           };
         },
       }),
-      convertFarenheitToCelsius: tool({
-        description: 'Convert a temperature in farenheit to celsius',
+      convertFahrenheitToCelsius: tool({
+        description: 'Convert a temperature in fahrenheit to celsius',
         parameters: z.object({
           temperature: z
             .number()
-            .describe('The temperature in farenheit to convert'),
+            .describe('The temperature in fahrenheit to convert'),
         }),
         execute: async ({ temperature }) => {
           const celsius = Math.round((temperature - 32) * (5 / 9));

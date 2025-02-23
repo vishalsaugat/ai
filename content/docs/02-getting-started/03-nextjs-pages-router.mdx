@@ -38,7 +38,7 @@ Navigate to the newly created directory:
 
 ### Install dependencies
 
-Install `ai` and `@ai-sdk/openai`, the AI SDK's OpenAI provider.
+Install `ai`, `@ai-sdk/react`, and `@ai-sdk/openai`, the AI package, AI SDK's React hooks, and AI SDK's [ OpenAI provider ](/providers/ai-sdk-providers/openai) respectively.
 
 <Note>
   The AI SDK is designed to be a unified interface to interact with any large
@@ -96,7 +96,7 @@ Create a Route Handler (`app/api/chat/route.ts`) and add the following code:
 
 ```tsx filename="app/api/chat/route.ts"
 import { openai } from '@ai-sdk/openai';
-import { streamText, convertToCoreMessages } from 'ai';
+import { streamText } from 'ai';
 
 // Allow streaming responses up to 30 seconds
 export const maxDuration = 30;
@@ -104,9 +104,9 @@ export const maxDuration = 30;
 export async function POST(req: Request) {
   const { messages } = await req.json();
 
-  const result = await streamText({
-    model: openai('gpt-4-turbo'),
-    messages: convertToCoreMessages(messages),
+  const result = streamText({
+    model: openai('gpt-4o'),
+    messages,
   });
 
   return result.toDataStreamResponse();
@@ -129,7 +129,7 @@ Now that you have an API route that can query an LLM, it's time to setup your fr
 Update your root page (`pages/index.tsx`) with the following code to show a list of chat messages and provide a user message input:
 
 ```tsx filename="pages/index.tsx"
-import { useChat } from 'ai/react';
+import { useChat } from '@ai-sdk/react';
 
 export default function Chat() {
   const { messages, input, handleInputChange, handleSubmit } = useChat();
@@ -144,7 +144,7 @@ export default function Chat() {
 
       <form onSubmit={handleSubmit}>
         <input
-          className="fixed bottom-0 w-full max-w-md p-2 mb-8 border border-gray-300 rounded shadow-xl"
+          className="fixed dark:bg-zinc-900 bottom-0 w-full max-w-md p-2 mb-8 border border-zinc-300 dark:border-zinc-800 rounded shadow-xl"
           value={input}
           placeholder="Say something..."
           onChange={handleInputChange}
@@ -160,7 +160,7 @@ This page utilizes the `useChat` hook, which will, by default, use the `POST` AP
 - `messages` - the current chat messages (an array of objects with `id`, `role`, and `content` properties).
 - `input` - the current value of the user's input field.
 - `handleInputChange` and `handleSubmit` - functions to handle user interactions (typing into the input field and submitting the form, respectively).
-- `isLoading` - boolean that indicates whether the API request is in progress.
+- `status` - the status of the API request.
 
 ## Running Your Application
 
@@ -186,7 +186,7 @@ Modify your `app/api/chat/route.ts` file to include the new weather tool:
 
 ```tsx filename="app/api/chat/route.ts" highlight="2,13-27"
 import { openai } from '@ai-sdk/openai';
-import { streamText, convertToCoreMessages, tool } from 'ai';
+import { streamText, tool } from 'ai';
 import { z } from 'zod';
 
 export const maxDuration = 30;
@@ -194,12 +194,12 @@ export const maxDuration = 30;
 export async function POST(req: Request) {
   const { messages } = await req.json();
 
-  const result = await streamText({
-    model: openai('gpt-4-turbo'),
-    messages: convertToCoreMessages(messages),
+  const result = streamText({
+    model: openai('gpt-4o'),
+    messages,
     tools: {
       weather: tool({
-        description: 'Get the weather in a location (farenheit)',
+        description: 'Get the weather in a location (fahrenheit)',
         parameters: z.object({
           location: z.string().describe('The location to get the weather for'),
         }),
@@ -238,7 +238,7 @@ Notice the blank response in the UI? This is because instead of generating a tex
 To display the tool invocations in your UI, update your `pages/index.tsx` file:
 
 ```tsx filename="pages/index.tsx" highlight="11-15"
-import { useChat } from 'ai/react';
+import { useChat } from '@ai-sdk/react';
 
 export default function Chat() {
   const { messages, input, handleInputChange, handleSubmit } = useChat();
@@ -257,7 +257,7 @@ export default function Chat() {
 
       <form onSubmit={handleSubmit}>
         <input
-          className="fixed bottom-0 w-full max-w-md p-2 mb-8 border border-gray-300 rounded shadow-xl"
+          className="fixed dark:bg-zinc-900 bottom-0 w-full max-w-md p-2 mb-8 border border-zinc-300 dark:border-zinc-800 rounded shadow-xl"
           value={input}
           placeholder="Say something..."
           onChange={handleInputChange}
@@ -283,7 +283,7 @@ To solve this, you can enable multi-step tool calls using the `maxSteps` option 
 Modify your `pages/index.tsx` file to include the `maxSteps` option:
 
 ```tsx filename="pages/index.tsx" highlight="6"
-import { useChat } from 'ai/react';
+import { useChat } from '@ai-sdk/react';
 
 export default function Chat() {
   const { messages, input, handleInputChange, handleSubmit } = useChat({
@@ -304,7 +304,7 @@ Update your `app/api/chat/route.ts` file to add a new tool to convert the temper
 
 ```tsx filename="app/api/chat/route.ts" highlight="27-40"
 import { openai } from '@ai-sdk/openai';
-import { streamText, convertToCoreMessages, tool } from 'ai';
+import { streamText, tool } from 'ai';
 import { z } from 'zod';
 
 export const maxDuration = 30;
@@ -312,12 +312,12 @@ export const maxDuration = 30;
 export async function POST(req: Request) {
   const { messages } = await req.json();
 
-  const result = await streamText({
-    model: openai('gpt-4-turbo'),
-    messages: convertToCoreMessages(messages),
+  const result = streamText({
+    model: openai('gpt-4o'),
+    messages,
     tools: {
       weather: tool({
-        description: 'Get the weather in a location (farenheit)',
+        description: 'Get the weather in a location (fahrenheit)',
         parameters: z.object({
           location: z.string().describe('The location to get the weather for'),
         }),
@@ -329,12 +329,12 @@ export async function POST(req: Request) {
           };
         },
       }),
-      convertFarenheitToCelsius: tool({
-        description: 'Convert a temperature in farenheit to celsius',
+      convertFahrenheitToCelsius: tool({
+        description: 'Convert a temperature in fahrenheit to celsius',
         parameters: z.object({
           temperature: z
             .number()
-            .describe('The temperature in farenheit to convert'),
+            .describe('The temperature in fahrenheit to convert'),
         }),
         execute: async ({ temperature }) => {
           const celsius = Math.round((temperature - 32) * (5 / 9));
