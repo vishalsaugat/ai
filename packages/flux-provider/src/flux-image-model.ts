@@ -16,7 +16,7 @@ import {
 } from '@ai-sdk/provider-utils';
 import { FluxImageSettings } from './flux-image-settings';
 import { z } from 'zod';
-const jwt = require('jsonwebtoken');
+import jwt from 'jsonwebtoken';
 
 const DEFAULT_POLL_INTERVAL_MILLIS = 500;
 const DEFAULT_MAX_POLL_ATTEMPTS = 60000 / DEFAULT_POLL_INTERVAL_MILLIS;
