@@ -1,6 +1,6 @@
 {
   "name": "@vishalai/flux",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "",
   "sideEffects": false,
   "main": "./dist/index.js",
