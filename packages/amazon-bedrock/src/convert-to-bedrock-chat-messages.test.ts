@@ -247,4 +247,324 @@ describe('assistant messages', () => {
       system: [],
     });
   });
+
+  it('should properly convert reasoning content type', async () => {
+    const result = convertToBedrockChatMessages([
+      {
+        role: 'user',
+        content: [{ type: 'text', text: 'Explain your reasoning' }],
+      },
+      {
+        role: 'assistant',
+        content: [
+          {
+            type: 'reasoning',
+            text: 'This is my step-by-step reasoning process',
+            signature: 'test-signature',
+          },
+        ],
+      },
+    ]);
+
+    expect(result).toEqual({
+      messages: [
+        {
+          role: 'user',
+          content: [{ text: 'Explain your reasoning' }],
+        },
+        {
+          role: 'assistant',
+          content: [
+            {
+              reasoningContent: {
+                reasoningText: {
+                  text: 'This is my step-by-step reasoning process',
+                  signature: 'test-signature',
+                },
+              },
+            },
+          ],
+        },
+      ],
+      system: [],
+    });
+  });
+
+  it('should properly convert redacted-reasoning content type', async () => {
+    const reasoningData = 'Redacted reasoning information';
+    const result = convertToBedrockChatMessages([
+      {
+        role: 'user',
+        content: [{ type: 'text', text: 'Explain your reasoning' }],
+      },
+      {
+        role: 'assistant',
+        content: [
+          {
+            type: 'redacted-reasoning',
+            data: reasoningData,
+          },
+        ],
+      },
+    ]);
+
+    expect(result).toEqual({
+      messages: [
+        {
+          role: 'user',
+          content: [{ text: 'Explain your reasoning' }],
+        },
+        {
+          role: 'assistant',
+          content: [
+            {
+              reasoningContent: {
+                redactedReasoning: {
+                  data: reasoningData,
+                },
+              },
+            },
+          ],
+        },
+      ],
+      system: [],
+    });
+  });
+
+  it('should trim trailing whitespace from reasoning content when it is the last part', async () => {
+    const result = convertToBedrockChatMessages([
+      {
+        role: 'user',
+        content: [{ type: 'text', text: 'Explain your reasoning' }],
+      },
+      {
+        role: 'assistant',
+        content: [
+          {
+            type: 'reasoning',
+            text: 'This is my reasoning with trailing space    ',
+            signature: 'test-signature',
+          },
+        ],
+      },
+    ]);
+
+    expect(result).toEqual({
+      messages: [
+        {
+          role: 'user',
+          content: [{ text: 'Explain your reasoning' }],
+        },
+        {
+          role: 'assistant',
+          content: [
+            {
+              reasoningContent: {
+                reasoningText: {
+                  text: 'This is my reasoning with trailing space',
+                  signature: 'test-signature',
+                },
+              },
+            },
+          ],
+        },
+      ],
+      system: [],
+    });
+  });
+
+  it('should handle a mix of text and reasoning content types', async () => {
+    const result = convertToBedrockChatMessages([
+      {
+        role: 'user',
+        content: [{ type: 'text', text: 'Explain your reasoning' }],
+      },
+      {
+        role: 'assistant',
+        content: [
+          { type: 'text', text: 'My answer is 42.' },
+          {
+            type: 'reasoning',
+            text: 'I calculated this by analyzing the meaning of life',
+            signature: 'reasoning-process',
+          },
+        ],
+      },
+    ]);
+
+    expect(result).toEqual({
+      messages: [
+        {
+          role: 'user',
+          content: [{ text: 'Explain your reasoning' }],
+        },
+        {
+          role: 'assistant',
+          content: [
+            { text: 'My answer is 42.' },
+            {
+              reasoningContent: {
+                reasoningText: {
+                  text: 'I calculated this by analyzing the meaning of life',
+                  signature: 'reasoning-process',
+                },
+              },
+            },
+          ],
+        },
+      ],
+      system: [],
+    });
+  });
+});
+
+describe('tool messages', () => {
+  it('should convert tool result with content array containing text', () => {
+    const result = convertToBedrockChatMessages([
+      {
+        role: 'tool',
+        content: [
+          {
+            type: 'tool-result',
+            toolCallId: 'call-123',
+            toolName: 'calculator',
+            result: { value: 42 },
+            content: [{ type: 'text', text: 'The result is 42' }],
+          },
+        ],
+      },
+    ]);
+
+    expect(result.messages[0]).toEqual({
+      role: 'user',
+      content: [
+        {
+          toolResult: {
+            toolUseId: 'call-123',
+            content: [{ text: 'The result is 42' }],
+          },
+        },
+      ],
+    });
+  });
+
+  it('should convert tool result with content array containing image', () => {
+    const result = convertToBedrockChatMessages([
+      {
+        role: 'tool',
+        content: [
+          {
+            type: 'tool-result',
+            toolCallId: 'call-123',
+            toolName: 'image-generator',
+            result: undefined,
+            content: [
+              {
+                type: 'image',
+                data: 'base64data',
+                mimeType: 'image/jpeg',
+              },
+            ],
+          },
+        ],
+      },
+    ]);
+
+    expect(result.messages[0]).toEqual({
+      role: 'user',
+      content: [
+        {
+          toolResult: {
+            toolUseId: 'call-123',
+            content: [
+              {
+                image: {
+                  format: 'jpeg',
+                  source: { bytes: 'base64data' },
+                },
+              },
+            ],
+          },
+        },
+      ],
+    });
+  });
+
+  it('should throw error for unsupported image format in tool result content', () => {
+    expect(() =>
+      convertToBedrockChatMessages([
+        {
+          role: 'tool',
+          content: [
+            {
+              type: 'tool-result',
+              toolCallId: 'call-123',
+              toolName: 'image-generator',
+              result: undefined,
+              content: [
+                {
+                  type: 'image',
+                  data: 'base64data',
+                  mimeType: 'image/webp', // unsupported format
+                },
+              ],
+            },
+          ],
+        },
+      ]),
+    ).toThrow('Unsupported image format: webp');
+  });
+
+  it('should throw error for missing mime type in tool result image content', () => {
+    expect(() =>
+      convertToBedrockChatMessages([
+        {
+          role: 'tool',
+          content: [
+            {
+              type: 'tool-result',
+              toolCallId: 'call-123',
+              toolName: 'image-generator',
+              result: undefined,
+              content: [
+                {
+                  type: 'image',
+                  data: 'base64data',
+                  // missing mimeType
+                },
+              ],
+            },
+          ],
+        },
+      ]),
+    ).toThrow('Image mime type is required in tool result part content');
+  });
+
+  it('should fallback to stringified result when content is undefined', () => {
+    const result = convertToBedrockChatMessages([
+      {
+        role: 'tool',
+        content: [
+          {
+            type: 'tool-result',
+            toolCallId: 'call-123',
+            toolName: 'calculator',
+            result: { value: 42 },
+          },
+        ],
+      },
+    ]);
+
+    expect(result.messages[0]).toEqual({
+      role: 'user',
+      content: [
+        {
+          toolResult: {
+            toolUseId: 'call-123',
+            content: [{ text: '{"value":42}' }],
+          },
+        },
+      ],
+    });
+  });
 });

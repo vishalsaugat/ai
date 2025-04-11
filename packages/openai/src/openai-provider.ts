@@ -1,6 +1,7 @@
 import {
   EmbeddingModelV1,
   ImageModelV1,
+  TranscriptionModelV1,
   LanguageModelV1,
   ProviderV1,
 } from '@ai-sdk/provider';
@@ -26,6 +27,11 @@ import {
   OpenAIImageModelId,
   OpenAIImageSettings,
 } from './openai-image-settings';
+import { OpenAITranscriptionModel } from './openai-transcription-model';
+import { OpenAITranscriptionModelId } from './openai-transcription-settings';
+import { OpenAIResponsesLanguageModel } from './responses/openai-responses-language-model';
+import { OpenAIResponsesModelId } from './responses/openai-responses-settings';
+import { openaiTools } from './openai-tools';
 
 export interface OpenAIProvider extends ProviderV1 {
   (
@@ -53,6 +59,11 @@ Creates an OpenAI chat model for text generation.
     modelId: OpenAIChatModelId,
     settings?: OpenAIChatSettings,
   ): LanguageModelV1;
+
+  /**
+Creates an OpenAI responses API model for text generation.
+   */
+  responses(modelId: OpenAIResponsesModelId): LanguageModelV1;
 
   /**
 Creates an OpenAI completion model for text generation.
@@ -103,6 +114,16 @@ Creates a model for image generation.
     modelId: OpenAIImageModelId,
     settings?: OpenAIImageSettings,
   ): ImageModelV1;
+
+  /**
+Creates a model for transcription.
+   */
+  transcription(modelId: OpenAITranscriptionModelId): TranscriptionModelV1;
+
+  /**
+OpenAI-specific tools.
+   */
+  tools: typeof openaiTools;
 }
 
 export interface OpenAIProviderSettings {
@@ -221,6 +242,14 @@ export function createOpenAI(
       fetch: options.fetch,
     });
 
+  const createTranscriptionModel = (modelId: OpenAITranscriptionModelId) =>
+    new OpenAITranscriptionModel(modelId, {
+      provider: `${providerName}.transcription`,
+      url: ({ path }) => `${baseURL}${path}`,
+      headers: getHeaders,
+      fetch: options.fetch,
+    });
+
   const createLanguageModel = (
     modelId: OpenAIChatModelId | OpenAICompletionModelId,
     settings?: OpenAIChatSettings | OpenAICompletionSettings,
@@ -241,6 +270,15 @@ export function createOpenAI(
     return createChatModel(modelId, settings as OpenAIChatSettings);
   };
 
+  const createResponsesModel = (modelId: OpenAIResponsesModelId) => {
+    return new OpenAIResponsesLanguageModel(modelId, {
+      provider: `${providerName}.responses`,
+      url: ({ path }) => `${baseURL}${path}`,
+      headers: getHeaders,
+      fetch: options.fetch,
+    });
+  };
+
   const provider = function (
     modelId: OpenAIChatModelId | OpenAICompletionModelId,
     settings?: OpenAIChatSettings | OpenAICompletionSettings,
@@ -251,12 +289,18 @@ export function createOpenAI(
   provider.languageModel = createLanguageModel;
   provider.chat = createChatModel;
   provider.completion = createCompletionModel;
+  provider.responses = createResponsesModel;
   provider.embedding = createEmbeddingModel;
   provider.textEmbedding = createEmbeddingModel;
   provider.textEmbeddingModel = createEmbeddingModel;
 
   provider.image = createImageModel;
   provider.imageModel = createImageModel;
+
+  provider.transcription = createTranscriptionModel;
+  provider.transcriptionModel = createTranscriptionModel;
+
+  provider.tools = openaiTools;
 
   return provider as OpenAIProvider;
 }

@@ -5,11 +5,15 @@ import {
   OpenAICompletionSettings,
   OpenAIEmbeddingModel,
   OpenAIEmbeddingSettings,
+  OpenAIImageModel,
+  OpenAIImageSettings,
+  OpenAIResponsesLanguageModel,
 } from '@ai-sdk/openai/internal';
 import {
   EmbeddingModelV1,
   LanguageModelV1,
   ProviderV1,
+  ImageModelV1,
 } from '@ai-sdk/provider';
 import { FetchFunction, loadApiKey, loadSetting } from '@ai-sdk/provider-utils';
 
@@ -30,6 +34,11 @@ Creates an Azure OpenAI chat model for text generation.
   chat(deploymentId: string, settings?: OpenAIChatSettings): LanguageModelV1;
 
   /**
+Creates an Azure OpenAI responses API model for text generation.
+   */
+  responses(deploymentId: string): LanguageModelV1;
+
+  /**
 Creates an Azure OpenAI completion model for text generation.
    */
   completion(
@@ -44,6 +53,20 @@ Creates an Azure OpenAI completion model for text generation.
     deploymentId: string,
     settings?: OpenAIEmbeddingSettings,
   ): EmbeddingModelV1<string>;
+
+  /**
+   * Creates an Azure OpenAI DALL-E model for image generation.
+   * @deprecated Use `imageModel` instead.
+   */
+  image(deploymentId: string, settings?: OpenAIImageSettings): ImageModelV1;
+
+  /**
+   * Creates an Azure OpenAI DALL-E model for image generation.
+   */
+  imageModel(
+    deploymentId: string,
+    settings?: OpenAIImageSettings,
+  ): ImageModelV1;
 
   /**
 @deprecated Use `textEmbeddingModel` instead.
@@ -123,11 +146,19 @@ export function createAzure(
       description: 'Azure OpenAI resource name',
     });
 
-  const apiVersion = options.apiVersion ?? '2024-10-01-preview';
-  const url = ({ path, modelId }: { path: string; modelId: string }) =>
-    options.baseURL
+  const apiVersion = options.apiVersion ?? '2025-03-01-preview';
+  const url = ({ path, modelId }: { path: string; modelId: string }) => {
+    if (path === '/responses') {
+      return options.baseURL
+        ? `${options.baseURL}${path}?api-version=${apiVersion}`
+        : `https://${getResourceName()}.openai.azure.com/openai/responses?api-version=${apiVersion}`;
+    }
+
+    // Default URL format for other endpoints
+    return options.baseURL
       ? `${options.baseURL}/${modelId}${path}?api-version=${apiVersion}`
       : `https://${getResourceName()}.openai.azure.com/openai/deployments/${modelId}${path}?api-version=${apiVersion}`;
+  };
 
   const createChatModel = (
     deploymentName: string,
@@ -164,6 +195,25 @@ export function createAzure(
       fetch: options.fetch,
     });
 
+  const createResponsesModel = (modelId: string) =>
+    new OpenAIResponsesLanguageModel(modelId, {
+      provider: 'azure-openai.responses',
+      url,
+      headers: getHeaders,
+      fetch: options.fetch,
+    });
+
+  const createImageModel = (
+    modelId: string,
+    settings: OpenAIImageSettings = {},
+  ) =>
+    new OpenAIImageModel(modelId, settings, {
+      provider: 'azure-openai.image',
+      url,
+      headers: getHeaders,
+      fetch: options.fetch,
+    });
+
   const provider = function (
     deploymentId: string,
     settings?: OpenAIChatSettings | OpenAICompletionSettings,
@@ -181,9 +231,11 @@ export function createAzure(
   provider.chat = createChatModel;
   provider.completion = createCompletionModel;
   provider.embedding = createEmbeddingModel;
+  provider.image = createImageModel;
+  provider.imageModel = createImageModel;
   provider.textEmbedding = createEmbeddingModel;
   provider.textEmbeddingModel = createEmbeddingModel;
-
+  provider.responses = createResponsesModel;
   return provider;
 }
 

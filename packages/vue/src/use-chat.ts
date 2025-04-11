@@ -104,7 +104,7 @@ export type UseChatHelpers = {
 };
 
 // @ts-expect-error - some issues with the default export of useSWRV
-const useSWRV = (swrv.default as typeof import('swrv')['default']) || swrv;
+const useSWRV = (swrv.default as (typeof import('swrv'))['default']) || swrv;
 const store: Record<string, UIMessage[] | undefined> = {};
 
 export function useChat(
@@ -423,6 +423,11 @@ export function useChat(
     });
 
     mutate(currentMessages);
+
+    // when the request is ongoing, the auto-submit will be triggered after the request is finished
+    if (status.value === 'submitted' || status.value === 'streaming') {
+      return;
+    }
 
     // auto-submit when all tool calls in the last assistant message have results:
     const lastMessage = currentMessages[currentMessages.length - 1];

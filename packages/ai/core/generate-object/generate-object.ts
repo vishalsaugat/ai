@@ -464,7 +464,9 @@ export async function generateObject<SCHEMA, RESULT>({
       let finishReason: FinishReason;
       let usage: Parameters<typeof calculateLanguageModelUsage>[0];
       let warnings: CallWarning[] | undefined;
-      let rawResponse: { headers?: Record<string, string> } | undefined;
+      let rawResponse:
+        | { headers?: Record<string, string>; body?: unknown }
+        | undefined;
       let response: LanguageModelResponseMetadata;
       let request: LanguageModelRequestMetadata;
       let logprobs: LogProbs | undefined;
@@ -478,11 +480,11 @@ export async function generateObject<SCHEMA, RESULT>({
                 outputStrategy.jsonSchema == null
                   ? injectJsonInstruction({ prompt: system })
                   : model.supportsStructuredOutputs
-                  ? system
-                  : injectJsonInstruction({
-                      prompt: system,
-                      schema: outputStrategy.jsonSchema,
-                    }),
+                    ? system
+                    : injectJsonInstruction({
+                        prompt: system,
+                        schema: outputStrategy.jsonSchema,
+                      }),
               prompt,
               messages,
             },
@@ -554,6 +556,7 @@ export async function generateObject<SCHEMA, RESULT>({
                       'No object generated: the model did not return a response.',
                     response: responseData,
                     usage: calculateLanguageModelUsage(result.usage),
+                    finishReason: result.finishReason,
                   });
                 }
 
@@ -679,6 +682,7 @@ export async function generateObject<SCHEMA, RESULT>({
                     message: 'No object generated: the tool was not called.',
                     response: responseData,
                     usage: calculateLanguageModelUsage(result.usage),
+                    finishReason: result.finishReason,
                   });
                 }
 
@@ -749,6 +753,7 @@ export async function generateObject<SCHEMA, RESULT>({
             text: result,
             response,
             usage: calculateLanguageModelUsage(usage),
+            finishReason: finishReason,
           });
         }
 
@@ -768,6 +773,7 @@ export async function generateObject<SCHEMA, RESULT>({
             text: result,
             response,
             usage: calculateLanguageModelUsage(usage),
+            finishReason: finishReason,
           });
         }
 
@@ -824,6 +830,7 @@ export async function generateObject<SCHEMA, RESULT>({
         response: {
           ...response,
           headers: rawResponse?.headers,
+          body: rawResponse?.body,
         },
         logprobs,
         providerMetadata: resultProviderMetadata,
